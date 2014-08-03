@@ -9,11 +9,13 @@ Things that will be added
 -------------------------
 
 - [x] Cleaning source (removing comments)
-- [x] #include directive
-- [x] #ifndef, #ifdef, #endif, #else - conditional evaluation
-- [x] Better working constant macros
-- [x] Macros in macros
-- [ ] Fully working functional macros
-- [ ] Code tokenization & conversion to an AST
+- [x] `#include` directive
+- [x] Branching using `#ifdef`, `#ifndef`, `#endif`, `#else`
+- [x] Constant macros with `#define`
+- [x] Function-like macros with `#define`
+- [x] Using macros in another macros
+- [ ] Code tokenization & conversion to an AST **Partially done**
+- [x] Output to file
+- [x] Verbose mode
 
 ...
