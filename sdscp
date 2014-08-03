@@ -2,8 +2,10 @@
 
 import sys
 import argparse
+import math
 
 from macros import MacroProcessor
+from tokens import Tokenizer
 
 
 parser = argparse.ArgumentParser(description='SDS-C macro preprocessor')
@@ -13,23 +15,50 @@ parser.add_argument('-o', '--output', help='The output file; If not specified, o
 
 args = parser.parse_args()
 
+def banner(text, fill='-', length=80):
+	blob = (fill*length + ' ' + text + ' ' + fill*length)
+	overlap = len(blob)-80
+	print('\n' + blob[ math.floor(overlap/2) : math.floor(-overlap/2)] + '\n')
 
-print('\n:::::: SDS-C Plus ::::::\n')
+
+
+banner('SDS-C Plus', ':')
 print('Source:', args.source)
 
 # read the file
 
 mp = MacroProcessor(args.source)
+
+print('Resolving #directives...')
+
 mp.process()
 
-
-print('\n:::::: RESOLVED SOURCE ::::::\n')
+banner('Cleaned source', '-')
 
 print( mp.get_output() )
+print()
+
+
+banner('MACROS FOUND', '-')
+
+for d in mp.get_defines().values():
+	print(d)
+
+
+print('Applying macro replacements...')
 
 mp.apply_macros()
 
-print('\n:::::: APPLIED MACROS ::::::\n')
-
+banner('OUTPUT', '-')
 print( mp.get_output() )
+print()
 
+
+print('Experimental tokenization...')
+
+banner('TOKEN TREE', '-')
+print('!!! EXPERIMENTAL !!!\n')
+
+tk = Tokenizer( mp.get_output() )
+tk.tokenize()
+tk.show()

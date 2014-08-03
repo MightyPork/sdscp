@@ -50,6 +50,8 @@ class T_Expression(CompositeToken):
 	def do_tokenize(self):
 		rd = CodeReader(self.value)
 
+		t = None
+
 		while not rd.has_end():
 			rd.consume_non_code()
 
@@ -66,8 +68,15 @@ class T_Expression(CompositeToken):
 				continue
 
 			if rd.has_paren():
+				is_expr = not isinstance(t, T_Identifier)
 				s = rd.consume_block()
 				t = T_Paren(s)
+
+				if is_expr:
+					t.set_type(ParenType.EXPR)
+				else:
+					t.set_type(ParenType.ARGS)
+
 				self.tokens.append(t)
 				continue
 
@@ -262,7 +271,7 @@ class Tokenizer:
 
 		self.tokens = []
 
-		rd = MacroReader(self.source, self.filename)
+		rd = CodeReader(self.source, self.filename)
 
 		while not rd.has_end():
 
@@ -346,6 +355,25 @@ class Tokenizer:
 
 
 		return self.tokens
+
+
+	def show(self):
+		""" Print tokens to console """
+
+		if self.tokens == None:
+			raise Esception('Not parsed yet.')
+
+		_show_tokenlist(self.tokens)
+
+
+
+def _show_tokenlist(tokens, level='\t'):
+	for tok in tokens:
+
+		print(level + str(tok))
+
+		if tok.is_composite():
+			_show_tokenlist(tok.tokenize(), level+'\t')
 
 
 

@@ -427,10 +427,9 @@ class D_Define(Token):
 
 
 	def __str__(self):
-		return type(self).__name__ + \
-			': Name = ' + self.name + \
-			', Args = ' + str(self.args) + \
-			', Body = ' + self.body
+		return  'MACRO: ' + self.name + \
+				', args = ' + str(self.args) + \
+				', replacement = ' + self.body
 
 
 	def generate(self, arguments=None):
@@ -534,17 +533,6 @@ def _load_file(filename):
 	return text
 
 
-def _show_tokenlist(tokens, level='\t'):
-	for tok in tokens:
-
-		print(level + str(tok))
-
-		if tok.is_composite():
-			_show_tokenlist(tok.tokenize(), level+'\t')
-
-
-
-
 class MacroProcessor:
 	""" Macro processor """
 
@@ -617,7 +605,7 @@ class MacroProcessor:
 
 							args = []
 							for a in t.tokens:
-								args.append(t.value)
+								args.append(a.value)
 
 							replacement = macro.generate(args)
 						else:
@@ -824,20 +812,3 @@ class MacroProcessor:
 
 		self.output = out
 
-
-
-	# def tokenize(self):
-	# 	""" Tokenize and evaluate macros """
-
-	# 	self._tk = Tokenizer(self.source, main_file)
-	# 	self.tokens = None
-	# 	self.tokens = self._tk.tokenize()
-
-
-	# def show(self):
-	# 	""" Print tokens to console """
-
-	# 	if self.tokens == None:
-	# 		raise Esception('Not parsed yet.')
-
-	# 	_show_tokenlist(self.tokens)
