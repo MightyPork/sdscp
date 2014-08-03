@@ -9,11 +9,29 @@ from tokens import Tokenizer
 
 
 parser = argparse.ArgumentParser(description='SDS-C macro preprocessor')
-parser.add_argument('source', help='The source file to process')
-parser.add_argument('-o', '--output', help='The output file; If not specified, output will be printed to console.')
 
+parser.add_argument(
+	'source',
+	help='The source file to process'
+)
+parser.add_argument(
+	'-o', '--output',
+	help='The output file; If not specified, output will be printed to console.'
+)
+parser.add_argument(
+		'-v', '--verbose',
+		action='store_true',
+		default=False,
+		help='Show various stages of the processing, for debug.'
+)
 
 args = parser.parse_args()
+
+
+SRC = args.source
+DEST = args.output
+VERBOSE = args.verbose
+
 
 def banner(text, fill='-', length=80):
 	blob = (fill*length + ' ' + text + ' ' + fill*length)
@@ -23,42 +41,52 @@ def banner(text, fill='-', length=80):
 
 
 banner('SDS-C Plus', ':')
-print('Source:', args.source)
+print('Reading file:', SRC)
 
 # read the file
 
-mp = MacroProcessor(args.source)
+mp = MacroProcessor(SRC)
 
 print('Resolving #directives...')
 
 mp.process()
 
-banner('Cleaned source', '-')
 
-print( mp.get_output() )
-print()
+if VERBOSE:
+	banner('Cleaned source', '-')
 
-
-banner('MACROS FOUND', '-')
-
-for d in mp.get_defines().values():
-	print(d)
+	print( mp.get_output() )
+	print()
+	banner('MACROS FOUND', '-')
+	for d in mp.get_defines().values():
+		print(d)
 
 
 print('Applying macro replacements...')
 
 mp.apply_macros()
 
-banner('OUTPUT', '-')
-print( mp.get_output() )
-print()
+processed = mp.get_output()
 
+if VERBOSE:
+	banner('OUTPUT', '-')
+	print(processed)
+	print()
 
-print('Experimental tokenization...')
+	print('Experimental tokenization...')
 
-banner('TOKEN TREE', '-')
-print('!!! EXPERIMENTAL !!!\n')
+	banner('TOKEN TREE', '-')
+	print('!!! EXPERIMENTAL !!!\n')
 
-tk = Tokenizer( mp.get_output() )
-tk.tokenize()
-tk.show()
+	tk = Tokenizer(processed)
+	tk.tokenize()
+	tk.show()
+
+if DEST == None:
+	banner('OUTPUT', '-')
+	print(processed)
+else:
+	print('Writing to file: %s' % DEST)
+	f = open(DEST, 'w')
+	f.write(processed)
+	f.close()
