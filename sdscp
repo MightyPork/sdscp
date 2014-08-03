@@ -1,0 +1,35 @@
+#!/bin/env python3
+
+import sys
+import argparse
+
+from macros import MacroProcessor
+
+
+parser = argparse.ArgumentParser(description='SDS-C macro preprocessor')
+parser.add_argument('source', help='The source file to process')
+parser.add_argument('-o', '--output', help='The output file; If not specified, output will be printed to console.')
+
+
+args = parser.parse_args()
+
+
+print('\n:::::: SDS-C Plus ::::::\n')
+print('Source:', args.source)
+
+# read the file
+
+mp = MacroProcessor(args.source)
+mp.process()
+
+
+print('\n:::::: RESOLVED SOURCE ::::::\n')
+
+print( mp.get_output() )
+
+mp.apply_macros()
+
+print('\n:::::: APPLIED MACROS ::::::\n')
+
+print( mp.get_output() )
+
