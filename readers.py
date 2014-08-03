@@ -10,9 +10,7 @@ class BaseReader:
 		self.filename = filename
 		self.pos = 0
 		self.length = len(source)
-		self.pos_mark = self.pos
 
-		self.savepoints = []
 
 	def near(self):
 		""" Get something near the current cursor, for error messages. """
@@ -29,7 +27,7 @@ class BaseReader:
 		near = re.sub(r'[\n\t ]+', ' ', self.text[begin:end])
 		fwd = re.sub(r'[\n\t ]+', ' ', self.text[self.pos:self.pos+20])
 
-		return '"%s", near: "%s"' % (fwd, near)
+		return '>>%s<<\nNear: >>%s<<' % (fwd, near)
 
 
 
@@ -61,23 +59,10 @@ class BaseReader:
 		column = self.pos2col(self.pos)
 
 		if self.filename == None:
-			raise SyntaxError(message + ',\nat: ' + self.near())
+			raise SyntaxError(message + '\nAt: ' + self.near())
 		else:
-			raise SyntaxError(message + ' in %s at line %d, column %d,\nat: %s' % (self.filename, lineno, column, self.near()))
+			raise SyntaxError(message + '\nIn file %s at line %d, col %d,\nAt: %s' % (self.filename, lineno, column, self.near()))
 
-
-
-	def save_pos(self):
-		""" Save current pos to be able to return to it later """
-
-		self.savepoints.append(self.pos)
-
-
-
-	def undo(self):
-		""" Go back to last saved pos """
-
-		self.pos = self.savepoints.pop()
 
 
 	def get_pos(self):
@@ -198,7 +183,7 @@ class BaseReader:
 
 		pos_begin = self.pos
 
-		while self.pos+len(end) < self.length:
+		while self.pos+len(end) <= self.length:
 
 			if self.starts(end):
 
@@ -221,7 +206,8 @@ class BaseReader:
 			self.pos = self.length
 			return self.from_pos(pos_begin)
 		else:
-			self.error('Reached end of file while looking for "%s"' % end)
+			self.pos = pos_begin
+			self.error('Expected to find %s, reached end of file.' % end)
 
 
 
@@ -393,7 +379,8 @@ class CodeReader(BaseReader):
 				else:
 					nested -= 1
 
-		self.error( 'Reached end of data while reading %s...%s block' % (opening, closing) )
+		self.move_to(pos_begin)
+		self.error( 'Unterminated %s...%s block' % (opening, closing) )
 
 
 
@@ -466,7 +453,8 @@ class CodeReader(BaseReader):
 		if eof:
 			return self.from_pos(pos_begin).strip()
 		else:
-			self.error('Reached end of data while looking for "%s".' % end)
+			self.move_to(pos_begin)
+			self.error('Expected to find %s, found End Of File.' % end)
 
 
 
@@ -480,21 +468,27 @@ class CodeReader(BaseReader):
 		quote = self.consume()
 		buffer = quote
 
+		if self.has_end():
+			self.error('Unexpected end of char literal')
+
+		if re.match(r"[\t\n]+", self.peek()):
+			self.error('Invalid char literal')
+
 		if self.peek() == '\\':
-			buffer += self.consume() # the backslash
-			buffer += self.consume()
+			buffer += self.consume(2) # the backslash & the following character
+
+		if self.peek() == "'":
+			self.error('Empty char literal.')
+
 		else:
 			char = self.consume()
 			buffer += char
-			if char == quote:
-				self.error('Empty char literal.')
-
 
 		endq = self.consume()
 		buffer += endq
 
 		if endq != quote:
-			self.error( 'Invalid char literal (expected %s, found %s)' % (quote, endq) )
+			self.error( 'Invalid char syntax (expected single quote, found %s)' % endq )
 
 		return buffer
 
@@ -511,16 +505,18 @@ class CodeReader(BaseReader):
 
 		quote = self.consume();
 
-		while self.pos < self.length:
+		while not self.has_end():
 			char = self.consume()
+			if char == '\n':
+				self.error('Unterminated string literal - must end on the same line.')
 
 			if char == '\\': # backslash
-				self.consume() # consume next character literally
+				self.consume() # consume next character also (even quote)
 
 			elif char == quote:
+				return self.from_pos(pos_begin) # end quote
 
-				return self.from_pos(pos_begin)
-
+		self.move_to(pos_begin)
 		self.error('Unterminated string literal.')
 
 
@@ -565,7 +561,7 @@ class CodeReader(BaseReader):
 
 		if self.matches(r'0x[0-9A-Fa-f]+'):
 			# hexa
-			senf.consume(2)
+			self.consume(2)
 			while self.pos < self.length:
 				if self.matches(r'[0-9A-Fa-f]'):
 					self.consume()
@@ -574,7 +570,7 @@ class CodeReader(BaseReader):
 
 		elif self.matches(r'0b[01]+'):
 			# hexa
-			senf.consume(2)
+			self.consume(2)
 			while self.pos < self.length:
 				if self.matches(r'[01]'):
 					self.consume()

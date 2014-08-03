@@ -33,6 +33,8 @@ class MacroReader(CodeReader):
 		# macro parameter list
 		if self.has_paren():
 			buffer += self.consume_block()
+		elif self.has_bracket():
+			buffer += self.consume_block()
 
 		buffer += ' '
 
@@ -229,7 +231,7 @@ class MacroReader(CodeReader):
 	def find_directive_block_end(self, can_else=True):
 		""" Find #else or #endif position """
 
-		self.save_pos()
+		pos_begin = self.pos
 
 		nest = 0
 
@@ -285,7 +287,7 @@ class MacroReader(CodeReader):
 					if nest == 0:
 						# found it
 						pos = self.pos
-						self.undo() # restore to previous pos
+						self.pos = pos_begin # restore to previous pos
 						return pos
 
 					else:
@@ -303,7 +305,7 @@ class MacroReader(CodeReader):
 					if nest == 0:
 						# found it
 						pos = self.pos
-						self.undo() # restore to previous pos
+						self.pos = pos_begin # restore to previous pos
 						return pos
 
 					else:
@@ -362,12 +364,27 @@ class D_Define(Token):
 		# get macro name
 		self.name = rd.consume_identifier()
 
+		# arraylike flag
+		self.arraylike = False
+
 		# macro parameters
 		self.args = None
+
+		print(str(rd.has_bracket()))
 
 		if rd.has_paren():
 			tmp = rd.consume_block()[1:-1] # inside the paren
 			self.args = [i.strip() for i in tmp.split(',')] # trim whitespace from arguments
+
+		elif rd.has_bracket():
+			tmp = rd.consume_block()[1:-1] # inside the bracket
+			self.args = [i.strip() for i in tmp.split(',')] # trim whitespace from arguments
+
+			if len(self.args) != 1:
+				rd.error('Array-like macro must have exactly one parameter.')
+
+			self.arraylike = True
+
 
 		rd.consume_inline_whitespace()
 
@@ -432,7 +449,14 @@ class D_Define(Token):
 				', replacement = ' + self.body
 
 
+	def is_arraylike(self):
+		""" Get if this macro is array-like """
+
+		return self.arraylike
+
+
 	def generate(self, arguments=None):
+		""" Generate replacement for given arguments """
 
 		if self.args == None:
 			if arguments != None:
@@ -486,6 +510,7 @@ class D_Include(Token):
 
 
 
+
 class D_Ifdef(Token):
 	""" #ifdef NAME """
 
@@ -502,6 +527,7 @@ class D_Ifdef(Token):
 		return type(self).__name__ + ': Name = ' + self.name
 
 
+
 class D_Ifndef(Token):
 	""" #ifndef NAME """
 
@@ -516,11 +542,6 @@ class D_Ifndef(Token):
 
 	def __str__(self):
 		return type(self).__name__ + ': Name = ' + self.name
-
-
-class D_Else(Token): pass
-
-class D_Endif(Token): pass
 
 
 
@@ -564,89 +585,9 @@ class MacroProcessor:
 		return self.output
 
 
-	def apply_macros(self):
-		""" Apply macros in the output """
-
-		if len(self.output) == 0:
-			raise Exception('There\'s no text to work with. Did you run process()?')
-
-		applied_count = 0
-
-		rd = CodeReader(self.output)
-
-		out = ''
-
-		while not rd.has_end():
-
-			junk = rd.consume_non_code()
-			if len(junk) > 0:
-				if junk.count('\n') > 0:
-					out += '\n'
-				else:
-					out += ' '
-				continue
-
-			if rd.has_identifier():
-
-				rd.save_pos()
-				ident = rd.consume_identifier()
-				if ident in self.defines:
-
-					macro = self.defines[ident]
-					applied_count += 1
-
-					try:
-						if rd.has_paren():
-							paren = rd.consume_block()
-
-							t = T_Paren(paren)
-							t.set_type(ParenType.ARGS)
-							t.tokenize()
-
-							args = []
-							for a in t.tokens:
-								args.append(a.value)
-
-							replacement = macro.generate(args)
-						else:
-							replacement = macro.generate(None)
-					except Exception as e:
-						rd.undo() # rewind to the identifier
-						rd.error(str(e))
-
-
-					out += replacement
-
-				else:
-					out += ident # give it back
-
-			# "..."
-			elif rd.has_string():
-				out += rd.consume_string()
-
-			# //...
-			elif rd.has_inline_comment():
-				rd.consume_line()
-
-			# /* ... */
-			elif rd.has_block_comment():
-				rd.consume_block_comment()
-
-			# any char...
-			else:
-				out += rd.consume()
-
-		self.output = out
-
-
-		# take care of macros in macros
-		if applied_count > 0:
-			return self.apply_macros()
-
-
 
 	def process(self):
-		""" Process all the macros in the source """
+		""" Process all the directives in the source """
 
 		rd = MacroReader(self.source, self.main_file)
 		self.built = ''
@@ -659,14 +600,14 @@ class MacroProcessor:
 
 		while not rd.has_end():
 
-			# handle whitespace
-			junk = rd.consume_non_code()
-			if len(junk) > 0:
-
-				if junk.count('\n') > 0:
-					out += '\n'
-				else:
-					out += ' '
+			# keep comments, indentation and up to two newlines
+			j = rd.consume_non_code()
+			if len(j) > 0:
+				out += re.sub(r'\n{2,}', '\n\n', j)
+				continue
+			j = rd.consume_non_code()
+			if len(j) > 0:
+				out += re.sub(r'\n{2,}', '\n\n', j)
 				continue
 
 
@@ -742,7 +683,7 @@ class MacroProcessor:
 
 
 					# remember current pos
-					rd.save_pos()
+					pp = rd.get_pos()
 
 					# let's find the end of this branch
 					endpos = rd.find_directive_block_end()
@@ -750,7 +691,7 @@ class MacroProcessor:
 
 					if rd.has_endif_directive():
 						# there is no else branch to skip
-						rd.undo() # back to saved pos
+						rd.move_to(pp) # back to saved pos
 						continue
 
 					elif rd.has_else_directive():
@@ -763,7 +704,7 @@ class MacroProcessor:
 						# remember where to skip
 						skip_dict[endpos] = endpos2
 
-						rd.undo() # back to saved pos
+						rd.move_to(pp) # back to saved pos
 						continue
 					else:
 						rd.error('Wtf?')
@@ -812,3 +753,91 @@ class MacroProcessor:
 
 		self.output = out
 
+
+
+	def apply_macros(self):
+		""" Apply macros in the output """
+
+		if len(self.output) == 0:
+			raise Exception('There\'s no text to work with. Did you run process()?')
+
+		applied_count = 0
+
+		rd = CodeReader(self.output)
+
+		out = ''
+
+		while not rd.has_end():
+
+			# keep comments, indentation and up to two newlines
+			j = rd.consume_non_code()
+			if len(j) > 0:
+				out += re.sub(r'\n{2,}', '\n\n', j)
+				continue
+
+
+			if rd.has_identifier():
+
+				ident = rd.consume_identifier()
+				if ident in self.defines:
+
+					macro = self.defines[ident]
+					applied_count += 1
+
+					if macro.is_arraylike():
+						if not rd.has_bracket():
+							rd.error('Missing [index] for array-like macro %s!' % macro.name)
+
+						bracket = rd.consume_block()[1:-1]
+						replacement = macro.generate([bracket])
+
+					elif rd.has_paren():
+						paren = rd.consume_block()
+
+						t = T_Paren(paren)
+						t.set_type(ParenType.ARGS)
+						t.tokenize()
+
+						args = []
+						for a in t.tokens:
+							args.append(a.value)
+
+						replacement = macro.generate(args)
+					else:
+						replacement = macro.generate(None)
+
+
+					out += replacement
+
+				else:
+					out += ident # give it back
+
+			# "...", and "sdgfsd""JOINED"  "This too"
+			elif rd.has_string():
+				# handle string concatenation
+				s = ''
+				while rd.has_string():
+					s += rd.consume_string()[1:-1] # drop quotes
+					rd.consume_non_code()
+
+				out += '"%s"' % s
+
+
+			# //...
+			elif rd.has_inline_comment():
+				rd.consume_line()
+
+			# /* ... */
+			elif rd.has_block_comment():
+				rd.consume_block_comment()
+
+			# any char...
+			else:
+				out += rd.consume()
+
+		self.output = out
+
+
+		# take care of macros in macros
+		if applied_count > 0:
+			return self.apply_macros()

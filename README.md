@@ -5,17 +5,31 @@ The goal of this project is to enable better coding practices and more powerful 
 
 It takes a SDS-C Plus source code, and digests it into a format compatible with the official SDS-C compiler (that is, ugly code).
 
-Things that will be added
--------------------------
+Available Features
+------------------
 
-- [x] Cleaning source (removing comments)
-- [x] `#include` directive
-- [x] Branching using `#ifdef`, `#ifndef`, `#endif`, `#else`
-- [x] Constant macros with `#define`
-- [x] Function-like macros with `#define`
-- [x] Using macros in another macros
-- [ ] Code tokenization & conversion to an AST **Partially done**
-- [x] Output to file
-- [x] Verbose mode
+- Cleaning source (removing comments)
+- `#include` directive
+- Branching using `#ifdef`, `#ifndef`, `#endif`, `#else`
+- Constant macros with `#define`
+- Function-like macros with `#define`
+- Using macros in another macros
+- Output to file
+- Verbose mode
+- Code tokenization (partial)
 
-...
+
+Planned Features
+----------------
+
+- Conversion to an Abstract Syntax Tree
+- Extra control structures
+  - `FOR`
+  - `WHILE`
+  - `UNTIL`
+  - `SWITCH`
+  - `IF_ELSEIF_ELSE`
+- Stack in `ram[]`
+- Return value, Arguments
+- Local variables (keeping variable value after function call)
+- New way of implementing functions using `goto`, labels and a redirection vector

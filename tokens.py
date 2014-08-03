@@ -41,8 +41,38 @@ class CompositeToken(Token):
 	def is_composite(self):
 		return True
 
+	def __str__(self):
+		return type(self).__name__
 
-class T_Identifier(Token): pass
+
+
+class T_Name(Token): pass
+
+
+class T_Comma(Token): pass
+
+
+class T_Semicolon(Token): pass
+
+
+class T_String(Token): pass
+
+
+class T_Char(Token): pass
+
+
+class T_Number(Token): pass
+
+
+class T_Operator(Token): pass
+
+
+class T_Label(Token): pass
+
+
+class T_Assign(Token): pass
+
+
 
 
 class T_Expression(CompositeToken):
@@ -57,7 +87,7 @@ class T_Expression(CompositeToken):
 
 			if rd.has_identifier():
 				s = rd.consume_identifier()
-				t = T_Identifier(s)
+				t = T_Name(s)
 				self.tokens.append(t)
 				continue
 
@@ -68,7 +98,7 @@ class T_Expression(CompositeToken):
 				continue
 
 			if rd.has_paren():
-				is_expr = not isinstance(t, T_Identifier)
+				is_expr = not isinstance(t, T_Name)
 				s = rd.consume_block()
 				t = T_Paren(s)
 
@@ -108,25 +138,13 @@ class T_Expression(CompositeToken):
 
 
 
-class T_Number(Token): pass
-
-
-class T_Operator(Token): pass
-
-
-class T_Label(Token): pass
-
-
-class T_AssignmentOperator(Token): pass
-
-
 class T_Rvalue(CompositeToken):
 
 	def do_tokenize(self):
 		rd = CodeReader( self.value )
 
 		s = rd.consume_until(end='=')
-		t = T_AssignmentOperator(s)
+		t = T_Assign(s)
 		self.tokens.append(t)
 
 		s = rd.consume_all()
@@ -209,7 +227,7 @@ class T_Paren(CompositeToken):
 
 
 	def __str__(self):
-		return type(self).__name__ + ': Type = ' + str(self.type) + ', ' + self.value
+		return type(self).__name__ + ' (' + str(self.type) + ')' + ['',', ' + self.value][self.type == ParenType.UNKNOWN]
 
 
 
@@ -239,15 +257,6 @@ class T_CodeBlock(CompositeToken):
 	def do_tokenize(self):
 		rd = Tokenizer( self.value[1:-1] )
 		self.tokens = rd.tokenize()
-
-
-class T_String(Token): pass
-
-
-class T_Char(Token): pass
-
-
-class T_StatementEnd(Token): pass
 
 
 
@@ -295,7 +304,7 @@ class Tokenizer:
 			elif rd.has_identifier():
 
 				s = rd.consume_identifier()
-				t = T_Identifier(s)
+				t = T_Name(s)
 				self.tokens.append(t)
 
 
@@ -339,6 +348,14 @@ class Tokenizer:
 				self.tokens.append(t)
 
 
+			# 123
+			elif rd.has_number():
+
+				s = rd.consume_number()
+				t = T_Number(s)
+				self.tokens.append(t)
+
+
 			# 'c'
 			elif rd.has_char():
 
@@ -347,11 +364,22 @@ class Tokenizer:
 				self.tokens.append(t)
 
 
-			# some statement
-			else:
-				s = rd.consume_code()
-				t = T_StatementEnd(s)
+			# , (eg. var foo, bar;)
+			elif rd.starts(','):
+
+				s = rd.consume()
+				t = T_Comma(s)
 				self.tokens.append(t)
+
+
+			# some statement
+			elif rd.starts(';'):
+				s = rd.consume()
+				t = T_Semicolon(s)
+				self.tokens.append(t)
+
+			else:
+				rd.error('Unexpected syntax.')
 
 
 		return self.tokens
@@ -367,13 +395,13 @@ class Tokenizer:
 
 
 
-def _show_tokenlist(tokens, level='\t'):
+def _show_tokenlist(tokens, level='  '):
 	for tok in tokens:
 
 		print(level + str(tok))
 
 		if tok.is_composite():
-			_show_tokenlist(tok.tokenize(), level+'\t')
+			_show_tokenlist(tok.tokenize(), level+'  ')
 
 
 

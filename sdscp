@@ -3,10 +3,14 @@
 import sys
 import argparse
 import math
+import re
+import traceback
 
 from macros import MacroProcessor
 from tokens import Tokenizer
+from readers import CodeReader
 
+# ==================== Command Line Arguments processing =======================
 
 parser = argparse.ArgumentParser(description='SDS-C macro preprocessor')
 
@@ -33,60 +37,183 @@ DEST = args.output
 VERBOSE = args.verbose
 
 
+# ==================== Utils =======================
+
+
 def banner(text, fill='-', length=80):
+	""" Show a banner line """
 	blob = (fill*length + ' ' + text + ' ' + fill*length)
 	overlap = len(blob)-80
 	print('\n' + blob[ math.floor(overlap/2) : math.floor(-overlap/2)] + '\n')
 
 
 
-banner('SDS-C Plus', ':')
-print('Reading file:', SRC)
+def prepare_for_sdsc(code):
+	""" Do some finishing touches to the syntax """
+	rd = CodeReader(code)
 
-# read the file
+	out = ''
 
-mp = MacroProcessor(SRC)
+	while not rd.has_end():
 
-print('Resolving #directives...')
+		if rd.has_inline_comment():
+			out += rd.consume_inline_comment()
+			continue
 
-mp.process()
+		elif rd.has_block_comment():
+			out += rd.consume_block_comment()
+			continue
+
+		elif rd.has_string():
+			# collect whole string
+			# convert quotes to apos
+			s = rd.consume_string()
+			s = s[1:-1]
+
+			if s.count("'") > 0:
+				raise SyntaxError('Sorry, SDS-C compiler is TOO STUPID to handle \' in string.')
+
+			s = re.sub(r'\\"', '"', s)
+
+			out += "'%s'" % s
+			continue
+
+		elif rd.has_char():
+			# collect whole char literal
+			out += rd.consume_char()
+			continue
+
+		elif rd.has_identifier():
+			# remove empty paren after function name
+			out += rd.consume_identifier()
+			out += rd.consume_whitespace()
+
+			if rd.has_paren():
+				pp = rd.get_pos()
+				paren = rd.consume_block()
+
+				if re.match(r'\(\s*\)', paren):
+					after = rd.consume_whitespace()
+					if rd.has_code_block():
+						# omit the empty paren
+						out += after
+					else:
+						out += paren
+						out += after
+				else:
+					rd.move_to(pp) # go back
+
+			elif rd.has_bracket():
+				# collect whole bracket
+
+				br = rd.consume_block()
+				br_in = br[1:-1].strip()
+
+				if re.match(r'^\([a-zA-Z_][a-zA-Z0-9_]*\)$', br_in):
+					br_in = br_in[1:-1]
+				elif re.match(r'^\((?:0x|0b)?[0-9]+\)$', br_in):
+					br_in = br_in[1:-1]
+				elif re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', br_in):
+					pass
+				elif re.match(r'^(?:0x|0b)?[0-9]+$', br_in):
+					pass
+				else:
+					raise SyntaxError('Sorry, %s appears to be invalid array index for SDS-C.' % br_in)
+
+				out += '[%s]' % br_in
+
+			continue
+
+		else:
+			# any other char is just used the same
+			out += rd.consume()
+
+	return out
 
 
-if VERBOSE:
-	banner('Cleaned source', '-')
 
-	print( mp.get_output() )
-	print()
-	banner('MACROS FOUND', '-')
-	for d in mp.get_defines().values():
-		print(d)
+# ==================== MAIN TASK =======================
+
+try:
+
+	banner('SDS-C Plus', ':')
+
+	print('Reading file:', SRC)
+
+	# read the file
+	mp = MacroProcessor(SRC)
 
 
-print('Applying macro replacements...')
 
-mp.apply_macros()
+	# ---------------- Resolve directives ------------------
+	print('Resolving #directives...')
 
-processed = mp.get_output()
 
-if VERBOSE:
-	banner('OUTPUT', '-')
+	# include files, resolve branching, find macros...
+	mp.process()
+
+
+	if VERBOSE:
+		banner('Cleaned source', '-')
+
+		print( mp.get_output() )
+		print()
+		banner('MACROS FOUND', '-')
+		for d in mp.get_defines().values():
+			print(d)
+
+
+
+	# -------------------- Apply macros --------------------
+	print('Applying macro replacements...')
+
+
+	# perform macro replacements
+	mp.apply_macros()
+	# get output code
+	processed = mp.get_output()
+
+
+	banner('PROCESSED', '-')
 	print(processed)
-	print()
 
-	print('Experimental tokenization...')
 
-	banner('TOKEN TREE', '-')
-	print('!!! EXPERIMENTAL !!!\n')
+	# perform tweaks to match some of SDS-C's broken syntax
+	for_sds = prepare_for_sdsc(processed)
 
-	tk = Tokenizer(processed)
-	tk.tokenize()
-	tk.show()
 
-if DEST == None:
-	banner('OUTPUT', '-')
-	print(processed)
-else:
-	print('Writing to file: %s' % DEST)
-	f = open(DEST, 'w')
-	f.write(processed)
-	f.close()
+	banner('CODE FOR SDS-C', '-')
+	print(for_sds+'\n')
+
+	if DEST != None:
+		print('Writing to file: %s' % DEST)
+		f = open(DEST, 'w')
+		f.write(for_sds)
+		f.close()
+
+
+
+	# if VERBOSE:
+	# 	banner('EXPERIMENTAL TOKEN TREE (from processed)', '-')
+	# 	print('Experimental tokenization of the code:\n')
+
+	# 	tk = Tokenizer(processed)
+	# 	tk.tokenize()
+	# 	tk.show()
+
+
+	print('\nDone.\n')
+
+except SyntaxError as e:
+	banner('SYNTAX ERROR', '#')
+	type_, value_, traceback_ = sys.exc_info()
+	ex = traceback.format_exception(type_, value_, traceback_)
+	for line in ex:
+		# discard useless junk
+		if 'raise SyntaxError' in line:
+			continue
+		if 'File "<string>", line None' in line:
+			continue
+
+		print(line)
+

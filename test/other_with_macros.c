@@ -1,2 +1,0 @@
-
-#define MiXED_CaSE_iS_OKaY 123456789
