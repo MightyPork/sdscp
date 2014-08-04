@@ -1,4 +1,6 @@
-# SDS-C Plus
+# SDSCP - an external SDS-C preprocessor
+
+**This is a free software, using GPL v2**
 
 The goal of this project is to enable better coding practices and more powerful features in the SDS-C scripting language.
 
