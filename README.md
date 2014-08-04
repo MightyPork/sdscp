@@ -59,7 +59,8 @@ change_mode()
 
     $ sdscp -c project/main.c out/project.c
 
-**Ready for deployment!**
+
+**Ready for SDS!**
 
 ```c
 change_mode
