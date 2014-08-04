@@ -366,7 +366,7 @@ test()
 
 
 	// SYNTAX ERROR
-	// (you got semicilon in the middle of echo())
+	// (you got semicolon in the middle of echo())
 	echo( RELAY[5] );
 	// ->
 	//    echo(
