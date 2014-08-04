@@ -212,7 +212,7 @@ The point is that you don't have to worry about including a file multiple times 
 
 One of the main problems with SDS-C is that all has to be in single source file.
 
-Such file tends to be very long and hard to work with. Includes to the rescue!
+Such file tends to be very long and hard to work with. **Includes to the rescue!**
 
 ```c
 #include "constants.c"
@@ -227,7 +227,10 @@ If the included file does something stupid, it will have effect on the main file
 
 #### Define and # branching
 
-Define lets you create flags for branching with `#ifdef` and `#ifndef`:
+Define lets you create flags for branching with `#ifdef` and `#ifndef`.
+
+A flag is true if (a) it has no value, or (b) it's value is not 0.
+That means you can set value to 0 to disable a flag, instead of commenting it out (which is less readable).
 
 ```c
 
@@ -371,18 +374,4 @@ test()
 
 ...obviously works, unlike in SDS-C.
 
-Check this:
-
-```c
-// --- some huge library file ---
-// ...
-#define RELAY1 sys[231]
-
-// --- application file ---
-#define GARAGE RELAY1
-
-// ...
-
-GARAGE = 1; // open door
-// -> sys[231] = 1;
-```
+This is shown in the example at the very top.

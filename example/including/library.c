@@ -1,7 +1,6 @@
 #ifndef LIBRARY_C_INCLUDED // <-- Include guards
 #define LIBRARY_C_INCLUDED
 
-
 // --- library file ---
 
 // This file will be included in main.c

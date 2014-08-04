@@ -59,7 +59,7 @@ class MacroReader(CodeReader):
 					last_was_backslash = False
 					continue
 				else:
-					return buffer
+					return buffer.strip()
 
 
 			if self.has_block_comment():
@@ -92,7 +92,7 @@ class MacroReader(CodeReader):
 					continue
 				else:
 					# end of macro
-					return buffer
+					return buffer.strip()
 			else:
 				# this char is valid but not backslash -> the backlash wasnt special
 				last_was_backslash = False
@@ -706,9 +706,13 @@ class MacroProcessor:
 					s = rd.consume_ifndef_directive()
 					d = D_Ifndef(s)
 
-				if positive == (d.name in self.defines):
-					# is defined
+				defined = (d.name in self.defines)
+				if defined:
+					defined = (self.defines[d.name].body != '0')
+					print('Macro %s value %s' % (d.name, self.defines[d.name].body) )
 
+				if positive == defined:
+					# is defined
 
 					# remember current pos
 					pp = rd.get_pos()
