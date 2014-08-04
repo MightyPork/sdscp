@@ -60,7 +60,7 @@ change_mode()
 
 **Process by SDSCP**
 
-   $ ./sdscp -c project/main.c out/project.c
+    $ ./sdscp -c project/main.c out/project.c
 
 **Ready for deployment!**
 
