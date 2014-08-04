@@ -96,7 +96,7 @@ It has to be compiled using a very bad proprietary compiler.
 - Except string literals. But you can't store them or do anything with them.
 - String literals use single quotes. And don't support escapes - no way to print `'`
 - There is almost no support for `++` and `--`
-- The authors apparently never heard of ternary operator ('<cond> ? <then> : <else>`)
+- The authors apparently never heard of ternary operator (`<cond> ? <then> : <else>`)
 - Can't create array variables.
 - Can't use expression as array index, only variable or number.
 - Tab in `#define` is syntax error
