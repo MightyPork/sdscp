@@ -9,14 +9,25 @@ It takes a SDS-C Plus source code, and digests it into a format compatible with 
 *library.c*
 
 ```c
+#ifndef LIBRARY_C_INCLUDED // <-- Include guards
+#define LIBRARY_C_INCLUDED
+
 #define RELAY1 sys[231]
 #define RELAY2 sys[232]
 
-#define ON 1
-#define OFF 0
+#define ON	1
+#define OFF	0
 
-#define isOn(what) ((what) != OFF)  // parenthesis for safety
+#define isOn(what) ((what) != OFF)             // parenthesis for safety
 #define setTo(what, value) what = (value)
+
+library_function()
+{
+	echo("Hello.");
+}
+
+#endif
+
 ```
 
 *main.c*
@@ -24,16 +35,16 @@ It takes a SDS-C Plus source code, and digests it into a format compatible with 
 ```c
 
 // including the library file
-#include "library.c" // <--
+#include "library.c"
 
-// using macros in other macros
+// We can use macros from library now
+
 #define heating		RELAY1
 #define ventilator 	RELAY2
 
-#define on(x) setTo(x, 1)
-#define off(x) setTo(x, 0)
+#define on(x)	setTo(x, 1)
+#define off(x)	setTo(x, 0)
 
-// function with parentheses (looks better)
 change_mode()
 {
 	if (isOn(heating)) {
@@ -44,6 +55,7 @@ change_mode()
 		on(heating);
 	}
 }
+
 ```
 
 *Output for SDS-C*
