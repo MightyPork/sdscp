@@ -28,6 +28,12 @@ parser.add_argument(
 		default=False,
 		help='Show various stages of the processing, for debug.'
 )
+parser.add_argument(
+		'-x', '--experimental',
+		action='store_true',
+		default=False,
+		help='Enable experimental features.'
+)
 
 args = parser.parse_args()
 
@@ -35,6 +41,7 @@ args = parser.parse_args()
 SRC = args.source
 DEST = args.output
 VERBOSE = args.verbose
+EXPERIMENTAL = args.experimental
 
 
 # ==================== Utils =======================
@@ -193,13 +200,13 @@ try:
 
 
 
-	# if VERBOSE:
-	# 	banner('EXPERIMENTAL TOKEN TREE (from processed)', '-')
-	# 	print('Experimental tokenization of the code:\n')
+	if EXPERIMENTAL:
+		banner('EXPERIMENTAL TOKEN TREE (from processed)', '-')
+		print('Experimental tokenization of the code:\n')
 
-	# 	tk = Tokenizer(processed)
-	# 	tk.tokenize()
-	# 	tk.show()
+		tk = Tokenizer(processed)
+		tk.tokenize()
+		tk.show()
 
 
 	print('\nDone.\n')

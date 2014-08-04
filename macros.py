@@ -241,6 +241,9 @@ class MacroReader(CodeReader):
 
 			self.consume_non_code() # comments and whitespace
 
+			if self.has_end():
+				break
+
 			if not self.has_directive():
 
 				if self.has_string():
@@ -256,12 +259,10 @@ class MacroReader(CodeReader):
 
 			else:
 				if self.has_define_directive():
-					nest += 1
 					self.consume_define_directive()
 
 				elif self.has_include_directive():
-					nest += 1
-					self.consume_define_directive()
+					self.consume_include_directive()
 
 				elif self.has_ifdef_directive():
 					nest += 1
@@ -300,7 +301,6 @@ class MacroReader(CodeReader):
 
 
 				elif self.has_endif_directive():
-
 
 					if nest == 0:
 						# found it
@@ -374,11 +374,19 @@ class D_Define(Token):
 
 		if rd.has_paren():
 			tmp = rd.consume_block()[1:-1] # inside the paren
-			self.args = [i.strip() for i in tmp.split(',')] # trim whitespace from arguments
+			self.args = []
+			for i in tmp.split(','):
+				i = i.strip()
+				if len(i) > 0:
+					self.args.append(i)
 
 		elif rd.has_bracket():
 			tmp = rd.consume_block()[1:-1] # inside the bracket
-			self.args = [i.strip() for i in tmp.split(',')] # trim whitespace from arguments
+			self.args = []
+			for i in tmp.split(','):
+				i = i.strip()
+				if len(i) > 0:
+					self.args.append(i)
 
 			if len(self.args) != 1:
 				rd.error('Array-like macro must have exactly one parameter.')
