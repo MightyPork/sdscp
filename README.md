@@ -358,28 +358,27 @@ var a; // temporary variable
 
 test()
 {
-	// works fine
+	// Works fine
 	RELAY[6] = 1;
 	// ->
-	//    a = 231+((6)-1);
-	//    sys[a] = 1;
+	//    a = 231+((6)-1);    // Assign address to a temporary variable
+	//    sys[a] = 1;         // assign the value
 
 
-	// SYNTAX ERROR
-	// (you got semicolon in the middle of echo())
+	// Does not work
 	echo( RELAY[5] );
 	// ->
 	//    echo(
-	//      a = 231+((5)-1); // <-- BAD
+	//      a = 231+((5)-1);  // statement inside echo
 	//      sys[a]
 	//    );
 
-	// TOTAL NONSENSE
+	// Neither does this
 	foo = RELAY[6] + RELAY[2];
 	// ->
-	//    foo = a = 231+((6)-1);
-	//    sys[a] + a = 231+((2)-1);
-	//    sys[a];
+	//    foo = a = 231+((6)-1);    // I doubt SDS-C can handle this
+	//    sys[a] + a = 231+((2)-1); // This doesn't even make any sense
+	//    sys[a];                   // Neither does this
 }
 ```
 
