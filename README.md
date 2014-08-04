@@ -58,9 +58,7 @@ change_mode()
 
 ```
 
-** Run it through SDSCP -> ***
-
-*Output for SDS-C*
+** Processed by SDSCP - ready for SDS-C **
 
 ```c
 change_mode
