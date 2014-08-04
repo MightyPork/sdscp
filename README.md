@@ -16,7 +16,7 @@ That means that macro is not defined above it's `#define` directive, and it is d
 
 This can be used for the Include Guards:
 
-```
+```c
 #ifndef UTILS_INCLUDED
 #define UTILS_INCLUDED
 
@@ -36,7 +36,7 @@ One of the main problems with SDS-C is that all has to be in single source file.
 
 Such file tends to be very long and hard to work with. Includes to the rescue!
 
-```
+```c
 #include "constants.c"
 #include "folder/other_file.c"
 ```
@@ -51,13 +51,11 @@ If the included file does something stupid, it will have effect on the main file
 
 Define lets you create flags for branching with `#ifdef` and `#ifndef`:
 
-```
+```c
 #define DO_STUFF
 // #define BE_LAZY
 
-
 // later...
-
 
 #ifdef DO_STUFF
 	// stuff
@@ -83,7 +81,7 @@ You can use `#define <name> <value>` to create constants.
 
 *NOTE: SDSCP does **not** force you to use uppercase.*
 
-```
+```c
 #define GARAGE_DOOR sys[231]
 
 #define Dog "Kitten"
@@ -108,7 +106,7 @@ When you add parenthesis to the macro name, it becomes a function-like macro.
 
 A function-like macro can contain some calculation, or a piece of code:
 
-```
+```c
 #define TWICE(what) (2 * (what) )
 ```
 
@@ -116,7 +114,7 @@ Notice how the whole macro, and the argument's occurences are parenthesised.
 
 Why?
 
-```
+```c
 #define TWICE_BAD(what) 2*what
 #define TWICE_GOOD(what) (2*(what))
 
@@ -129,7 +127,7 @@ var Good = TWICE_GOOD(10+10)^3;
 
 Function-like macros can span multiple lines:
 
-```
+```c
 var LONG_MACRO()  do_simething();      \   // <-- backslash wraps a line
                   more_stuff();        \      /* comments here are ignored */
                   almost_done();       \
@@ -140,7 +138,7 @@ var LONG_MACRO()  do_simething();      \   // <-- backslash wraps a line
 
 They are pretty much the same like function-like macros, except they must take EXACTLY one parameter, and use square brackets:
 
-```
+```c
 #define SQUARES[index]  ((index)*(index)) // Fake array of squares
 
 var foo = SQUARES[100];
@@ -149,7 +147,7 @@ var foo = SQUARES[100];
 
 This can be used to alias the `sys[]` array:
 
-```
+```c
 #define RELAY[n] sys[231+((n)-1)]
 
 test()
@@ -164,7 +162,7 @@ That will be taken care of in some future version of SDSCP.
 
 For now, all you can do is this, but it's broken:
 
-```
+```c
 var a; // temporary variable
 #define RELAY[n] a = 231+((n)-1); \
                  sys[a]
@@ -191,7 +189,7 @@ test()
 
 Check this:
 
-````
+```c
 // --- some huge library file ---
 // ...
 #define RELAY1 sys[231]
