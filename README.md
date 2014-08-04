@@ -187,7 +187,12 @@ Note, that until all files are connected, the evaluation is linear.
 
 That means that macro is not defined above it's `#define` directive, and it is defined all the way below it. Included files can see all already defined macros.
 
-This can be used for the Include Guards:
+However, once the files are connected, the definition order no longer matters.
+
+If you re-define a macro, the later definition will have effect (that is, until macro overloading is implemented)
+
+
+The linear nature of the concatenation phase can be used to make so Include Guards:
 
 ```c
 #ifndef UTILS_INCLUDED
@@ -200,7 +205,7 @@ This can be used for the Include Guards:
 
 Such file can still be included multiple times, but will be evaluated only the first time.
 
-This is the same as with real C header files.
+The point is that you don't have to worry about including a file multiple times by accident - the later includes won't have any effect on the output.
 
 
 #### Include directive
