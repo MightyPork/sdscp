@@ -160,7 +160,7 @@ sdscp source.c
 # store the output to a file (ready to be pasted in SDS-C)
 sdscp source.c -o outfile.c
 
-# clean the code (remove comments and extra newlines)
+# clean the produced code (remove comments and extra newlines)
 sdscp source.c -c
 
 # verbose mode (show extra info - eg. list of all macros)
