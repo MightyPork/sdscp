@@ -6,9 +6,9 @@ It takes a SDS-C Plus source code, and digests it into a format compatible with 
 
 **Example of SDSCP in action**
 
-*library.c*
-
 ```c
+// File library.c
+
 #ifndef LIBRARY_C_INCLUDED // <-- Include guards
 #define LIBRARY_C_INCLUDED
 
@@ -27,12 +27,10 @@ library_function()
 }
 
 #endif
-
 ```
 
-*main.c*
-
 ```c
+// File main.c
 
 // including the library file
 #include "library.c"
@@ -55,12 +53,11 @@ change_mode()
 		on(heating);
 	}
 }
-
 ```
 
 **Process by SDSCP**
 
-    $ ./sdscp -c project/main.c out/project.c
+    $ sdscp -c project/main.c out/project.c
 
 **Ready for deployment!**
 
