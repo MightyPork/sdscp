@@ -1,6 +1,6 @@
 # SDSCP - a SDS-C preprocessor
 
-*SDSCP is a free software, using GPL v2*
+*SDSCP is free software, available under GPL v2*
 
 **Table of Contents**
 
