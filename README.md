@@ -29,7 +29,7 @@ I won't go as far as saying "everything", but it'd be pretty close.
 - Can't use `++` and `--` in expression
 - Strings use single quotes. And don't support escapes - no way to print `'`
 - Tab in `#define` is syntax error
-- The compiler often and gives useless error messages.
+- The compiler usually gives meaningless error messages.
 
 
 **= Dumb limitations =**
