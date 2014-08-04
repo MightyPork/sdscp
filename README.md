@@ -238,13 +238,11 @@ Define lets you create flags for branching with `#ifdef` and `#ifndef`:
 
 func()
 {
-
 #ifdef DO_STUFF
 	stuff();
 #else
 	something_else();
 #endif
-
 }
 
 
@@ -278,7 +276,6 @@ main()
 	// ...
 	print("Hot" Dog);
 	// -> print("HotKitten") /* lol */
-
 }
 ```
 
