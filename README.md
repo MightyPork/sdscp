@@ -317,7 +317,7 @@ Function-like macros can span multiple lines:
 #define LONG_MACRO()  do_simething();      \   // <-- backslash wraps a line
                       more_stuff();        \      /* comments here are ignored */
                       almost_done();       \
-                      print("It's done!")      // <-- no semicolon
+                      print("It's done!")      // <-- no semicolon, to allow syntax like LONG_MACRO();
 ```
 
 #### Array-like macros
@@ -331,7 +331,10 @@ var foo = SQUARES[100];
 // -> var foo = ((100)*(100));
 ```
 
-This can be used to alias the `sys[]` array:
+Array-like macros can work as access to some other array, or a virtual table of values.
+Placing statements in an array-like macro is generally a bad idea
+
+Typical array-like macro usage - alias to a part of the `sys[]` array:
 
 ```c
 #define RELAY[n] sys[231+((n)-1)]
@@ -343,33 +346,46 @@ test()
 }
 ```
 
-However, this will not work (yet), since SDS-C can't have expression as array index.
+However, this **will not work (yet)**, since SDS-C can't handle expression as array index.
 That will be taken care of in some future version of SDSCP.
 
 For now, all you can do is this, but it's broken:
 
 ```c
 var a; // temporary variable
-#define RELAY[n] a = 231+((n)-1); \
+#define RELAY[n] a = 231+((n)-1); \  // <-- see the statement? That's not good.
                  sys[a]
 
 test()
 {
 	// works fine
 	RELAY[6] = 1;
-	// -> a = 231+((6)-1); sys[a] = 1;
+	// ->
+	//    a = 231+((6)-1);
+	//    sys[a] = 1;
+
 
 	// SYNTAX ERROR
+	// (you got semicilon in the middle of echo())
 	echo( RELAY[5] );
-	// -> echo( a = 231+((5)-1); sys[a] );
+	// ->
+	//    echo(
+	//      a = 231+((5)-1); // <-- BAD
+	//      sys[a]
+	//    );
 
-	// TOTAL DISASTER
-	foo = RELAY[6] + RELAY[2] ;
-	// -> foo = a = 231+((6)-1); sys[a] + a = 231+((2)-1); sys[a] ;
+	// TOTAL NONSENSE
+	foo = RELAY[6] + RELAY[2];
+	// ->
+	//    foo = a = 231+((6)-1);
+	//    sys[a] + a = 231+((2)-1);
+	//    sys[a];
 }
 ```
 
-#### Using macros in another macros
+Conclusion? Be careful with macros - in general.
+
+#### Using macros in other macros
 
 ...obviously works, unlike in SDS-C.
 
