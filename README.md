@@ -7,7 +7,7 @@ It takes a SDS-C Plus source code, and digests it into a format compatible with 
 
 ## What is SDS-C anyway?
 
-SDS-C is a scripting language for SDS devices.
+SDS-C is a scripting language for SDS devices - see the [website](wiki.merenienergie.cz/index.php/Sdsc_sysf).
 
 It has to be compiled using a very bad proprietary compiler.
 
@@ -37,7 +37,7 @@ It has to be compiled using a very bad proprietary compiler.
 
 It's not that SDS could not handle better language / features - the limitations are artificial.
 
-The compiler is simply **TOTALLY STUPID**.
+The compiler is, frankly, **ABSOLUTELY STUPID**.
 
 
 ## Goals of SDSCP
