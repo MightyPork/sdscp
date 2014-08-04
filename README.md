@@ -7,7 +7,7 @@ It takes a SDS-C Plus source code, and digests it into a format compatible with 
 **Example of SDSCP in action**
 
 ```c
-// File library.c
+// File project/library.c
 
 #ifndef LIBRARY_C_INCLUDED // <-- Include guards
 #define LIBRARY_C_INCLUDED
@@ -30,7 +30,7 @@ library_function()
 ```
 
 ```c
-// File main.c
+// File project/main.c
 
 // including the library file
 #include "library.c"
