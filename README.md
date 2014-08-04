@@ -2,9 +2,83 @@
 
 **This is a free software, using GPL v2**
 
-The goal of this project is to enable better coding practices and more powerful features in the SDS-C scripting language.
+## What is SDS-C?
 
-It takes a SDS-C Plus source code, and digests it into a format compatible with the official SDS-C compiler (that is, ugly code).
+SDS-C is a (pretty bad) scripting language for SDS devices - see their [website](http://wiki.merenienergie.cz/index.php/Sdsc_sysf).
+
+### What is wrong with SDS-C?
+
+I won't go as far as saying "everything", but it'd be pretty close.
+
+
+**= Common things missing =**
+
+- No control structures except `If-Else` and procedures. Why? *"You can just use GOTO"*
+- No function arguments (*"To keep it simple and reliable"*)
+- No return values
+- No function-like macros
+- Can't create arrays.
+- No support for ternary operator (`<cond> ? <then> : <else>`)
+- Can't use branching (`#ifdef` etc)
+
+
+**= Bugs & bad design =**
+
+- `GOTO`s everywhere
+- Can't use macros in other macros
+- Can't use `++` and `--` in expression
+- Strings use single quotes. And don't support escapes - no way to print `'`
+- Tab in `#define` is syntax error
+- The compiler often and gives useless error messages.
+
+
+**= Dumb limitations =**
+
+- Can't use expression as array index, only variable or number.
+- No variable scope, all is global
+- Stack is limited to 6
+- Can have only 48 routines.
+- Can have only 128 variables.
+- Everything is signed *int32*. (Except strings, but you can't put them in a variable)
+
+
+SDSs are actually quite powerful devices - the compiler is just **REALLY STUPID**.
+
+
+## Goals of SDSCP
+
+This project's goal is to enable better C-like syntax without all the stupid limitations of SDS-C.
+
+It's a python script that works as a macro processor, and later will be added a proper tokenizer, making it possible to add new control structures and other features missing from SDS-C script.
+
+
+### Already implemented
+
+- `#include` directive
+- Function-like macros
+- Array-like macros
+- Double quotes for strings
+- Code branching with `#ifdef`, `#ifndef` etc...
+- Basic tokenizer (experimental, activate using the -x argument)
+
+
+### Planned Features
+
+- Extra control structures
+  - `FOR`
+  - `WHILE`
+  - `UNTIL`
+  - `SWITCH`
+  - `IF_ELSEIF_ELSE`
+- Stack in `ram[]` - Used for argument passing and return values
+- Local variables (keeping variable value after a function call)
+- Expression as array index
+- Reimplemented functions (GOTO's, redirection vector, storing index on stack etc.) - to remove SDS-C's limitations such as stack size and function count limit.
+
+
+
+
+
 
 **Example of SDSCP in action**
 
@@ -78,70 +152,6 @@ change_mode
 	}
 }
 ```
-
-
-## What is SDS-C anyway?
-
-SDS-C is a scripting language for SDS devices - see the [website](http://wiki.merenienergie.cz/index.php/Sdsc_sysf).
-
-It has to be compiled using a very bad proprietary compiler.
-
-### Why is SDS-C so bad?
-
-- No variable scope, all is global
-- `GOTO`s everywhere
-- Stack is limited to 6
-- No function arguments.
-- No return values.
-- No control structures except `IF-ELSE`. Why? "You can just use GOTO"
-- Everything is signed *Int 32*.
-- Except string literals. But you can't store them or do anything with them.
-- String literals use single quotes. And don't support escapes - no way to print `'`
-- There is almost no support for `++` and `--`
-- The authors apparently never heard of ternary operator (`<cond> ? <then> : <else>`)
-- Can't create array variables.
-- Can't use expression as array index, only variable or number.
-- Tab in `#define` is syntax error
-- Can't assign value in variable declaration
-- Can have only 48 routines.
-- Can have only 128 variables.
-- No support for multi-line or functional macros
-- Can't use macros in other macros
-- Can't use branching (`#ifdef` etc)
-- The compiler is super buggy and gives useless error messages.
-
-It's not that SDS could not handle better language - the compiler is just **REALLY STUPID**.
-
-
-## Goals of SDSCP
-
-This project's goal is to enable better C-like syntax without all the stupid limitations of SDS-C.
-
-It's a python script that works as a macro processor, and later will be added a proper tokenizer, making it possible to add new control structures and other features missing from SDS-C script.
-
-
-### Already implemented
-
-- `#include` directive
-- Function-like macros
-- Array-like macros
-- Double quotes for strings
-- Code branching with `#ifdef`, `#ifndef` etc...
-- Basic tokenizer (experimental, activate using the -x argument)
-
-
-### Planned Features
-
-- Extra control structures
-  - `FOR`
-  - `WHILE`
-  - `UNTIL`
-  - `SWITCH`
-  - `IF_ELSEIF_ELSE`
-- Stack in `ram[]` - Used for argument passing and return values
-- Local variables (keeping variable value after a function call)
-- Expression as array index
-- Reimplemented functions (GOTO's, redirection vector, storing index on stack etc.) - to remove SDS-C's limitations such as stack size and function count limit.
 
 
 
