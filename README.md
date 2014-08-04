@@ -1,4 +1,4 @@
-# SDSCP - an external SDS-C preprocessor
+# SDSCP - a SDS-C preprocessor
 
 **This is a free software, using GPL v2**
 
