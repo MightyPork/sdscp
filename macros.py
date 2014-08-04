@@ -370,7 +370,7 @@ class D_Define(Token):
 		# macro parameters
 		self.args = None
 
-		print(str(rd.has_bracket()))
+		#print(str(rd.has_bracket()))
 
 		if rd.has_paren():
 			tmp = rd.consume_block()[1:-1] # inside the paren
