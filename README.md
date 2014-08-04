@@ -6,36 +6,42 @@ It takes a SDS-C Plus source code, and digests it into a format compatible with 
 
 **Example of SDSCP in action**
 
+*library.c*
+
 ```c
-// library.c
 #define RELAY1 sys[231]
 #define RELAY2 sys[232]
 
 #define ON 1
 #define OFF 0
 
-#define isOn(what) ((what) != OFF)
+#define isOn(what) ((what) != OFF)  // parenthesis for safety
+#define setTo(what, value) what = (value)
 ```
 
+*main.c*
+
 ```c
-// main.c
 
-#include "library.c"
+// including the library file
+#include "library.c" // <--
 
+// using macros in other macros
 #define heating		RELAY1
 #define ventilator 	RELAY2
 
-#define on(sv) sv = 1
-#define off(sv) sv = 0
+#define on(x) setTo(x, 1)
+#define off(x) setTo(x, 0)
 
+// function with parentheses (looks better)
 change_mode()
 {
 	if (isOn(heating)) {
-		off(heating)
-		on(ventilator)
+		off(heating);
+		on(ventilator);
 	} else {
-		off(ventilator)
-		on(heating)
+		off(ventilator);
+		on(heating);
 	}
 }
 ```
@@ -46,11 +52,11 @@ change_mode()
 change_mode
 {
 	if (((sys[231]) != 0)) {
-		sys[231] = 0
-		sys[232] = 1
+		sys[231] = (0);
+		sys[232] = (1);
 	} else {
-		sys[232] = 0
-		sys[231] = 1
+		sys[232] = (0);
+		sys[231] = (1);
 	}
 }
 ```

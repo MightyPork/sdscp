@@ -8,25 +8,26 @@
 #define ON 1
 #define OFF 0
 
-#define isOn(what) ((what) != OFF)
+#define isOn(what) ((what) != OFF)             // parenthesis for safety
+#define setTo(what, value) what = (value)
 
 // --- application file ---
 
 #define heating		RELAY1
 #define ventilator 	RELAY2
 
-#define on(sv) sv = 1
-#define off(sv) sv = 0
+#define on(x) setTo(x, 1)
+#define off(x) setTo(x, 0)
 
 // ...
 
 change_mode()
 {
 	if (isOn(heating)) {
-		off(heating)
-		on(ventilator)
+		off(heating);
+		on(ventilator);
 	} else {
-		off(ventilator)
-		on(heating)
+		off(ventilator);
+		on(heating);
 	}
 }
