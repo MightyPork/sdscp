@@ -570,6 +570,7 @@ class MacroProcessor:
 		self.source = _load_file(main_file)
 		self.output = ''
 		self.defines = {}
+		self.keep_comments = True
 
 
 
@@ -593,6 +594,32 @@ class MacroProcessor:
 		return self.output
 
 
+	def __handle_whitespace(self, rd):
+		out = ''
+		# handle whitespace
+		if self.keep_comments:
+			# keep comments, indentation and up to two newlines (at once)
+			j = rd.consume_non_code()
+			if len(j) > 0:
+				out += re.sub(r'\n{2,}', '\n\n', j)
+
+		else:
+			# keep up to two newlines and indentation
+			j = rd.consume_non_code()
+			if len(j) > 0:
+				if j.count('\n') >= 2:
+					out += '\n\n'
+
+				elif j.count('\n') == 1:
+					out += '\n'
+
+				c = len(j)-1
+				while c >= 0 and j[c] in ['\t', ' ']:
+					out += j[c]
+					c -= 1
+
+		return out
+
 
 	def process(self):
 		""" Process all the directives in the source """
@@ -608,16 +635,9 @@ class MacroProcessor:
 
 		while not rd.has_end():
 
-			# keep comments, indentation and up to two newlines
-			j = rd.consume_non_code()
-			if len(j) > 0:
-				out += re.sub(r'\n{2,}', '\n\n', j)
-				continue
-			j = rd.consume_non_code()
-			if len(j) > 0:
-				out += re.sub(r'\n{2,}', '\n\n', j)
-				continue
-
+			out += self.__handle_whitespace(rd)
+			if rd.has_end():
+				break
 
 			# jump false # branches
 			if rd.pos in skip_dict:
@@ -777,12 +797,9 @@ class MacroProcessor:
 
 		while not rd.has_end():
 
-			# keep comments, indentation and up to two newlines
-			j = rd.consume_non_code()
-			if len(j) > 0:
-				out += re.sub(r'\n{2,}', '\n\n', j)
-				continue
-
+			out += self.__handle_whitespace(rd)
+			if rd.has_end():
+				break
 
 			if rd.has_identifier():
 

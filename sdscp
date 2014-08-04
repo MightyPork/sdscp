@@ -34,6 +34,12 @@ parser.add_argument(
 		default=False,
 		help='Enable experimental features.'
 )
+parser.add_argument(
+		'-c', '--clean',
+		action='store_true',
+		default=False,
+		help='Remove some whitespace and all comments'
+)
 
 args = parser.parse_args()
 
@@ -42,6 +48,7 @@ SRC = args.source
 DEST = args.output
 VERBOSE = args.verbose
 EXPERIMENTAL = args.experimental
+CLEAN = args.clean
 
 
 # ==================== Utils =======================
@@ -149,7 +156,7 @@ try:
 
 	# read the file
 	mp = MacroProcessor(SRC)
-
+	mp.keep_comments = not CLEAN
 
 
 	# ---------------- Resolve directives ------------------
