@@ -452,9 +452,22 @@ class D_Define(Token):
 
 
 	def __str__(self):
-		return  'MACRO: ' + self.name + \
-				', args = ' + str(self.args) + \
-				', replacement = ' + self.body
+
+		s = 'MACRO: %s' % self.name
+
+		if self.args == None:
+			s += ' '
+		else:
+			s += '(%s) ' % ', '.join(self.args)
+
+		if len(s) < 30:
+			s = (s + '.'*35)[:35]
+		else:
+			s += '...'
+
+		s += ' %s' % self.body
+
+		return s
 
 
 	def is_arraylike(self):

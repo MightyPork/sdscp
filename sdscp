@@ -40,6 +40,18 @@ parser.add_argument(
 		default=False,
 		help='Remove some whitespace and all comments'
 )
+parser.add_argument(
+		'-m', '--macros',
+		action='store_true',
+		default=False,
+		help='List all macros (even if not verbose)'
+)
+parser.add_argument(
+		'-n', '--no-output',
+		action='store_true',
+		default=False,
+		help='Do not show the compiled source (if no output is specified and not verbose)'
+)
 
 args = parser.parse_args()
 
@@ -49,6 +61,8 @@ DEST = args.output
 VERBOSE = args.verbose
 EXPERIMENTAL = args.experimental
 CLEAN = args.clean
+SHOW_MACROS = args.macros
+NO_OUTPUT_DUMP = args.no_output
 
 
 # ==================== Utils =======================
@@ -172,6 +186,10 @@ try:
 
 		print( mp.get_output() )
 		print()
+
+
+	if VERBOSE or SHOW_MACROS:
+
 		banner('MACROS FOUND', '-')
 		for d in mp.get_defines().values():
 			print(d)
@@ -188,32 +206,32 @@ try:
 	processed = mp.get_output()
 
 
-	banner('PROCESSED', '-')
-	print(processed)
+	if VERBOSE:
+		banner('PROCESSED', '-')
+		print(processed)
+
+
+	if EXPERIMENTAL:
+		banner('EXPERIMENTAL TOKEN TREE', '-')
+		print('Experimental tokenization of the code:\n')
+
+		tk = Tokenizer(processed)
+		tk.tokenize()
+		tk.show()
 
 
 	# perform tweaks to match some of SDS-C's broken syntax
 	for_sds = prepare_for_sdsc(processed)
-
-
-	banner('CODE FOR SDS-C', '-')
-	print(for_sds+'\n')
 
 	if DEST != None:
 		print('Writing to file: %s' % DEST)
 		f = open(DEST, 'w')
 		f.write(for_sds)
 		f.close()
+	elif not NO_OUTPUT_DUMP:
+		banner('CODE FOR SDS-C', '-')
+		print(for_sds+'\n')
 
-
-
-	if EXPERIMENTAL:
-		banner('EXPERIMENTAL TOKEN TREE (from processed)', '-')
-		print('Experimental tokenization of the code:\n')
-
-		tk = Tokenizer(processed)
-		tk.tokenize()
-		tk.show()
 
 
 	print('\nDone.\n')
