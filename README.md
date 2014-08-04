@@ -229,8 +229,10 @@ If the included file does something stupid, it will have effect on the main file
 
 Define lets you create flags for branching with `#ifdef` and `#ifndef`.
 
-A flag is true if (a) it has no value, or (b) it's value is not 0.
-That means you can set value to 0 to disable a flag, instead of commenting it out (which is less readable).
+When you use `#define <name>`, it will be asigned value 1.
+If you set the value to 0 with `#define <name> 0`, it will be treated as undefined.
+
+That means you can set value to 0 to disable a flag, instead of commenting it out.
 
 ```c
 
@@ -255,8 +257,6 @@ main()
 	#endif
 }
 ```
-
-When you use `#define <name>`, it will be asigned value 1.
 
 
 #### Constant macros
