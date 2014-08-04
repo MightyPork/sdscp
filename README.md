@@ -4,6 +4,57 @@ The goal of this project is to enable better coding practices and more powerful 
 
 It takes a SDS-C Plus source code, and digests it into a format compatible with the official SDS-C compiler (that is, ugly code).
 
+**Example of SDSCP in action**
+
+```c
+// library.c
+#define RELAY1 sys[231]
+#define RELAY2 sys[232]
+
+#define ON 1
+#define OFF 0
+
+#define isOn(what) ((what) != OFF)
+```
+
+```c
+// main.c
+
+#include "library.c"
+
+#define heating		RELAY1
+#define ventilator 	RELAY2
+
+#define on(sv) sv = 1
+#define off(sv) sv = 0
+
+change_mode()
+{
+	if (isOn(heating)) {
+		off(heating)
+		on(ventilator)
+	} else {
+		off(ventilator)
+		on(heating)
+	}
+}
+```
+
+*Output for SDS-C*
+
+```c
+change_mode
+{
+	if (((sys[231]) != 0)) {
+		sys[231] = 0
+		sys[232] = 1
+	} else {
+		sys[232] = 0
+		sys[231] = 1
+	}
+}
+```
+
 
 ## What is SDS-C anyway?
 
