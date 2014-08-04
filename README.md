@@ -79,7 +79,7 @@ When you use `#define <name>`, it will be asigned value 1.
 
 You can use `#define <name> <value>` to create constants.
 
-*NOTE: SDSCP does **not** force you to use uppercase.*
+**NOTE:** SDSCP does NOT force you to use uppercase.
 
 ```c
 #define GARAGE_DOOR sys[231]
