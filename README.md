@@ -108,9 +108,7 @@ It has to be compiled using a very bad proprietary compiler.
 - Can't use branching (`#ifdef` etc)
 - The compiler is super buggy and gives useless error messages.
 
-It's not that SDS could not handle better language / features - the limitations are artificial.
-
-The compiler is, frankly, **ABSOLUTELY STUPID**.
+It's not that SDS could not handle better language - the compiler is just **REALLY STUPID**.
 
 
 ## Goals of SDSCP
