@@ -4,6 +4,105 @@ The goal of this project is to enable better coding practices and more powerful 
 
 It takes a SDS-C Plus source code, and digests it into a format compatible with the official SDS-C compiler (that is, ugly code).
 
+
+## What is SDS-C anyway?
+
+SDS-C is a scripting language for SDS devices.
+
+It has to be compiled using a very bad proprietary compiler.
+
+### Why is SDS-C so bad?
+
+- No variable scope, all is global
+- `GOTO`s everywhere
+- Stack is limited to 6
+- No function arguments.
+- No return values.
+- No control structures except `IF-ELSE`. Why? "You can just use GOTO"
+- Everything is signed *Int 32*.
+- Except string literals. But you can't store them or do anything with them.
+- String literals use single quotes. And don't support escapes - no way to print `'`
+- There is almost no support for `++` and `--`
+- The authors apparently never heard of ternary operator ('<cond> ? <then> : <else>`)
+- Can't create array variables.
+- Can't use expression as array index, only variable or number.
+- Tab in `#define` is syntax error
+- Can't assign value in variable declaration
+- Can have only 48 routines.
+- Can have only 128 variables.
+- No support for multi-line or functional macros
+- Can't use macros in other macros
+- Can't use branching (`#ifdef` etc)
+- The compiler is super buggy and gives useless error messages.
+
+It's not that SDS could not handle better language / features - the limitations are artificial.
+
+The compiler is simply **TOTALLY STUPID**.
+
+
+## Goals of SDSCP
+
+This project's goal is to enable better C-like syntax without all the stupid limitations of SDS-C.
+
+It's a python script that works as a macro processor, and later will be added a proper tokenizer, making it possible to add new control structures and other features missing from SDS-C script.
+
+
+### Already implemented
+
+- `#include` directive
+- Function-like macros
+- Array-like macros
+- Double quotes for strings
+- Code branching with `#ifdef`, `#ifndef` etc...
+- Basic tokenizer (experimental, activate using the -x argument)
+
+
+### Planned Features
+
+- Extra control structures
+  - `FOR`
+  - `WHILE`
+  - `UNTIL`
+  - `SWITCH`
+  - `IF_ELSEIF_ELSE`
+- Stack in `ram[]` - Used for argument passing and return values
+- Local variables (keeping variable value after a function call)
+- Expression as array index
+- Reimplemented functions (GOTO's, redirection vector, storing index on stack etc.) - to remove SDS-C's limitations such as stack size and function count limit.
+
+
+
+## How to use SDSCP
+
+To run SDSCP, you need Python 3 installed.
+
+It is designed for use on Linux, some small adjustments may be needed to use it on other systems. (Not tested)
+
+```none
+
+# get help
+sdscp -h
+
+# convert a file (shows to terminal)
+sdscp source.c
+
+# store output to a file
+sdscp source.c -o outfile.c
+
+# verbose mode (show extra debug info - eg. list of all macros)
+sdscp source.c -v
+
+# expermiental mode (use together with -v)
+sdscp source.c -v -x
+
+```
+
+SDSCP generates a SDS-C compatible source code, or warns you if there is some problem.
+
+Since the tokenizer is not yet finished, it will not catch all errors (eg. missing braces).
+But stay assured that SDS-C will loudly complain.
+
+
 ## Available Features
 
 ### Pre-processing
@@ -52,22 +151,28 @@ If the included file does something stupid, it will have effect on the main file
 Define lets you create flags for branching with `#ifdef` and `#ifndef`:
 
 ```c
+
 #define DO_STUFF
 // #define BE_LAZY
 
 // later...
 
+func()
+{
+
 #ifdef DO_STUFF
-	// stuff
+	stuff();
 #else
-	// do something other
+	something_else();
 #endif
+
+}
 
 
 main()
 {
 	#ifndef BE_LAZY
-	// work hard
+	work_hard(); // only if BE_LAZY is not defined
 	#endif
 }
 ```
@@ -90,8 +195,9 @@ main()
 {
 	// some logic
 	GARAGE_DOOR = 1;
+	// -> sys[231] = 1;
 	// ...
-	print("Hot" Dog)
+	print("Hot" Dog);
 	// -> print("HotKitten") /* lol */
 
 }
@@ -115,23 +221,25 @@ Notice how the whole macro, and the argument's occurences are parenthesised.
 Why?
 
 ```c
-#define TWICE_BAD(what) 2*what
-#define TWICE_GOOD(what) (2*(what))
+var Bad, Good;
 
-var Bad  = TWICE_BAD(10+10)^3;
-// -> var Bad  = 2*10+10^3;
+#define BAD(what) 2*what
+#define GOOD(what) (2*(what))
 
-var Good = TWICE_GOOD(10+10)^3;
-// -> var Good = (2*(10+10))^3;
+Bad  = BAD(10+10)^3;
+// -> Bad  = 2*10+10^3; // messed up meaning
+
+Good = GOOD(10+10)^3;
+// -> Good = (2*(10+10))^3; // uglier but works properly
 ```
 
 Function-like macros can span multiple lines:
 
 ```c
-var LONG_MACRO()  do_simething();      \   // <-- backslash wraps a line
-                  more_stuff();        \      /* comments here are ignored */
-                  almost_done();       \
-                  print("It's done!")      // <-- no semicolon
+#define LONG_MACRO()  do_simething();      \   // <-- backslash wraps a line
+                      more_stuff();        \      /* comments here are ignored */
+                      almost_done();       \
+                      print("It's done!")      // <-- no semicolon
 ```
 
 #### Array-like macros
@@ -202,19 +310,3 @@ Check this:
 GARAGE = 1; // open door
 // -> sys[231] = 1;
 ```
-
-
-
- ## Planned Features
-
-- Conversion to an Abstract Syntax Tree
-- Extra control structures
-  - `FOR`
-  - `WHILE`
-  - `UNTIL`
-  - `SWITCH`
-  - `IF_ELSEIF_ELSE`
-- Stack in `ram[]`
-- Return value, Arguments
-- Local variables (keeping variable value after function call)
-- New way of implementing functions using `goto`, labels and a redirection vector

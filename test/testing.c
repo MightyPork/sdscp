@@ -1,7 +1,13 @@
-#define RELAY[n] sys[231+((n)-1)]
+#define GARAGE_DOOR sys[231]
 
-test()
+#define Dog "Kitten"
+
+main()
 {
-	RELAY[6] = 1;
-	echo(RELAY[5]);
+    // some logic
+    GARAGE_DOOR = 1;
+    // ...
+    print("Hot" Dog)
+    // -> print("HotKitten") /* lol */
+
 }
