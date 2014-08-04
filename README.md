@@ -83,17 +83,20 @@ It is designed for use on Linux, some small adjustments may be needed to use it 
 # get help
 sdscp -h
 
-# convert a file (shows to terminal)
+# convert a file (prints it to terminal)
 sdscp source.c
 
-# store output to a file
+# store the output to a file (ready to be pasted in SDS-C)
 sdscp source.c -o outfile.c
 
-# verbose mode (show extra debug info - eg. list of all macros)
+# clean the code (remove comments and extra newlines)
+sdscp source.c -c
+
+# verbose mode (show extra info - eg. list of all macros)
 sdscp source.c -v
 
-# expermiental mode (use together with -v)
-sdscp source.c -v -x
+# expermiental mode (show work-in-progress features)
+sdscp source.c -x
 
 ```
 
