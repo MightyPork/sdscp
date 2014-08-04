@@ -58,6 +58,8 @@ change_mode()
 
 ```
 
+** Run it through SDSCP -> ***
+
 *Output for SDS-C*
 
 ```c
