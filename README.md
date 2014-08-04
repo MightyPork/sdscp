@@ -97,7 +97,7 @@ It's a python script that works as a macro processor, and later will be added a 
 #define isOn(what) ((what) != OFF)             // parenthesis for safety
 #define setTo(what, value) what = (value)
 
-library_function()
+say_hello()
 {
 	echo("Hello.");
 }
@@ -128,10 +128,14 @@ change_mode()
 		off(ventilator);
 		on(heating);
 	}
+
+	say_hello();
 }
 ```
 
 **Process by SDSCP**
+
+(`-c` flag to remove comments and extra whitespace)
 
     $ sdscp -c project/main.c out/project.c
 
@@ -140,6 +144,11 @@ change_mode()
 
 ```c
 // out/project.c
+
+say_hello
+{
+	echo('Hello.');
+}
 
 change_mode
 {
@@ -150,6 +159,8 @@ change_mode
 		sys[232] = (0);
 		sys[231] = (1);
 	}
+
+	say_hello();
 }
 ```
 
