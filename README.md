@@ -235,24 +235,23 @@ That means you can set value to 0 to disable a flag, instead of commenting it ou
 ```c
 
 #define DO_STUFF
-// #define BE_LAZY
+#define BE_LAZY 0 // Don't be lazy
 
 // later...
 
 func()
 {
-#ifdef DO_STUFF
+	#ifdef DO_STUFF
 	stuff();
-#else
+	#else
 	something_else();
-#endif
+	#endif
 }
-
 
 main()
 {
 	#ifndef BE_LAZY
-	work_hard(); // only if BE_LAZY is not defined
+	work_hard(); // only if not lazy
 	#endif
 }
 ```
