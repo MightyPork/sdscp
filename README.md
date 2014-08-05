@@ -59,11 +59,14 @@ It's a python script that works as a macro processor, and later will be added a 
 - Array-like macros
 - Double quotes for strings
 - Code branching with `#ifdef`, `#ifndef` etc...
-- Basic tokenizer (experimental, activate using the -x argument)
+- Tokenizer
 
 
 ### Planned Features
 
+- Fixinf SDS-C bugs (expression as array index, etc.)
+- Token -> AST conversion
+- AST -> source coversion (allowing AST manipulations to alter output code)
 - Extra control structures
   - `FOR`
   - `WHILE`
