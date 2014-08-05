@@ -64,7 +64,7 @@ It's a python script that works as a macro processor, and later will be added a 
 
 ### Planned Features
 
-- Fixinf SDS-C bugs (expression as array index, etc.)
+- Fixing SDS-C bugs (expression as array index, etc.)
 - Token -> AST conversion
 - AST -> source coversion (allowing AST manipulations to alter output code)
 - Extra control structures
