@@ -626,7 +626,7 @@ class CodeReader(BaseReader):
 
 		elif self.matches( self.RE_RVALUE_EXTENDED_EQUALS ):
 			# extended equals
-			buffer += senf.consume_until('=') # consume it until the equals
+			buffer += self.consume_until('=') # consume it until the equals
 
 		else:
 			self.error('Expected equals or extended equals, found:'+self.peek(2))
