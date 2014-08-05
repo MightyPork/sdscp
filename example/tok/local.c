@@ -13,7 +13,7 @@ task()
 
 	g = 13;
 	do_stuff();
-	echo('g ', loc);
+	echo("g ", loc);
 
-	echo('loc ', loc);
+	echo("loc ", loc);
 }

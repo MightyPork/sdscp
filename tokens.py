@@ -55,6 +55,9 @@ class T_Comma(Token): pass
 class T_Semicolon(Token): pass
 
 
+class T_Colon(Token): pass
+
+
 class T_String(Token): pass
 
 
@@ -67,12 +70,13 @@ class T_Number(Token): pass
 class T_Operator(Token): pass
 
 
-class T_Label(Token): pass
-
-
 class T_Assign(Token): pass
 
 
+class T_Increment(Token): pass
+
+
+class T_Decrement(Token): pass
 
 
 class T_Expression(CompositeToken):
@@ -105,7 +109,7 @@ class T_Expression(CompositeToken):
 				if is_expr:
 					t.set_type(ParenType.EXPR)
 				else:
-					t.set_type(ParenType.ARGS)
+					t.set_type(ParenType.ARGVALS)
 
 				self.tokens.append(t)
 				continue
@@ -156,7 +160,8 @@ class ParenType(Enum):
 	UNKNOWN = 0
 	EXPR = 1
 	FOR = 2
-	ARGS = 3
+	ARGVALS = 3
+	ARGNAMES = 4
 
 
 class T_Paren(CompositeToken):
@@ -189,7 +194,7 @@ class T_Paren(CompositeToken):
 			t = T_Expression(s)
 			self.tokens.append(t)
 
-		elif self.type == ParenType.ARGS:
+		elif self.type == ParenType.ARGVALS:
 			# comma-separated list of expressions, can be empty
 
 			while not rd.has_end():
@@ -292,12 +297,49 @@ class Tokenizer:
 				break
 
 
-			# label:
-			elif rd.has_label():
+			elif rd.matches(r'^case[ \t\()]'):
 
-				s = rd.consume_label()
-				t = T_Label(s)
+				rd.consume_exact('case')
+				t = T_Name('case')
 				self.tokens.append(t)
+
+				rd.consume_non_code()
+				if rd.has_end(): rd.error('Unexpected end of CASE.')
+
+				expr = rd.consume_code(end=':', consume_end=False, eof=False)
+				t = T_Expression(expr)
+				self.tokens.append(t)
+
+				rd.consume_non_code()
+				t = T_Colon(rd.consume_exact(':')) # the colon
+				self.tokens.append(t)
+				continue
+
+
+			elif rd.matches(r'^return[ \t;\(]'):
+
+				rd.consume_exact('return')
+				rd.consume_non_code()
+				if rd.has_end(): rd.error('Unexpected end of RETURN.')
+
+				t = T_Name('return')
+				self.tokens.append(t)
+
+				if rd.starts(';'):
+					t = T_Semicolon( t.consume_exact(';') )
+					self.tokens.append(t)
+					continue
+
+				if rd.has_end(): rd.error('Unexpected end of RETURN.')
+
+				expr = rd.consume_code(end=';', consume_end=False, eof=False)
+				t = T_Expression(expr)
+				self.tokens.append(t)
+
+				rd.consume_non_code()
+				t = T_Semicolon(rd.consume_exact(';')) # the semicolon
+				self.tokens.append(t)
+				continue
 
 
 			# <identifier>
@@ -377,6 +419,29 @@ class Tokenizer:
 				s = rd.consume()
 				t = T_Semicolon(s)
 				self.tokens.append(t)
+
+
+			# ++
+			elif rd.starts('++'):
+				s = rd.consume(2)
+				t = T_Increment(s)
+				self.tokens.append(t)
+
+
+			# --
+			elif rd.starts('--'):
+				s = rd.consume(2)
+				t = T_Decrement(s)
+				self.tokens.append(t)
+
+
+			# :
+			elif rd.starts(':'):
+
+				s = rd.consume()
+				t = T_Colon(s)
+				self.tokens.append(t)
+
 
 			else:
 				rd.error('Unexpected syntax.')

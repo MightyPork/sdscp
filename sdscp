@@ -191,22 +191,6 @@ try:
 	banner('PROCESSED', '-')
 	print(processed)
 
-
-	# perform tweaks to match some of SDS-C's broken syntax
-	for_sds = prepare_for_sdsc(processed)
-
-
-	banner('CODE FOR SDS-C', '-')
-	print(for_sds+'\n')
-
-	if DEST != None:
-		print('Writing to file: %s' % DEST)
-		f = open(DEST, 'w')
-		f.write(for_sds)
-		f.close()
-
-
-
 	if EXPERIMENTAL:
 		banner('EXPERIMENTAL TOKEN TREE (from processed)', '-')
 		print('Experimental tokenization of the code:\n')
@@ -214,6 +198,20 @@ try:
 		tk = Tokenizer(processed)
 		tk.tokenize()
 		tk.show()
+
+	else:
+		# perform tweaks to match some of SDS-C's broken syntax
+		for_sds = prepare_for_sdsc(processed)
+
+
+		banner('CODE FOR SDS-C', '-')
+		print(for_sds+'\n')
+
+		if DEST != None:
+			print('Writing to file: %s' % DEST)
+			f = open(DEST, 'w')
+			f.write(for_sds)
+			f.close()
 
 
 	print('\nDone.\n')
