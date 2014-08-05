@@ -25,10 +25,10 @@
 #define DEBUG
 
 #ifdef DEBUG
-	echo('Dlouha debug zprava');
-	echo('Dalsi debuga');
+	echo("Dlouha debug zprava");
+	echo("Dalsi debuga");
 #else
-	echo('Strucna zprava');
+	echo("Strucna zprava");
 #endif
 
 

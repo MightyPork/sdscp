@@ -41,9 +41,16 @@ class CompositeToken(Token):
 	def is_composite(self):
 		return True
 
-	def __str__(self):
-		return type(self).__name__
 
+	# def __str__(self):
+	# 	return type(self).__name__
+
+	def __str__(self):
+		self.tokenize()
+		return '%s{ %s }' % (
+				type(self).__name__,
+				', '.join([str(a) for a in (self.tokens or [])])
+		)
 
 # --- keywords ---
 
@@ -120,34 +127,50 @@ class T_SET(TokenKeyword):
 class T_LABEL(TokenKeyword):
 	""" The LABEL keyword (synthetic, for labels) """
 
+
+class T_CALL(TokenKeyword):
+	""" The CALL keyword (synthetic, for call without assigning retval) """
+
+
+class T_FUNCTION(TokenKeyword):
+	""" The FUNCTION keyword (synthetic, for function/routine declaration) """
+
+
 # --- end of keywords ---
-
-
 
 
 class T_Name(Token):
 	""" Any identifier not recognized as a keyword """
 
 
-class T_Comma(Token):
+class TokenSymbol(Token):
+	""" A token representing a symbol """
+
+	def __init__(self):
+		super().__init__('')
+
+	def __str__(self):
+		return type(self).__name__
+
+
+class T_Comma(TokenSymbol):
 	""" , """
 
-	def __init__(self):
-		super().__init__(',')
 
-
-class T_Semicolon(Token):
+class T_Semicolon(TokenSymbol):
 	""" ; """
 
-	def __init__(self):
-		super().__init__(';')
 
-
-class T_Colon(Token):
+class T_Colon(TokenSymbol):
 	""" : """
 
-	def __init__(self):
-		super().__init__(':')
+
+class T_Increment(TokenSymbol):
+	""" ++ """
+
+
+class T_Decrement(TokenSymbol):
+	""" -- """
 
 
 class T_String(Token):
@@ -166,30 +189,14 @@ class T_Operator(Token):
 	""" Any operator in an expression """
 
 
-class T_Assign(Token):
+class T_AssignOperator(Token):
 	""" Assignment operator at the beginning of a Rvalue """
-
-
-class T_Increment(Token):
-	""" ++ """
-
-	def __init__(self):
-		super().__init__('++')
-
-
-class T_Decrement(Token):
-	""" -- """
-
-	def __init__(self):
-		super().__init__('--')
 
 
 class T_Expression(CompositeToken):
 
 	def do_tokenize(self):
 		rd = CodeReader(self.value)
-
-		t = None
 
 		while not rd.has_end():
 			rd.consume_non_code()
@@ -198,30 +205,36 @@ class T_Expression(CompositeToken):
 				s = rd.consume_identifier()
 				t = T_Name(s)
 				self.tokens.append(t)
+
+				rd.consume_non_code()
+
+				if rd.has_bracket():
+					s = rd.consume_block()
+					t = T_Bracket(s)
+					self.tokens.append(t)
+
+				elif rd.has_paren():
+
+					s = rd.consume_block()
+					t = T_Paren(s)
+
+					t.set_type(ParenType.ARGVALS)
+
+					self.tokens.append(t)
+
+				continue
+
+			if rd.has_paren():
+
+				s = rd.consume_block()
+				t = T_Paren(s)
+				t.set_type(ParenType.EXPR)
+				self.tokens.append(t)
 				continue
 
 			if rd.has_number():
 				s = rd.consume_number()
 				t = T_Number(s)
-				self.tokens.append(t)
-				continue
-
-			if rd.has_paren():
-				is_expr = not isinstance(t, T_Name) # check if last token was identifier
-				s = rd.consume_block()
-				t = T_Paren(s)
-
-				if is_expr:
-					t.set_type(ParenType.EXPR)
-				else:
-					t.set_type(ParenType.ARGVALS)
-
-				self.tokens.append(t)
-				continue
-
-			if rd.has_bracket():
-				s = rd.consume_block()
-				t = T_Bracket(s)
 				self.tokens.append(t)
 				continue
 
@@ -253,7 +266,7 @@ class T_Rvalue(CompositeToken):
 		rd = CodeReader( self.value )
 
 		s = rd.consume_until(end='=')
-		t = T_Assign(s)
+		t = T_AssignOperator(s)
 		self.tokens.append(t)
 
 		s = rd.consume_all()
@@ -284,6 +297,7 @@ class T_Paren(CompositeToken):
 	def do_tokenize(self):
 
 		if self.type == None:
+			print('Paren has no type, cannot tokenize: ' + str(self))
 			pass # Cannot parse without context
 
 		rd = CodeReader( self.value[1:-1].strip() )
@@ -329,33 +343,40 @@ class T_Paren(CompositeToken):
 		elif self.type == ParenType.FOR:
 			# arguments for a FOR loop
 
-			self.for_init = None
-			self.for_cond = None
-			self.for_iter = None
-
 			# init statement
 			s = rd.consume_code(end=';', eof=False, keep_end=True)
 
 			tt = Tokenizer(s)
-			self.for_init = tt.tokenize()
+			self.for_init = tt.tokenize() # tokenlist
+			self.for_init_s = s
 
 			# condition
 			s = rd.consume_code(end=';', eof=False, keep_end=False)
-			self.for_cond = T_Expression(s)
+			self.for_cond = T_Expression(s) # one expression token
+			self.for_cond_s = s
 
 			# iter statement
 			s = rd.consume_code(end=';', eof=True, keep_end=False) + ';'
-
 			tt = Tokenizer(s)
-			self.for_iter = tt.tokenize()
+			self.for_iter = tt.tokenize() # tokenlist
+			self.for_iter_s = s
 
 
 	def __str__(self):
 
-		s = type(self).__name__ + ':' + str(self.type.name)
+		s = type(self).__name__ + ' (...) : ' + str(self.type.name)
 
 		if self.type == ParenType.UNKNOWN:
 			s += ', Content: ' + self.value
+
+		elif self.type == ParenType.FOR:
+			self.tokenize()
+			s += ' (INIT %s  | COND %s  | ITER %s )' % (self.for_init_s, self.for_cond_s, self.for_iter_s)
+			s += '\n - INIT {%s}\n - COND {%s}\n - ITER {%s} )' % (
+				', '.join([str(a) for a in self.for_init]),
+				str(self.for_cond),
+				', '.join([str(a) for a in self.for_iter])
+			)
 
 		return s
 
@@ -379,6 +400,9 @@ class T_Bracket(CompositeToken):
 		if not rd.has_end():
 			raise Exception('Invalid array index (must be single expression).')
 
+	def __str__(self):
+		return type(self).__name__ + ' [...]'
+
 
 class T_CodeBlock(CompositeToken):
 	def __init__(self, value):
@@ -388,6 +412,8 @@ class T_CodeBlock(CompositeToken):
 		rd = Tokenizer( self.value[1:-1] )
 		self.tokens = rd.tokenize()
 
+	def __str__(self):
+		return type(self).__name__ + ' {...}'
 
 
 class Tokenizer:
@@ -427,13 +453,13 @@ class Tokenizer:
 				s = rd.consume_identifier()
 				rd.consume_non_code() # whitespace perhaps
 
+				kwd = s.lower()
+
 				# handle keywords first
 
 
-				if s.lower() == 'case':
+				if kwd == 'case':
 					self.tokens.append( T_CASE() )
-
-					rd.consume_non_code()
 
 					expr = rd.consume_code(end=':', consume_end=False)
 					t = T_Expression(expr)
@@ -444,22 +470,18 @@ class Tokenizer:
 					continue
 
 
-				elif s.lower() == 'default':
+				elif kwd == 'default':
 					self.tokens.append( T_DEFAULT() )
-
-					rd.consume_non_code()
 
 					rd.assert_starts(':') # consumed next iteration
 					continue
 
 
-				elif s.lower() == 'if':
+				elif kwd == 'if':
 					self.tokens.append( T_IF() )
 
-					rd.consume_non_code()
-
 					if not rd.has_paren():
-						rd.error('Expected parenthesis.')
+						rd.error('Expected parenthesis with IF condition.')
 
 					paren = rd.consume_block()
 
@@ -470,32 +492,135 @@ class Tokenizer:
 					continue
 
 
-				elif s.lower() == 'else':
+				elif kwd == 'while':
+					self.tokens.append( T_WHILE() )
+
+					if not rd.has_paren():
+						rd.error('Expected parenthesis with WHILE condition.')
+
+					paren = rd.consume_block()
+
+					t = T_Paren(paren)
+					t.set_type(ParenType.EXPR)
+					self.tokens.append(t)
+
+					continue
+
+
+				elif kwd == 'until':
+					self.tokens.append( T_UNTIL() )
+
+					if not rd.has_paren():
+						rd.error('Expected parenthesis with UNTIL condition.')
+
+					paren = rd.consume_block()
+
+					t = T_Paren(paren)
+					t.set_type(ParenType.EXPR)
+					self.tokens.append(t)
+
+					continue
+
+
+				elif kwd == 'for':
+					self.tokens.append( T_FOR() )
+
+					if not rd.has_paren():
+						rd.error('Expected parenthesis with FOR (init; cond; iter).')
+
+					paren = rd.consume_block()
+
+					t = T_Paren(paren)
+					t.set_type(ParenType.FOR)
+					self.tokens.append(t)
+
+					continue
+
+
+				elif kwd == 'switch':
+					self.tokens.append( T_SWITCH() )
+
+					if not rd.has_paren():
+						rd.error('Expected parenthesis with SWITCH condition.')
+
+					paren = rd.consume_block()
+
+					t = T_Paren(paren)
+					t.set_type(ParenType.EXPR)
+					self.tokens.append(t)
+
+					continue
+
+
+				elif kwd == 'else':
 					self.tokens.append( T_ELSE() )
+					continue
+
+
+				elif kwd == 'var':
+
+					while True:
+						self.tokens.append( T_VAR() )
+						rd.consume_non_code() # whitespace
+
+						name = rd.consume_identifier()
+						self.tokens.append( T_Name(name) )
+
+						rd.consume_non_code() # whitespace
+
+						if rd.has_rvalue():
+							v = rd.consume_rvalue()
+							self.tokens.append( T_Rvalue(v) )
+
+						rd.consume_non_code() # whitespace
+
+						if rd.starts(','):
+							# more vars
+
+							rd.consume() # the comma
+
+							self.tokens.append( T_Semicolon() ) # start new statement
+
+							continue # to next var name
+
+						elif rd.starts(';'):
+							# end of it
+							rd.consume() # the sc
+							self.tokens.append( T_Semicolon() )
+							break # to next statement
+
+						else:
+							rd.error('Expected , or ; here.')
 
 					continue
 
 
-				elif s.lower() == 'var':
-					self.tokens.append( T_VAR() )
+				elif kwd == 'break':
+					self.tokens.append( T_BREAK() )
+
 					continue
 
 
-				elif s.lower() == 'do':
+				elif kwd == 'do':
 					self.tokens.append( T_DO() )
 
 					continue
 
 
-				elif s.lower() == 'label':
-					# discard label keyword
+				elif kwd == 'continue':
+					self.tokens.append( T_CONTINUE() )
+
 					continue
 
 
-				elif s.lower() == 'goto':
-					self.tokens.append( T_GOTO() )
+				elif kwd == 'label':
+					# the label keyword (optional for labels)
+					self.tokens.append( T_LABEL() )
+					continue
 
-					rd.consume_non_code()
+
+				elif kwd == 'goto':
+					self.tokens.append( T_GOTO() )
 
 					lbl = rd.consume_identifier()
 					t = T_Name(lbl)
@@ -517,10 +642,8 @@ class Tokenizer:
 					continue
 
 
-				elif s.lower() == 'return':
+				elif kwd == 'return':
 					self.tokens.append( T_RETURN() )
-
-					rd.consume_non_code()
 
 					if rd.starts(';'):
 						# return with no value
@@ -535,28 +658,116 @@ class Tokenizer:
 
 				elif rd.has_paren():
 					# function call or declaration
-					self.tokens.append( T_Name(s) )
 
 					paren = rd.consume_block() # consume the paren
 
-					rd.consume_non_code() # whitespace after paren
+					rd.consume_non_code() # whitespace
 
 					if rd.starts(';'): # was a call
+						self.tokens.append( T_CALL() )
+						self.tokens.append( T_Name(s) )
 						t = T_Paren(paren)
 						t.set_type(ParenType.ARGVALS)
 						self.tokens.append(t)
 
 					elif rd.has_code_block(): # was a declaration most likely
+						self.tokens.append( T_FUNCTION() )
+						self.tokens.append( T_Name(s) )
 						t = T_Paren(paren)
 						t.set_type(ParenType.ARGNAMES)
 						self.tokens.append(t)
 
 					continue
 
+				elif rd.has_bracket():
+					# moo[foo] = bar;
+					self.tokens.append( T_SET() )
+					self.tokens.append( T_Name( s ) )
+
+					bracket = rd.consume_block() # consume the bracket
+					self.tokens.append( T_Bracket( bracket ) )
+
+					rd.consume_non_code() # whitespace
+
+					if not rd.has_rvalue():
+						rd.error('Expected assignment.')
+
+					self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
+
+					rd.consume_non_code() # whitespace
+
+					rd.consume_exact(';');
+
+					continue
+
+				elif rd.has_rvalue():
+					# foo = bar, other = baz;
+					self.tokens.append( T_SET() )
+					self.tokens.append( T_Name( s ) )
+					self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
+
+					if rd.starts(';'):
+						continue
+
+					elif rd.starts(','):
+						rd.consume() # the comma
+
+						while True:
+							rd.consume_non_code() # whitespace
+
+							if rd.has_identifier():
+								self.tokens.append( T_Semicolon() ) # start new statement
+								self.tokens.append( T_SET() )
+								self.tokens.append( T_Name( rd.consume_identifier() ) )
+								rd.consume_non_code() # whitespace
+
+								self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
+							else:
+								rd.error('Missing identifier.')
+
+							rd.consume_non_code() # whitespace
+
+							if rd.starts(','):
+								continue
+							elif rd.starts(';'):
+								break
+							else:
+								rd.error('Expected , or ; here.')
+
+
+				elif rd.starts('++'):
+					rd.consume_exact('++')
+
+					self.tokens.append( T_SET() )
+					self.tokens.append( T_Name(s) )
+					self.tokens.append( T_Rvalue('+= 1') )
+
+
+				elif rd.starts('--'):
+					rd.consume_exact('--')
+
+					self.tokens.append( T_SET() )
+					self.tokens.append( T_Name(s) )
+					self.tokens.append( T_Rvalue('-= 1') )
+
+
 				else:
 					# just a name
-					t = T_Name(s)
-					self.tokens.append(t)
+					rd.consume_non_code() # whitespace
+
+					if rd.starts(':'):
+						# was a label
+						self.tokens.append( T_LABEL() )
+						self.tokens.append( T_Name(s) )
+
+						rd.consume()
+						self.tokens.append( T_Colon() )
+
+
+						continue
+
+					# unknown meaning
+					rd.error("Unexpected syntax: Don't know what %s means here." % s)
 
 
 			# = rvalue;
@@ -586,7 +797,6 @@ class Tokenizer:
 				s = rd.consume_block()
 				self.tokens.append( T_CodeBlock(s) )
 
-
 			# "string"
 			elif rd.has_string():
 
@@ -615,10 +825,16 @@ class Tokenizer:
 				self.tokens.append( T_Comma() )
 
 
-			# some statement
+			# ;
 			elif rd.starts(';'):
 				rd.consume()
 				self.tokens.append( T_Semicolon() )
+
+
+			# :
+			elif rd.starts(':'):
+				rd.consume()
+				self.tokens.append( T_Colon() )
 
 
 			# ++
@@ -633,14 +849,8 @@ class Tokenizer:
 				self.tokens.append( T_Decrement() )
 
 
-			# :
-			elif rd.starts(':'):
-				rd.consume_exact(':')
-				self.tokens.append( T_Colon() )
-
-
 			else:
-				rd.error('Unexpected syntax.')
+				rd.error('Unexpected syntax here.')
 
 
 		return self.tokens

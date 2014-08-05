@@ -824,7 +824,7 @@ class MacroProcessor:
 						paren = rd.consume_block()
 
 						t = T_Paren(paren)
-						t.set_type(ParenType.ARGS)
+						t.set_type(ParenType.ARGVALS)
 						t.tokenize()
 
 						args = []

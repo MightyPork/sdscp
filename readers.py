@@ -414,24 +414,29 @@ class CodeReader(BaseReader):
 
 		"""
 
+		if type(end) == str:
+			end = [end] # wrap as array
+
+
 		pos_begin = self.pos
 		buffer = ''
 
 		while self.pos < self.length:
 
-			if self.starts(end):
-				if not consume_end:
-					return self.from_pos(pos_begin).strip()
-				else:
-					if keep_end:
-						# consume end and add it to the value
-						self.consume_exact(end)
+			for ee in end:
+				if self.starts(ee):
+					if not consume_end:
 						return self.from_pos(pos_begin).strip()
 					else:
-						# consume end, but don't add it to the value
-						txt = self.from_pos(pos_begin).strip()
-						self.consume_exact(end)
-						return txt
+						if keep_end:
+							# consume end and add it to the value
+							self.consume_exact(ee)
+							return self.from_pos(pos_begin).strip()
+						else:
+							# consume end, but don't add it to the value
+							txt = self.from_pos(pos_begin).strip()
+							self.consume_exact(ee)
+							return txt
 
 			char = self.peek()
 
@@ -611,14 +616,14 @@ class CodeReader(BaseReader):
 			return self.consume()
 
 		# doesn't have dual version
-		if self.matches(r'^[*/%~!]'):
+		if self.matches(r'^[*/%~!^]'):
 			return self.consume()
 
 		# long ones
 		if self.matches(r'^(&&|\|\||<<|>>|>=|<=|==|!=|\+\+|--)'):
 			return self.consume(2)
 
-		self.error('Expected operator, found ' + self.peek(2))
+		self.error('Expected operator, found something else.')
 
 
 
@@ -641,7 +646,7 @@ class CodeReader(BaseReader):
 
 		self.consume_non_code()
 		buffer += ' '
-		buffer += self.consume_code(end=';', consume_end=False)
+		buffer += self.consume_code(end=[';', ','], consume_end=False)
 
 		return buffer
 
