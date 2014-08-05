@@ -77,9 +77,6 @@ It's a python script that works as a macro processor, and later will be added a 
 
 
 
-
-
-
 **Example of SDSCP in action**
 
 ```c
@@ -165,34 +162,73 @@ change_mode
 ```
 
 
-
 ## How to use SDSCP
 
 To run SDSCP, you need Python 3 installed.
 
 It is designed for use on Linux, some small adjustments may be needed to use it on other systems. (Not tested)
 
+**Help page**
+
+Use `sdscp -h` for the most up-to-date info.
+
+At the time of writing this, you would get:
+
 ```none
+$ sdscp -h
+usage: sdscp [-h] [-o OUTPUT] [-c] [-v] [-t] [-m] [-p] [-r] [-s] [-d] source
 
-# get help
-sdscp -h
+SDS-C macro preprocessor
 
-# convert a file (prints it to terminal)
-sdscp source.c
+positional arguments:
+  source                The source file to process
 
-# store the output to a file (ready to be pasted in SDS-C)
-sdscp source.c -o outfile.c
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        The output file; If not specified, output will be
+                        printed to console.
+  -c, --clean           Remove some whitespace and all comments
+  -v, --verbose         Show all optional debug info.
+  -t, --show-tokens     Show tokenization.
+  -m, --show-macros     List all macros
+  -p, --show-processed  Show code after replacing macros (preprocessor output)
+  -r, --show-resolved   Show code after processing includes and # branching.
+  -s, --show-source     Show original source (only main file)
+  -d, --show-output     Show the final source
+```
 
-# clean the produced code (remove comments and extra newlines)
-sdscp source.c -c
+**Some examples:**
 
-# verbose mode (show extra info - eg. list of all macros)
-sdscp source.c -v
+```bash
 
-# expermiental mode (show work-in-progress features)
-sdscp source.c -x
+# process a file, show the output
+sdscp -d input.c
+
+# store the output to a file
+sdscp input.c -o output.c
+
+# clean the produced code
+sdscp input.c -c -o output.c
+
+# verbose mode (show tons of debug info)
+sdscp input.c -v
 
 ```
+
+Setups for unit testing:
+
+```bash
+# for the macro tests
+sdscp input.c -smpc
+
+# for tokenizer tests
+sdscp input.c -ptc
+
+# to test the "pretty" to "SDS-C" filter
+sdscp input.c -pdc
+``
+
 
 SDSCP generates a SDS-C compatible source code, or warns you if there is some problem.
 

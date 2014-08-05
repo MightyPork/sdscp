@@ -262,8 +262,8 @@ try:
 		for_sds = prepare_for_sdsc(processed)
 
 		if SHOW_OUTPUT:
-			banner('CODE FOR SDS-C', '-')
-			print(for_sds+'\n')
+			banner('OUTPUT SDS-C CODE', '-')
+			print(prep4disp(for_sds) + '\n')
 
 		if DEST != None:
 			print('Writing to file: %s' % DEST)
@@ -271,7 +271,7 @@ try:
 			f.write(for_sds)
 			f.close()
 		else:
-			print('No output file specified.')
+			print('[!] No output file specified.')
 
 
 	print('\nDone.\n')
