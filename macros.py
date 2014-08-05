@@ -709,7 +709,7 @@ class MacroProcessor:
 				defined = (d.name in self.defines)
 				if defined:
 					defined = (self.defines[d.name].body != '0')
-					print('Macro %s value %s' % (d.name, self.defines[d.name].body) )
+					print('Checking # condition: %s is %s' % (d.name, self.defines[d.name].body) )
 
 				if positive == defined:
 					# is defined
