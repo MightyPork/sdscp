@@ -1,6 +1,24 @@
 # SDSCP - a SDS-C preprocessor
 
-**This is a free software, using GPL v2**
+*SDSCP is free software, available under GPL v2*
+
+**Table of Contents**
+
+- [What is SDS-C?](#user-content-what-is-sds-c)
+	- [What is wrong with SDS-C?](#user-content-what-is-wrong-with-sds-c)
+- [Goals of SDSCP](#user-content-goals-of-sdscp)
+	- [Already implemented](#user-content-already-implemented)
+	- [Planned Features](#user-content-planned-features)
+- [How to use SDSCP](#user-content-how-to-use-sdscp)
+- [Available Features](#user-content-available-features)
+	- [Pre-processing](#user-content-pre-processing)
+		- [Include Guards](#user-content-include-guards)
+		- [Include directive](#user-content-include-directive)
+		- [Define and # branching](#user-content-define-and--branching)
+		- [Constant macros](#user-content-constant-macros)
+		- [Function-like macros](#user-content-function-like-macros)
+		- [Array-like macros](#user-content-array-like-macros)
+		- [Using macros in other macros](#user-content-using-macros-in-other-macros)
 
 ## What is SDS-C?
 
