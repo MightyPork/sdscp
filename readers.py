@@ -439,12 +439,20 @@ class CodeReader(BaseReader):
 				self.consume_block()
 				continue
 
-			elif re.match(self.RE_STRING_QUOTE, char):
+			elif self.has_string():
 				self.consume_string()
 				continue
 
-			elif re.match(self.RE_CHAR_QUOTE, char):
+			elif self.has_char():
 				self.consume_char()
+				continue
+
+			elif self.has_block_comment():
+				self.consume_block_comment()
+				continue
+
+			elif self.has_inline_comment():
+				self.consume_inline_comment()
 				continue
 
 			self.consume()

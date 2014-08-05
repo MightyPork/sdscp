@@ -45,38 +45,143 @@ class CompositeToken(Token):
 		return type(self).__name__
 
 
+# --- keywords ---
 
-class T_Name(Token): pass
+class TokenKeyword(Token):
+	""" A token representing a keyword """
 
+	def __init__(self):
+		super().__init__( type(self).__name__[2:].lower() )
 
-class T_Comma(Token): pass
-
-
-class T_Semicolon(Token): pass
-
-
-class T_Colon(Token): pass
-
-
-class T_String(Token): pass
+	def __str__(self):
+		return type(self).__name__
 
 
-class T_Char(Token): pass
+class T_IF(TokenKeyword):
+	""" The IF keyword """
 
 
-class T_Number(Token): pass
+class T_ELSE(TokenKeyword):
+	""" The ELSE keyword (in if) """
 
 
-class T_Operator(Token): pass
+class T_FOR(TokenKeyword):
+	""" The FOR keyword """
 
 
-class T_Assign(Token): pass
+class T_WHILE(TokenKeyword):
+	""" The WHILE keyword """
 
 
-class T_Increment(Token): pass
+class T_UNTIL(TokenKeyword):
+	""" The DEFAULT keyword (while not) """
 
 
-class T_Decrement(Token): pass
+class T_SWITCH(TokenKeyword):
+	""" The SWITCH keyword """
+
+
+class T_CASE(TokenKeyword):
+	""" The CASE keyword (in switch) """
+
+
+class T_DEFAULT(TokenKeyword):
+	""" The DEFAULT keyword (in switch) """
+
+
+class T_DO(TokenKeyword):
+	""" The DO keyword (loop with condition at the end) """
+
+
+class T_VAR(TokenKeyword):
+	""" The VAR keyword """
+
+
+class T_GOTO(TokenKeyword):
+	""" The GOTO keyword """
+
+
+class T_BREAK(TokenKeyword):
+	""" The BREAK keyword """
+
+
+class T_CONTINUE(TokenKeyword):
+	""" The CONTINUE keyword """
+
+
+class T_CONTINUE(TokenKeyword):
+	""" The CONTINUE keyword """
+
+
+class T_SET(TokenKeyword):
+	""" The SET keyword (synthetic, for var assignment) """
+
+
+class T_LABEL(TokenKeyword):
+	""" The LABEL keyword (synthetic, for labels) """
+
+# --- end of keywords ---
+
+
+
+
+class T_Name(Token):
+	""" Any identifier not recognized as a keyword """
+
+
+class T_Comma(Token):
+	""" , """
+
+	def __init__(self):
+		super().__init__(',')
+
+
+class T_Semicolon(Token):
+	""" ; """
+
+	def __init__(self):
+		super().__init__(';')
+
+
+class T_Colon(Token):
+	""" : """
+
+	def __init__(self):
+		super().__init__(':')
+
+
+class T_String(Token):
+	""" String literal """
+
+
+class T_Char(Token):
+	""" Char literal """
+
+
+class T_Number(Token):
+	""" Dec, hex or bin number literal """
+
+
+class T_Operator(Token):
+	""" Any operator in an expression """
+
+
+class T_Assign(Token):
+	""" Assignment operator at the beginning of a Rvalue """
+
+
+class T_Increment(Token):
+	""" ++ """
+
+	def __init__(self):
+		super().__init__('++')
+
+
+class T_Decrement(Token):
+	""" -- """
+
+	def __init__(self):
+		super().__init__('--')
 
 
 class T_Expression(CompositeToken):
@@ -102,7 +207,7 @@ class T_Expression(CompositeToken):
 				continue
 
 			if rd.has_paren():
-				is_expr = not isinstance(t, T_Name)
+				is_expr = not isinstance(t, T_Name) # check if last token was identifier
 				s = rd.consume_block()
 				t = T_Paren(s)
 
@@ -207,6 +312,20 @@ class T_Paren(CompositeToken):
 				t = T_Expression(s)
 				self.tokens.append(t)
 
+		elif self.type == ParenType.ARGNAMES:
+			# comma-separated list of argument names
+
+			while not rd.has_end():
+
+				rd.consume_non_code()
+				if rd.has_end():
+					break # end of args after some junk
+
+				s = rd.consume_identifier()
+				t = T_Name(s)
+				self.tokens.append(t)
+
+
 		elif self.type == ParenType.FOR:
 			# arguments for a FOR loop
 
@@ -232,7 +351,13 @@ class T_Paren(CompositeToken):
 
 
 	def __str__(self):
-		return type(self).__name__ + ' (' + str(self.type) + ')' + ['',', ' + self.value][self.type == ParenType.UNKNOWN]
+
+		s = type(self).__name__ + ':' + str(self.type.name)
+
+		if self.type == ParenType.UNKNOWN:
+			s += ', Content: ' + self.value
+
+		return s
 
 
 
@@ -296,151 +421,222 @@ class Tokenizer:
 			if rd.has_end():
 				break
 
-
-			elif rd.matches(r'^case[ \t\()]'):
-
-				rd.consume_exact('case')
-				t = T_Name('case')
-				self.tokens.append(t)
-
-				rd.consume_non_code()
-				if rd.has_end(): rd.error('Unexpected end of CASE.')
-
-				expr = rd.consume_code(end=':', consume_end=False, eof=False)
-				t = T_Expression(expr)
-				self.tokens.append(t)
-
-				rd.consume_non_code()
-				t = T_Colon(rd.consume_exact(':')) # the colon
-				self.tokens.append(t)
-				continue
-
-
-			elif rd.matches(r'^return[ \t;\(]'):
-
-				rd.consume_exact('return')
-				rd.consume_non_code()
-				if rd.has_end(): rd.error('Unexpected end of RETURN.')
-
-				t = T_Name('return')
-				self.tokens.append(t)
-
-				if rd.starts(';'):
-					t = T_Semicolon( t.consume_exact(';') )
-					self.tokens.append(t)
-					continue
-
-				if rd.has_end(): rd.error('Unexpected end of RETURN.')
-
-				expr = rd.consume_code(end=';', consume_end=False, eof=False)
-				t = T_Expression(expr)
-				self.tokens.append(t)
-
-				rd.consume_non_code()
-				t = T_Semicolon(rd.consume_exact(';')) # the semicolon
-				self.tokens.append(t)
-				continue
-
-
 			# <identifier>
 			elif rd.has_identifier():
 
 				s = rd.consume_identifier()
-				t = T_Name(s)
-				self.tokens.append(t)
+				rd.consume_non_code() # whitespace perhaps
+
+				# handle keywords first
+
+
+				if s.lower() == 'case':
+					self.tokens.append( T_CASE() )
+
+					rd.consume_non_code()
+
+					expr = rd.consume_code(end=':', consume_end=False)
+					t = T_Expression(expr)
+					self.tokens.append(t)
+
+					rd.assert_starts(':')
+
+					continue
+
+
+				elif s.lower() == 'default':
+					self.tokens.append( T_DEFAULT() )
+
+					rd.consume_non_code()
+
+					rd.assert_starts(':') # consumed next iteration
+					continue
+
+
+				elif s.lower() == 'if':
+					self.tokens.append( T_IF() )
+
+					rd.consume_non_code()
+
+					if not rd.has_paren():
+						rd.error('Expected parenthesis.')
+
+					paren = rd.consume_block()
+
+					t = T_Paren(paren)
+					t.set_type(ParenType.EXPR)
+					self.tokens.append(t)
+
+					continue
+
+
+				elif s.lower() == 'else':
+					self.tokens.append( T_ELSE() )
+
+					continue
+
+
+				elif s.lower() == 'var':
+					self.tokens.append( T_VAR() )
+					continue
+
+
+				elif s.lower() == 'do':
+					self.tokens.append( T_DO() )
+
+					continue
+
+
+				elif s.lower() == 'label':
+					# discard label keyword
+					continue
+
+
+				elif s.lower() == 'goto':
+					self.tokens.append( T_GOTO() )
+
+					rd.consume_non_code()
+
+					lbl = rd.consume_identifier()
+					t = T_Name(lbl)
+					self.tokens.append(t)
+
+					rd.consume_non_code()
+					rd.assert_starts(';')
+
+
+					if rd.starts(';'):
+						# return with no value
+						continue
+
+					expr = rd.consume_code(end=';', consume_end=False)
+					t = T_Expression(expr)
+					self.tokens.append(t)
+
+					rd.assert_starts(';') # consumed next iteration
+					continue
+
+
+				elif s.lower() == 'return':
+					self.tokens.append( T_RETURN() )
+
+					rd.consume_non_code()
+
+					if rd.starts(';'):
+						# return with no value
+						continue
+
+					expr = rd.consume_code(end=';', consume_end=False)
+					t = T_Expression(expr)
+					self.tokens.append(t)
+
+					rd.assert_starts(';') # consumed next iteration
+					continue
+
+				elif rd.has_paren():
+					# function call or declaration
+					self.tokens.append( T_Name(s) )
+
+					paren = rd.consume_block() # consume the paren
+
+					rd.consume_non_code() # whitespace after paren
+
+					if rd.starts(';'): # was a call
+						t = T_Paren(paren)
+						t.set_type(ParenType.ARGVALS)
+						self.tokens.append(t)
+
+					elif rd.has_code_block(): # was a declaration most likely
+						t = T_Paren(paren)
+						t.set_type(ParenType.ARGNAMES)
+						self.tokens.append(t)
+
+					continue
+
+				else:
+					# just a name
+					t = T_Name(s)
+					self.tokens.append(t)
 
 
 			# = rvalue;
 			elif rd.has_rvalue():
 
 				s = rd.consume_rvalue()
-				t = T_Rvalue(s)
-				self.tokens.append(t)
+				self.tokens.append( T_Rvalue(s) )
 
 
 			# (arg, list)
 			elif rd.has_paren():
 
 				s = rd.consume_block()
-				t = T_Paren(s)
-				self.tokens.append(t)
+				self.tokens.append( T_Paren(s) )
 
 
 			# [asf + 16]
 			elif rd.has_bracket():
 
 				s = rd.consume_block()
-				t = T_Bracket(s)
-				self.tokens.append(t)
+				self.tokens.append( T_Bracket(s) )
 
 
 			# {...stuff...}
 			elif rd.has_code_block():
 
 				s = rd.consume_block()
-				t = T_CodeBlock(s)
-				self.tokens.append(t)
+				self.tokens.append( T_CodeBlock(s) )
 
 
 			# "string"
 			elif rd.has_string():
 
 				s = rd.consume_string()
-				t = T_String(s)
-				self.tokens.append(t)
+				self.tokens.append( T_String(s) )
 
 
 			# 123
 			elif rd.has_number():
 
 				s = rd.consume_number()
-				t = T_Number(s)
-				self.tokens.append(t)
+				self.tokens.append( T_Number(s) )
 
 
 			# 'c'
 			elif rd.has_char():
 
 				s = rd.consume_char()
-				t = T_Char(s)
-				self.tokens.append(t)
+				self.tokens.append( T_Char(s) )
 
 
 			# , (eg. var foo, bar;)
 			elif rd.starts(','):
 
-				s = rd.consume()
-				t = T_Comma(s)
-				self.tokens.append(t)
+				rd.consume()
+				self.tokens.append( T_Comma() )
 
 
 			# some statement
 			elif rd.starts(';'):
-				s = rd.consume()
-				t = T_Semicolon(s)
-				self.tokens.append(t)
+				rd.consume()
+				self.tokens.append( T_Semicolon() )
 
 
 			# ++
 			elif rd.starts('++'):
-				s = rd.consume(2)
-				t = T_Increment(s)
-				self.tokens.append(t)
+				rd.consume_exact('++')
+				self.tokens.append( T_Increment() )
 
 
 			# --
 			elif rd.starts('--'):
-				s = rd.consume(2)
-				t = T_Decrement(s)
-				self.tokens.append(t)
+				rd.consume_exact('--')
+				self.tokens.append( T_Decrement() )
 
 
 			# :
 			elif rd.starts(':'):
-
-				s = rd.consume()
-				t = T_Colon(s)
-				self.tokens.append(t)
+				rd.consume_exact(':')
+				self.tokens.append( T_Colon() )
 
 
 			else:
@@ -461,12 +657,16 @@ class Tokenizer:
 
 
 def _show_tokenlist(tokens, level='  '):
-	for tok in tokens:
+	if len(tokens) == 0:
+		print(level + '-empty-')
 
-		print(level + str(tok))
+	else:
+		for tok in tokens:
 
-		if tok.is_composite():
-			_show_tokenlist(tok.tokenize(), level+'  ')
+			print(level + str(tok))
+
+			if tok.is_composite():
+				_show_tokenlist(tok.tokenize(), level+'  ')
 
 
 
