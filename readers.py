@@ -611,12 +611,17 @@ class CodeReader(BaseReader):
 	def consume_operator(self):
 		""" Consume an operator. """
 
-		# one only
-		if self.matches(r'^([-+|&><])(?!\1)'):
+		# always single so just consume it
+		# * / % ~ ^
+		if self.matches(r'^[*/%~^]'):
 			return self.consume()
 
-		# doesn't have dual version
-		if self.matches(r'^[*/%~!^]'):
+		# - + | & but not: -- ++ || &&
+		if self.matches(r'^([-+|&])(?!\1)'):
+			return self.consume()
+
+		# < > ! but not: <= >= !=
+		if self.matches(r'[><!][^=]'):
 			return self.consume()
 
 		# long ones

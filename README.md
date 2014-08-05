@@ -2,115 +2,47 @@
 
 **This is a free software, using GPL v2**
 
-The goal of this project is to enable better coding practices and more powerful features in the SDS-C scripting language.
+## What is SDS-C?
 
-It takes a SDS-C Plus source code, and digests it into a format compatible with the official SDS-C compiler (that is, ugly code).
+SDS-C is a (pretty bad) scripting language for SDS devices - see their [website](http://wiki.merenienergie.cz/index.php/Sdsc_sysf).
 
-**Example of SDSCP in action**
+### What is wrong with SDS-C?
 
-```c
-// project/library.c
-
-#ifndef LIBRARY_C_INCLUDED // <-- Include guards
-#define LIBRARY_C_INCLUDED
-
-#define RELAY1 sys[231]
-#define RELAY2 sys[232]
-
-#define ON	1
-#define OFF	0
-
-#define isOn(what) ((what) != OFF)             // parenthesis for safety
-#define setTo(what, value) what = (value)
-
-library_function()
-{
-	echo("Hello.");
-}
-
-#endif
-```
-
-```c
-// project/main.c
-
-// including the library file
-#include "library.c"
-
-// We can use macros from library now
-
-#define heating		RELAY1
-#define ventilator 	RELAY2
-
-#define on(x)	setTo(x, 1)
-#define off(x)	setTo(x, 0)
-
-change_mode()
-{
-	if (isOn(heating)) {
-		off(heating);
-		on(ventilator);
-	} else {
-		off(ventilator);
-		on(heating);
-	}
-}
-```
-
-**Process by SDSCP**
-
-    $ sdscp -c project/main.c out/project.c
+I won't go as far as saying "everything", but it'd be pretty close.
 
 
-**Ready for SDS!**
+**= Common things missing =**
 
-```c
-// out/project.c
-
-change_mode
-{
-	if (((sys[231]) != 0)) {
-		sys[231] = (0);
-		sys[232] = (1);
-	} else {
-		sys[232] = (0);
-		sys[231] = (1);
-	}
-}
-```
+- No control structures except `If-Else` and procedures. Why? *"You can just use GOTO"*
+- No function arguments (*"To keep it simple and reliable"*)
+- No return values
+- No function-like macros
+- Can't create arrays.
+- No support for ternary operator (`<cond> ? <then> : <else>`)
+- Can't use branching (`#ifdef` etc)
 
 
-## What is SDS-C anyway?
+**= Bugs & bad design =**
 
-SDS-C is a scripting language for SDS devices - see the [website](http://wiki.merenienergie.cz/index.php/Sdsc_sysf).
-
-It has to be compiled using a very bad proprietary compiler.
-
-### Why is SDS-C so bad?
-
-- No variable scope, all is global
 - `GOTO`s everywhere
-- Stack is limited to 6
-- No function arguments.
-- No return values.
-- No control structures except `IF-ELSE`. Why? "You can just use GOTO"
-- Everything is signed *Int 32*.
-- Except string literals. But you can't store them or do anything with them.
-- String literals use single quotes. And don't support escapes - no way to print `'`
-- There is almost no support for `++` and `--`
-- The authors apparently never heard of ternary operator (`<cond> ? <then> : <else>`)
-- Can't create array variables.
-- Can't use expression as array index, only variable or number.
+- Can't use macros in other macros
+- Can't use `++` and `--` in expression
+- Strings use single quotes. And don't support escapes - no way to print `'`
 - Tab in `#define` is syntax error
-- Can't assign value in variable declaration
+- The compiler usually gives meaningless error messages.
+
+
+**= Dumb limitations =**
+
+- Can't use expression as array index, only variable or number.
+- No variable scope, all is global
+- Stack is limited to 6
 - Can have only 48 routines.
 - Can have only 128 variables.
-- No support for multi-line or functional macros
-- Can't use macros in other macros
-- Can't use branching (`#ifdef` etc)
-- The compiler is super buggy and gives useless error messages.
+- Everything is signed *int32*. (Except strings, but you can't put them in a variable)
 
-It's not that SDS could not handle better language - the compiler is just **REALLY STUPID**.
+
+SDSs are actually quite powerful devices - the compiler is just **REALLY STUPID**.
 
 
 ## Goals of SDSCP
@@ -142,6 +74,95 @@ It's a python script that works as a macro processor, and later will be added a 
 - Local variables (keeping variable value after a function call)
 - Expression as array index
 - Reimplemented functions (GOTO's, redirection vector, storing index on stack etc.) - to remove SDS-C's limitations such as stack size and function count limit.
+
+
+
+
+
+
+**Example of SDSCP in action**
+
+```c
+// project/library.c
+
+#ifndef LIBRARY_C_INCLUDED // <-- Include guards
+#define LIBRARY_C_INCLUDED
+
+#define RELAY1 sys[231]
+#define RELAY2 sys[232]
+
+#define ON	1
+#define OFF	0
+
+#define isOn(what) ((what) != OFF)             // parenthesis for safety
+#define setTo(what, value) what = (value)
+
+say_hello()
+{
+	echo("Hello.");
+}
+
+#endif
+```
+
+```c
+// project/main.c
+
+// including the library file
+#include "library.c"
+
+// We can use macros from library now
+
+#define heating		RELAY1
+#define ventilator 	RELAY2
+
+#define on(x)	setTo(x, 1)
+#define off(x)	setTo(x, 0)
+
+change_mode()
+{
+	if (isOn(heating)) {
+		off(heating);
+		on(ventilator);
+	} else {
+		off(ventilator);
+		on(heating);
+	}
+
+	say_hello();
+}
+```
+
+**Process by SDSCP**
+
+(`-c` flag to remove comments and extra whitespace)
+
+    $ sdscp -c project/main.c out/project.c
+
+
+**Ready for SDS!**
+
+```c
+// out/project.c
+
+say_hello
+{
+	echo('Hello.');
+}
+
+change_mode
+{
+	if (((sys[231]) != 0)) {
+		sys[231] = (0);
+		sys[232] = (1);
+	} else {
+		sys[232] = (0);
+		sys[231] = (1);
+	}
+
+	say_hello();
+}
+```
 
 
 

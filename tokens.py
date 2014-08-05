@@ -112,6 +112,10 @@ class T_BREAK(TokenKeyword):
 	""" The BREAK keyword """
 
 
+class T_RETURN(TokenKeyword):
+	""" The RETURN keyword """
+
+
 class T_CONTINUE(TokenKeyword):
 	""" The CONTINUE keyword """
 
@@ -256,7 +260,7 @@ class T_Expression(CompositeToken):
 				self.tokens.append(t)
 				continue
 
-			raise Exception('Unexpected token near' + rd.peek(10))
+			raise Exception('Unexpected expression token near' + rd.peek(10))
 
 
 
@@ -429,6 +433,31 @@ class Tokenizer:
 		self.source = source
 		self.tokens = None
 
+
+	def __collect_assign_stmt(self, rd):
+		""" Collect a varname = value statement from reader and add as tokens """
+
+		s = rd.consume_identifier()
+		tok = T_Name(s)
+		self.tokens.append(tok)
+
+		rd.consume_non_code() # whitespace
+
+		if rd.has_bracket():
+			s = rd.consume_block()
+			self.tokens.append(T_Bracket(s))
+			rd.consume_non_code() # whitespace
+
+		if rd.starts('++') or rd.starts('--') :
+			sign = rd.consume()
+			rd.consume() # discard the second
+			self.tokens.append( T_Rvalue( "%s=1" % sign ) )
+		elif rd.has_rvalue():
+			self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
+		else:
+			rd.error('Unexpected syntax.')
+
+
 	def tokenize(self):
 
 		if self.tokens != None:
@@ -449,6 +478,8 @@ class Tokenizer:
 
 			# <identifier>
 			elif rd.has_identifier():
+
+				pos_before_s = rd.get_pos()
 
 				s = rd.consume_identifier()
 				rd.consume_non_code() # whitespace perhaps
@@ -563,17 +594,20 @@ class Tokenizer:
 						self.tokens.append( T_VAR() )
 						rd.consume_non_code() # whitespace
 
+						#varname
 						name = rd.consume_identifier()
 						self.tokens.append( T_Name(name) )
 
 						rd.consume_non_code() # whitespace
 
+						# initial value assignment
 						if rd.has_rvalue():
 							v = rd.consume_rvalue()
 							self.tokens.append( T_Rvalue(v) )
 
 						rd.consume_non_code() # whitespace
 
+						# whats next?
 						if rd.starts(','):
 							# more vars
 
@@ -597,19 +631,16 @@ class Tokenizer:
 
 				elif kwd == 'break':
 					self.tokens.append( T_BREAK() )
-
 					continue
 
 
 				elif kwd == 'do':
 					self.tokens.append( T_DO() )
-
 					continue
 
 
 				elif kwd == 'continue':
 					self.tokens.append( T_CONTINUE() )
-
 					continue
 
 
@@ -656,6 +687,7 @@ class Tokenizer:
 					rd.assert_starts(';') # consumed next iteration
 					continue
 
+
 				elif rd.has_paren():
 					# function call or declaration
 
@@ -679,32 +711,16 @@ class Tokenizer:
 
 					continue
 
-				elif rd.has_bracket():
-					# moo[foo] = bar;
-					self.tokens.append( T_SET() )
-					self.tokens.append( T_Name( s ) )
 
-					bracket = rd.consume_block() # consume the bracket
-					self.tokens.append( T_Bracket( bracket ) )
-
-					rd.consume_non_code() # whitespace
-
-					if not rd.has_rvalue():
-						rd.error('Expected assignment.')
-
-					self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
-
-					rd.consume_non_code() # whitespace
-
-					rd.consume_exact(';');
-
-					continue
-
-				elif rd.has_rvalue():
+				elif rd.has_bracket() or rd.has_rvalue() or rd.starts('++') or rd.starts('--'):
 					# foo = bar, other = baz;
 					self.tokens.append( T_SET() )
-					self.tokens.append( T_Name( s ) )
-					self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
+
+					rd.move_to(pos_before_s) # rewind
+
+					self.__collect_assign_stmt(rd)
+
+					rd.consume_non_code() # whitespace
 
 					if rd.starts(';'):
 						continue
@@ -716,39 +732,24 @@ class Tokenizer:
 							rd.consume_non_code() # whitespace
 
 							if rd.has_identifier():
+
 								self.tokens.append( T_Semicolon() ) # start new statement
 								self.tokens.append( T_SET() )
-								self.tokens.append( T_Name( rd.consume_identifier() ) )
-								rd.consume_non_code() # whitespace
 
-								self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
+								self.__collect_assign_stmt(rd)
+
 							else:
 								rd.error('Missing identifier.')
 
 							rd.consume_non_code() # whitespace
 
 							if rd.starts(','):
+								rd.consume()
 								continue
 							elif rd.starts(';'):
 								break
 							else:
 								rd.error('Expected , or ; here.')
-
-
-				elif rd.starts('++'):
-					rd.consume_exact('++')
-
-					self.tokens.append( T_SET() )
-					self.tokens.append( T_Name(s) )
-					self.tokens.append( T_Rvalue('+= 1') )
-
-
-				elif rd.starts('--'):
-					rd.consume_exact('--')
-
-					self.tokens.append( T_SET() )
-					self.tokens.append( T_Name(s) )
-					self.tokens.append( T_Rvalue('-= 1') )
 
 
 				else:
@@ -835,18 +836,6 @@ class Tokenizer:
 			elif rd.starts(':'):
 				rd.consume()
 				self.tokens.append( T_Colon() )
-
-
-			# ++
-			elif rd.starts('++'):
-				rd.consume_exact('++')
-				self.tokens.append( T_Increment() )
-
-
-			# --
-			elif rd.starts('--'):
-				rd.consume_exact('--')
-				self.tokens.append( T_Decrement() )
 
 
 			else:
