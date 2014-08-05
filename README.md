@@ -248,7 +248,7 @@ sdscp input.c -ptc
 
 # to test the "pretty" to "SDS-C" filter
 sdscp input.c -pdc
-``
+```
 
 
 SDSCP generates a SDS-C compatible source code, or warns you if there is some problem.
