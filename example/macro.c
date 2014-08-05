@@ -10,7 +10,6 @@
 
 main()
 {
-
 	var a = ADD(12, 13);
 	var b = Q(a > 13, ADD(ADD(Inner1, Inner2), Outer), 456+15);
 }
