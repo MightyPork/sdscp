@@ -149,7 +149,7 @@ class BaseReader:
 	def validate_cursor(self):
 		""" Assert that the cursor is not outside string bounds """
 		if self.pos >= self.length or self.pos < 0:
-			self.error('Cursor is out of the string range.')
+			self.error('Unexpected end of scope. Maybe something like missing semicolon?')
 
 
 
@@ -307,8 +307,9 @@ class CodeReader(BaseReader):
 
 
 
-	def consume_non_code(self):
+	def sweep(self):
 		""" Consume comments and whitespace """
+
 		pos_begin = self.pos
 
 		while self.pos < self.length:
@@ -353,7 +354,7 @@ class CodeReader(BaseReader):
 
 		while self.pos < self.length:
 
-			self.consume_non_code()
+			self.sweep()
 
 			if self.matches( self.RE_STRING_QUOTE ):
 				self.consume_string()
@@ -649,7 +650,7 @@ class CodeReader(BaseReader):
 		else:
 			self.error('Expected equals or extended equals, found:'+self.peek(2))
 
-		self.consume_non_code()
+		self.sweep()
 		buffer += ' '
 		buffer += self.consume_code(end=[';', ','], consume_end=False)
 

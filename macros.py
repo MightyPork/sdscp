@@ -38,7 +38,7 @@ class MacroReader(CodeReader):
 
 		buffer += ' '
 
-		trash = self.consume_non_code()
+		trash = self.sweep()
 
 		if trash.count('\n') > 0:
 			# was no-body macro
@@ -52,7 +52,7 @@ class MacroReader(CodeReader):
 
 			if self.has_inline_comment():
 				# consume comment
-				self.consume_non_code()
+				self.sweep()
 
 				if last_was_backslash:
 					buffer = buffer_before_backslash.strip() + ' '
@@ -63,7 +63,7 @@ class MacroReader(CodeReader):
 
 
 			if self.has_block_comment():
-				trash = self.consume_non_code()
+				trash = self.sweep()
 				if trash.count('\n') > 0:
 					# was more lines
 
@@ -86,7 +86,7 @@ class MacroReader(CodeReader):
 					last_was_backslash = False
 
 					# new line of macro
-					self.consume_non_code()
+					self.sweep()
 					buffer = buffer_before_backslash.strip() + ' '
 
 					continue
@@ -239,7 +239,7 @@ class MacroReader(CodeReader):
 
 			# print('At: %s' % re.sub(r'[\n\t ]+', ' ', self.peek(20)) )
 
-			self.consume_non_code() # comments and whitespace
+			self.sweep() # comments and whitespace
 
 			if self.has_end():
 				break
@@ -612,13 +612,13 @@ class MacroProcessor:
 		# handle whitespace
 		if self.keep_comments:
 			# keep comments, indentation and up to two newlines (at once)
-			j = rd.consume_non_code()
+			j = rd.sweep()
 			if len(j) > 0:
 				out += re.sub(r'\n{2,}', '\n\n', j)
 
 		else:
 			# keep up to two newlines and indentation
-			j = rd.consume_non_code()
+			j = rd.sweep()
 			if len(j) > 0:
 				if j.count('\n') >= 2:
 					out += '\n\n'
@@ -860,7 +860,7 @@ class MacroProcessor:
 				s = ''
 				while rd.has_string():
 					s += rd.consume_string()[1:-1] # drop quotes
-					rd.consume_non_code()
+					rd.sweep()
 
 				out += '"%s"' % s
 
