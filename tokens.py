@@ -584,6 +584,7 @@ class Tokenizer:
 		rd.sweep()
 
 		lbl = rd.consume_identifier()
+		self.tokens.append( T_LABEL() )
 		self.tokens.append( T_Name(lbl) )
 
 		rd.sweep()
@@ -736,8 +737,7 @@ class Tokenizer:
 
 		elif kwd == 'label':
 			# the label keyword (optional for labels)
-			self.tokens.append( T_LABEL() )
-
+			rd.move_to(pos_before_s) # backtrack
 			self.__collect_label(rd)
 
 

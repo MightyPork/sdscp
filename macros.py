@@ -804,7 +804,8 @@ class MacroProcessor:
 		""" Apply macros in the output """
 
 		if len(self.output) == 0:
-			raise Exception('There\'s no text to work with. Did you run process()?')
+			print('There is no source code.')
+			return
 
 		applied_count = 0
 
