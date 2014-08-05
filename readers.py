@@ -617,17 +617,17 @@ class CodeReader(BaseReader):
 		if self.matches(r'^[*/%~^]'):
 			return self.consume()
 
-		# - + | & but not: -- ++ || &&
-		if self.matches(r'^([-+|&])(?!\1)'):
-			return self.consume()
-
-		# < > ! but not: <= >= !=
-		if self.matches(r'[><!][^=]'):
-			return self.consume()
-
 		# long ones
 		if self.matches(r'^(&&|\|\||<<|>>|>=|<=|==|!=|\+\+|--)'):
 			return self.consume(2)
+
+		# < > !
+		if self.matches(r'[><!]'):
+			return self.consume()
+
+		# - + | &
+		if self.matches(r'^[-+|&]'):
+			return self.consume()
 
 		self.error('Expected operator, found something else.')
 

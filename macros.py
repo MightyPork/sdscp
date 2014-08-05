@@ -4,6 +4,7 @@ import re
 from readers import CodeReader
 from tokens import Token, T_Paren, ParenType
 import os.path
+from collections import OrderedDict
 
 
 class MacroReader(CodeReader):
@@ -582,7 +583,7 @@ class MacroProcessor:
 		self.main_file = main_file
 		self.source = _load_file(main_file)
 		self.output = ''
-		self.defines = {}
+		self.defines = OrderedDict()
 		self.keep_comments = True
 
 
@@ -722,7 +723,7 @@ class MacroProcessor:
 				defined = (d.name in self.defines)
 				if defined:
 					defined = (self.defines[d.name].body != '0')
-					print('Checking # condition: %s is %s' % (d.name, self.defines[d.name].body) )
+					# print('Checking # condition: %s is %s' % (d.name, self.defines[d.name].body) )
 
 				if positive == defined:
 					# is defined
