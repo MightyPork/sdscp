@@ -21,7 +21,7 @@ parser.add_argument(
 
 parser.add_argument(
 	'-o', '--output',
-	help='The output file; If not specified, output will be printed to console.'
+	help='The output file. To just print the output, use -d'
 )
 
 parser.add_argument(
@@ -37,25 +37,17 @@ parser.add_argument(
 		default=False,
 		help='Show all optional debug info.'
 )
-
 parser.add_argument(
-		'-t', '--show-tokens',
+		'-s', '--show-source',
 		action='store_true',
 		default=False,
-		help='Show tokenization.'
+		help='Show original source (only main file)'
 )
-
 parser.add_argument(
 		'-m', '--show-macros',
 		action='store_true',
 		default=False,
 		help='List all macros'
-)
-parser.add_argument(
-		'-p', '--show-processed',
-		action='store_true',
-		default=False,
-		help='Show code after replacing macros (preprocessor output)'
 )
 parser.add_argument(
 		'-r', '--show-resolved',
@@ -64,16 +56,22 @@ parser.add_argument(
 		help='Show code after processing includes and # branching.'
 )
 parser.add_argument(
-		'-s', '--show-source',
+		'-p', '--show-processed',
 		action='store_true',
 		default=False,
-		help='Show original source (only main file)'
+		help='Show code after replacing macros (preprocessor output)'
+)
+parser.add_argument(
+		'-t', '--show-tokens',
+		action='store_true',
+		default=False,
+		help='Show tokenization.'
 )
 parser.add_argument(
 		'-d', '--show-output',
 		action='store_true',
 		default=False,
-		help='Show the final source'
+		help='Show the final source (D stands for Display)'
 )
 
 args = parser.parse_args()
