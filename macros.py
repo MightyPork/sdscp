@@ -166,7 +166,7 @@ class MacroReader(CodeReader):
 		if self.has_end():
 			return False
 
-		return self.matches(r'#[a-zA-Z][a-zA-Z_]+(?:[^a-zA-Z_]|$)')
+		return self.matches(r'#^[a-zA-Z_][a-zA-Z0-9_]+(?:[^a-zA-Z0-9_]|$)')
 
 
 
