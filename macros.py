@@ -482,10 +482,7 @@ class D_Define(Token):
 				if self.vararg_pos == n:
 					s += '...'
 				n += 1
-			s += ')'
-
-		if self.vararg_pos != None:
-			s += ' v@%d ' % self.vararg_pos
+			s += ') '
 
 		if len(s) < 30:
 			s = (s + '.'*35)[:35]
@@ -521,7 +518,7 @@ class D_Define(Token):
 				if len(self.args) != len(args):
 					return False
 			else:
-				if len(self.args)-1 > len(args): # variadic one can be empty
+				if len(self.args)-1 > len(args): # variadic arg can be missing
 					return False
 
 		return True
@@ -610,12 +607,16 @@ class D_Define(Token):
 				va_empty_done = False
 				if self.vararg_pos != None and dt.name == self.args[self.vararg_pos]:
 					# this is variadic argument
-					if len(a2v[dt.name].strip()) == 0:
-						# is empty
-						if re.match(r'\A.*?,[ \t]*##[ \t]?\Z', generated):
-							# preceded by a concatenation operator
-							generated = generated[0:generated.rindex(',')]
+
+					if re.match(r'\A.*?,[ \t]*##[ \t]?\Z', generated):
+						# preceded by a concatenation operator
+
+						if len(a2v[dt.name].strip()) == 0:
+							# empty
+							generated = generated[:generated.rindex(',')] # remove since last comma
 							va_empty_done = True
+						else:
+							generated = generated[:-2] # just remove the ##
 
 				if not va_empty_done:
 					generated += a2v[dt.name]
@@ -995,6 +996,9 @@ class MacroProcessor:
 
 						if replacement == None:
 							out += ident + ident_whitesp + paren
+							print(
+								'[W] Macro "%s" defined, but can\'t use arguments (%s)'
+								% (ident, ', '.join(args) ))
 						else:
 							out += replacement
 							applied_count += 1

@@ -1,3 +1,4 @@
+// This example shows how strings behave within macros
 
 #define INDEX "index.php"
 
