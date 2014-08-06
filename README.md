@@ -17,7 +17,7 @@
 		- [Define and # branching](#user-content-define-and--branching)
 		- [Constant macros](#user-content-constant-macros)
 		- [Function-like macros](#user-content-function-like-macros)
-		- [Variadic function-like macros](#user-content-variadic-function-like-macros)
+		- [Variadic macros](#user-content-variadic-macros)
 		- [Array-like macros](#user-content-array-like-macros)
 		- [Macro overloading](#user-content-macro-overloading)
 		- [Using macros in other macros](#user-content-using-macros-in-other-macros)
@@ -402,8 +402,7 @@ Function-like macros can span multiple lines:
 ```
 
 
-
-#### Variadic function-like macros
+#### Variadic macros
 
 Yes, you heard right: variadic macros.
 
@@ -433,8 +432,34 @@ And you get:
 http_get(192, 165, 120, 11, "localhost", "index.php?a=", sys[140], "&b=", sys[445], "&c=", myVar);
 ```
 
-**Pretty cool, right?**
+*Pretty cool, right?*
 
+**Dealing with trailing commas**
+
+One more useful tip - sometimes, when the variadic argument can be left out, you have a problem with the trailing comma:
+
+```c
+#define my_print(t...) echo("[MESSAGE] ", t)
+
+my_print("hello");
+// -> echo("[MESSAGE] ", "hello");
+
+my_print(); // Intent: print a blank line
+// -> echo("[MESSAGE] ", );
+```
+
+What you got is simply a *syntax error*.
+
+SDSCP borrows one handy trick from GCC - add `##` before the argument, and it will consume the comma before it, if the argument is empty:
+
+```c
+#define my_print(t...) echo("[MESSAGE] ", ## t)
+
+my_print();
+// -> echo("[MESSAGE] ");
+```
+
+This works only on the preceding comma, putting `##` after the argument will not work.
 
 
 #### Array-like macros
