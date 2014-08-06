@@ -444,7 +444,7 @@ One more useful tip - sometimes, when the variadic argument can be left out, you
 my_print("hello");
 // -> echo("[MESSAGE] ", "hello");
 
-my_print(); // Intent: print a blank line
+my_print(); // Here we have a problem:
 // -> echo("[MESSAGE] ", );
 ```
 
