@@ -17,7 +17,9 @@
 		- [Define and # branching](#user-content-define-and--branching)
 		- [Constant macros](#user-content-constant-macros)
 		- [Function-like macros](#user-content-function-like-macros)
+		- [Variadic function-like macros](#user-content-variadic-function-like-macros)
 		- [Array-like macros](#user-content-array-like-macros)
+		- [Macro overloading](#user-content-macro-overloading)
 		- [Using macros in other macros](#user-content-using-macros-in-other-macros)
 
 ## What is SDS-C?
@@ -197,7 +199,7 @@ At the time of writing this, you would get:
 
 ```none
 $ sdscp -h
-usage: sdscp [-h] [-o OUTPUT] [-c] [-v] [-t] [-m] [-p] [-r] [-s] [-d] source
+usage: sdscp [-h] [-o OUTPUT] [-c] [-v] [-s] [-m] [-r] [-p] [-t] [-d] source
 
 SDS-C macro preprocessor
 
@@ -207,16 +209,16 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -o OUTPUT, --output OUTPUT
-                        The output file; If not specified, output will be
-                        printed to console.
+                        The output file. To just print the output, use -d
   -c, --clean           Remove some whitespace and all comments
   -v, --verbose         Show all optional debug info.
-  -t, --show-tokens     Show tokenization.
-  -m, --show-macros     List all macros
-  -p, --show-processed  Show code after replacing macros (preprocessor output)
-  -r, --show-resolved   Show code after processing includes and # branching.
   -s, --show-source     Show original source (only main file)
-  -d, --show-output     Show the final source
+  -m, --show-macros     List all macros
+  -r, --show-resolved   Show code after processing includes and # branching.
+  -p, --show-processed  Show code after replacing macros (preprocessor output)
+  -t, --show-tokens     Show tokenization.
+  -d, --show-output     Show the final source (D stands for Display)
+
 ```
 
 **Some examples:**
@@ -261,18 +263,18 @@ But stay assured that SDS-C will loudly complain.
 
 ### Pre-processing
 
-#### Include Guards
-
 Note, that until all files are connected, the evaluation is linear.
 
 That means that macro is not defined above it's `#define` directive, and it is defined all the way below it. Included files can see all already defined macros.
 
 However, once the files are connected, the definition order no longer matters.
 
-If you re-define a macro, the later definition will have effect (that is, until macro overloading is implemented)
+If you re-define a macro, the later definition will have effect (unless their types / argument count differs - for that, see Overloading Macros)
 
 
-The linear nature of the concatenation phase can be used to make so Include Guards:
+#### Include Guards
+
+The linear nature of the concatenation phase can be used to make so called Include Guards:
 
 ```c
 #ifndef UTILS_INCLUDED
@@ -315,7 +317,6 @@ If you set the value to 0 with `#define <name> 0`, it will be treated as undefin
 That means you can set value to 0 to disable a flag, instead of commenting it out.
 
 ```c
-
 #define DO_STUFF
 #define BE_LAZY 0 // Don't be lazy
 
@@ -400,6 +401,42 @@ Function-like macros can span multiple lines:
                       print("It's done!")      // <-- no semicolon, to allow syntax like LONG_MACRO();
 ```
 
+
+
+#### Variadic function-like macros
+
+Yes, you heard right: variadic macros.
+
+SDSCP lets you do this by putting three dots after an argument name:
+
+
+```c
+// I don't like "echo", let's make an alias
+#define print(t...) echo(t)
+```
+
+The variadic argument can be at the beginning, at the end, or anywhere in between, but you can use **only one** variadic argument (otherwise it would be ambiguous).
+
+One useful example for SDS:
+
+```c
+// simplified http_get
+
+#define my_http_get(path...) http_get(192, 168, 10, 20, "localhost", path)
+
+// how to use
+my_http_get("index.php?a=", sys[140], "&b=", sys[445], "&c=", myVar);
+```
+And you get:
+
+```c
+http_get(192, 165, 120, 11, "localhost", "index.php?a=", sys[140], "&b=", sys[445], "&c=", myVar);
+```
+
+**Pretty cool, right?**
+
+
+
 #### Array-like macros
 
 They are pretty much the same like function-like macros, except they must take EXACTLY one parameter, and use square brackets:
@@ -429,43 +466,44 @@ test()
 However, this **will not work (yet)**, since SDS-C can't handle expression as array index.
 That will be taken care of in some future version of SDSCP.
 
-For now, all you can do is this, but it's broken:
-
-```c
-var a; // temporary variable
-#define RELAY[n] a = 231+((n)-1); \  // <-- see the statement? That's not good.
-                 sys[a]
-
-test()
-{
-	// Works fine
-	RELAY[6] = 1;
-	// ->
-	//    a = 231+((6)-1);    // Assign address to a temporary variable
-	//    sys[a] = 1;         // assign the value
 
 
-	// Does not work
-	echo( RELAY[5] );
-	// ->
-	//    echo(
-	//      a = 231+((5)-1);  // statement inside echo
-	//      sys[a]
-	//    );
+#### Macro overloading
 
-	// Neither does this
-	foo = RELAY[6] + RELAY[2];
-	// ->
-	//    foo = a = 231+((6)-1);    // I doubt SDS-C can handle this
-	//    sys[a] + a = 231+((2)-1); // This doesn't even make any sense
-	//    sys[a];                   // Neither does this
-}
+SDSCP supports macro overloading. Shortly, it means that you can have multiple macros with the same name, as long as their usage looks different.
+
+This may get a bit confusing with variadic macros, so be careful.
+
+```
+#define ADD(a, b)  ((a) + (b))
+#define ADD(a, b, c)  ((a) + (b) + (c))
+#define ADD(a, b, c, d)  ((a) + (b) + (c) + (c))
 ```
 
-Conclusion? Be careful with macros - in general.
+You can even have together Array-like, Function-like and Constant macro at the same time, if you for some bizzare reason need it.
+
+Running SDSCP with the `-m` flag reveals that you indeed have defined three different macros:
+
+```none
+  MACRO: add(a, b) .................. ((a) + (b))
+  MACRO: add(a, b, c) ............... ((a) + (b) + (c))
+  MACRO: add(a, b, c, d) ............ ((a) + (b) + (c) + (d))
+```
+
+You can use them all in the same file, SDSCP will try it's best to pick the right one.
+
+If you're not sure it works right, try running SDSCP with `-rpm`, to see list of macros, code before and after the replacements are done.
+
+
 
 #### Using macros in other macros
 
-...obviously works, unlike in SDS-C.
+Works just fine with SDSCP, unlike in the original SDS-C.
 
-This is shown in the example at the very top.
+```c
+#define ID = 12345
+#define show_id() echo(ID)
+
+show_id();
+// -> echo(12345);
+```
