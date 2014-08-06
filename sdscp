@@ -197,7 +197,7 @@ def prepare_for_sdsc(code):
 
 try:
 
-	banner('SDS-C Plus', ':')
+	banner('SDS-C Preprocessor', ':')
 
 	print('Reading file:', SRC)
 

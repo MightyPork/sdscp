@@ -910,10 +910,10 @@ class TokenWalker:
 
 
 
-	def has(self, clazz, offset=1):
+	def has(self, kind, offset=1):
 		""" Get if the next (or offset) token is of given type """
 
-		return isinstance(self.peek(offset), clazz)
+		return isinstance(self.peek(offset), kind)
 
 
 	def move(self, steps=1):
