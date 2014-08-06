@@ -220,7 +220,8 @@ try:
 		banner('MACROS', '-')
 		print('List of all found macros, in definition order:\n')
 		for d in mp.get_defines().values():
-			print('  ' + str(d))
+			for m in d:
+				print('  ' + str(m))
 		print()
 
 

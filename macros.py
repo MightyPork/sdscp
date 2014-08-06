@@ -355,6 +355,7 @@ class DT_Var:
 class D_Define(Token):
 	""" #define name(args) body """
 
+
 	def __init__(self, value):
 		super().__init__(value)
 
@@ -367,31 +368,43 @@ class D_Define(Token):
 
 		# arraylike flag
 		self.arraylike = False
+		self.functionlike = False
 
-		# macro parameters
+		# macro arguments
 		self.args = None
+
+		# which argument is variadic
+		self.vararg_pos = None
 
 		#print(str(rd.has_bracket()))
 
 		if rd.has_paren():
 			tmp = rd.consume_block()[1:-1] # inside the paren
 			self.args = []
-			for i in tmp.split(','):
-				i = i.strip()
-				if len(i) > 0:
-					self.args.append(i)
+			for a in tmp.split(','):
+				a = a.strip()
+				if len(a) > 0:
+
+					if a[-3:] == '...':
+						# a is a variadic argument
+
+						if self.vararg_pos != None:
+							rd.error('Macro can have only one variadic argument!')
+
+						self.vararg_pos = len(self.args)
+						a = a[:-3].strip()
+
+					self.args.append(a)
+
+			self.functionlike = True
 
 		elif rd.has_bracket():
-			tmp = rd.consume_block()[1:-1] # inside the bracket
-			self.args = []
-			for i in tmp.split(','):
-				i = i.strip()
-				if len(i) > 0:
-					self.args.append(i)
+			tmp = rd.consume_block()[1:-1].strip() # inside the bracket
 
-			if len(self.args) != 1:
-				rd.error('Array-like macro must have exactly one parameter.')
+			if not re.match(r'\A[a-zA-Z_][a-zA-Z0-9_]*\Z', tmp):
+				rd.error('Invalid argument format for macro "%s": %s' % (self.name, tmp))
 
+			self.args = [tmp]
 			self.arraylike = True
 
 
@@ -404,7 +417,6 @@ class D_Define(Token):
 		self.tokens = []
 
 		self.__parse_body()
-
 
 
 	def __parse_body(self):
@@ -458,8 +470,22 @@ class D_Define(Token):
 
 		if self.args == None:
 			s += ' '
+		elif self.arraylike:
+			s += '[%s] ' % self.args[0]
 		else:
-			s += '(%s) ' % ', '.join(self.args)
+			s += '('
+			n=0
+			for a in self.args:
+				if n > 0:
+					s += ', '
+				s += a
+				if self.vararg_pos == n:
+					s += '...'
+				n += 1
+			s += ')'
+
+		if self.vararg_pos != None:
+			s += ' v@%d ' % self.vararg_pos
 
 		if len(s) < 30:
 			s = (s + '.'*35)[:35]
@@ -477,29 +503,103 @@ class D_Define(Token):
 		return self.arraylike
 
 
-	def generate(self, arguments=None):
+	def is_functionlike(self):
+		""" Get if this macro is function-like """
+
+		return self.functionlike
+
+
+	def can_use_args(self, args):
+		""" Check if this macro could be used with the given arguments """
+
+		if (self.args == None) != (args == None):
+			return False
+
+		if self.args != None:
+
+			if self.vararg_pos == None:
+				if len(self.args) != len(args):
+					return False
+			else:
+				if len(self.args)-1 > len(args): # variadic one can be empty
+					return False
+
+		return True
+
+
+
+	def equals_signature(self, other):
+		""" Check if this macro can seamlessly substitute another macro """
+
+		# the name must be the same
+		if self.name != other.name:
+			return False
+
+		if (self.args == None) != (other.args == None):
+			# one has args and the other not
+			return False
+
+		if len(self.args) != len(other.args):
+			# differ in number of args
+			return False
+
+		if self.arraylike != other.arraylike:
+			return False
+
+		if self.functionlike != other.functionlike:
+			return False
+
+		if self.vararg_pos != other.vararg_pos:
+			# which argument is variadic
+			return False
+
+		return True
+
+
+
+	def generate(self, args=None):
 		""" Generate replacement for given arguments """
 
+		if not self.can_use_args(args):
+			raise Exception('Macro %s cannot be used with arguments %s!' % (self.name, ','.join(args)) )
+
+
+		# no-args macro
 		if self.args == None:
-			if arguments != None:
-				raise Exception('Macro %s is not function-like, cannot call with ()!')
-
 			return self.tokens[0].text
-
-		# ensure not None
-		if arguments == None:
-			arguments = []
-
-		if len(self.args) != len(arguments):
-			raise Exception('Macro %s takes %d arguments, %d given! (%s)'
-				% (self.name, len(self.args), len(arguments), ','.join(arguments) ))
 
 
 		# argument->value map
 		a2v = {}
 
-		for i in range(0, len(self.args)):
-			a2v[ self.args[i] ] = arguments[i]
+		if self.vararg_pos == None:
+			for i in range(0, len(self.args)):
+				a2v[ self.args[i] ] = args[i]
+		else:
+
+			pre_from = 0
+			pre_to = self.vararg_pos
+
+			va_from = pre_to
+			va_to = len(args)-(len(self.args) - self.vararg_pos) +1
+
+			post_from = va_to
+			post_to = len(args)
+
+
+			for i in range(pre_from, pre_to):
+				a2v[ self.args[i] ] = args[i]
+
+			va = []
+			for i in range(va_from, va_to):
+				va.append(args[i])
+			a2v[ self.args[self.vararg_pos] ] = ', '.join(va)
+
+			# print( 'VA: %s' % (','.join(va)) )
+
+			for i in range(post_from, post_to):
+				a2v[ self.args[i-len(va)+1] ] = args[i]
+
 
 		generated = ''
 
@@ -507,7 +607,18 @@ class D_Define(Token):
 			if not dt.is_var():
 				generated += dt.text
 			else:
-				generated += a2v[dt.name]
+				va_empty_done = False
+				if self.vararg_pos != None and dt.name == self.args[self.vararg_pos]:
+					# this is variadic argument
+					if len(a2v[dt.name].strip()) == 0:
+						# is empty
+						if re.match(r'\A.*?,[ \t]*##[ \t]?\Z', generated):
+							# preceded by a concatenation operator
+							generated = generated[0:generated.rindex(',')]
+							va_empty_done = True
+
+				if not va_empty_done:
+					generated += a2v[dt.name]
 
 		return generated
 
@@ -591,8 +702,19 @@ class MacroProcessor:
 	def add_defines(self, new_defines):
 		""" Add extra defines to the processor """
 
-		self.defines.update( new_defines )
+		for (name, macros) in new_defines.items():
+			if not name in self.defines:
+				self.defines[name] = macros
+			else:
+				# merge
+				for new_m in new_defines[name]:
+					self.defines[name].prepend(new_m)
 
+				# remove duplicates from the list
+				for i in range(0, len(self.defines[name]) ):
+					for j in range(len(self.defines[name])-1, -1, -1):
+						if self.defines[i].equals_signature( self.defines[j] ):
+							del self.defines[j]
 
 
 	def get_defines(self):
@@ -675,7 +797,10 @@ class MacroProcessor:
 
 				s = rd.consume_define_directive()
 				d = D_Define(s)
-				self.defines[d.name] = d
+				if not d.name in self.defines:
+					self.defines[d.name] = []
+
+				self.defines[d.name].append(d)
 
 
 			# #include - include external file
@@ -823,19 +948,35 @@ class MacroProcessor:
 			if rd.has_identifier():
 
 				ident = rd.consume_identifier()
+				ident_whitesp = rd.consume_inline_whitespace()
+
 				if ident in self.defines:
 
-					macro = self.defines[ident]
-					applied_count += 1
+					macros = self.defines[ident]
 
-					if macro.is_arraylike():
-						if not rd.has_bracket():
-							rd.error('Missing [index] for array-like macro %s!' % macro.name)
+					replacement = None
+
+					if rd.has_bracket():
+						# array macro
 
 						bracket = rd.consume_block()[1:-1]
-						replacement = macro.generate([bracket])
+
+						for mm in macros:
+							if mm.is_arraylike():
+								if mm.can_use_args([bracket]):
+									replacement = mm.generate([bracket])
+									break
+
+						if replacement == None:
+							out += ident + ident_whitesp
+							out += '[%s]' % bracket
+						else:
+							out += replacement
+							applied_count += 1
 
 					elif rd.has_paren():
+						# func macro
+
 						paren = rd.consume_block()
 
 						t = T_Paren(paren)
@@ -846,15 +987,35 @@ class MacroProcessor:
 						for a in t.tokens:
 							args.append(a.value)
 
-						replacement = macro.generate(args)
+						for mm in macros:
+							if mm.is_functionlike():
+								if mm.can_use_args(args):
+									replacement = mm.generate(args)
+									break
+
+						if replacement == None:
+							out += ident + ident_whitesp + paren
+						else:
+							out += replacement
+							applied_count += 1
+
+
 					else:
-						replacement = macro.generate(None)
+						# const macro
 
+						for mm in macros:
+							if mm.can_use_args(None):
+								replacement = mm.generate(None)
+								break
 
-					out += replacement
+						if replacement == None:
+							out += ident + ident_whitesp
+						else:
+							out += replacement + ident_whitesp
+							applied_count += 1
 
 				else:
-					out += ident # give it back
+					out += ident + ident_whitesp # give it back
 
 			# "...", and "sdgfsd""JOINED"  "This too"
 			elif rd.has_string():
