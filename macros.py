@@ -506,6 +506,12 @@ class D_Define(Token):
 		return self.functionlike
 
 
+	def is_constant(self):
+		""" Get if this macro is constant """
+
+		return (not self.functionlike) and not (self.arraylike)
+
+
 	def can_use_args(self, args):
 		""" Check if this macro could be used with the given arguments """
 
@@ -536,18 +542,20 @@ class D_Define(Token):
 			# one has args and the other not
 			return False
 
-		if len(self.args) != len(other.args):
-			# differ in number of args
-			return False
+		if self.args != None:
 
-		if self.arraylike != other.arraylike:
-			return False
+			if len(self.args) != len(other.args):
+				# differ in number of args
+				return False
+
+			if self.arraylike != other.arraylike:
+				return False
+
+			if self.vararg_pos != other.vararg_pos:
+				# which argument is variadic
+				return False
 
 		if self.functionlike != other.functionlike:
-			return False
-
-		if self.vararg_pos != other.vararg_pos:
-			# which argument is variadic
 			return False
 
 		return True
@@ -704,18 +712,27 @@ class MacroProcessor:
 		""" Add extra defines to the processor """
 
 		for (name, macros) in new_defines.items():
+			#print('macro name %s' % name)
 			if not name in self.defines:
-				self.defines[name] = macros
+
+				self.defines[name] = []
+				for new_m in macros:
+					self.defines[name].append(new_m)
+
 			else:
+				#print(new_defines[name])
+
 				# merge
-				for new_m in new_defines[name]:
-					self.defines[name].prepend(new_m)
+				for new_m in macros:
+					#print(new_m)
+					self.defines[name].insert(0, new_m)
 
 				# remove duplicates from the list
 				for i in range(0, len(self.defines[name]) ):
-					for j in range(len(self.defines[name])-1, -1, -1):
-						if self.defines[i].equals_signature( self.defines[j] ):
-							del self.defines[j]
+					for j in range(len(self.defines[name])-1, i, -1):
+						if self.defines[name][i].equals_signature( self.defines[name][j] ):
+							del self.defines[name][j]
+
 
 
 	def get_defines(self):
@@ -848,8 +865,21 @@ class MacroProcessor:
 
 				defined = (d.name in self.defines)
 				if defined:
-					defined = (self.defines[d.name].body != '0')
-					# print('Checking # condition: %s is %s' % (d.name, self.defines[d.name].body) )
+					found = False
+
+					# print(','.join([str(m) for m in self.defines[d.name]]))
+
+					for m in self.defines[d.name]:
+						if m.is_constant():
+							defined = (m.body != '0')
+							found = True
+							break
+
+					if not found:
+						print('[W] Macro %s is not constant.' % (d.name) )
+						defined = False
+
+					print('- Checking # condition: %s is %s' % (d.name, [0,1][defined]) )
 
 				if positive == defined:
 					# is defined
