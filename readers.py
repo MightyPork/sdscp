@@ -427,30 +427,29 @@ class CodeReader(BaseReader):
 			for ee in end:
 				if self.starts(ee):
 					if not consume_end:
-						return self.from_pos(pos_begin).strip()
+						return buffer.strip()
 					else:
 						if keep_end:
 							# consume end and add it to the value
-							self.consume_exact(ee)
-							return self.from_pos(pos_begin).strip()
+							buffer += self.consume_exact(ee)
+							return buffer.strip()
 						else:
 							# consume end, but don't add it to the value
-							txt = self.from_pos(pos_begin).strip()
 							self.consume_exact(ee)
-							return txt
+							return buffer.strip()
 
 			char = self.peek()
 
 			if char in ['(', '[']:
-				self.consume_block()
+				buffer += self.consume_block()
 				continue
 
 			elif self.has_string():
-				self.consume_string()
+				buffer += self.consume_string()
 				continue
 
 			elif self.has_char():
-				self.consume_char()
+				buffer += self.consume_char()
 				continue
 
 			elif self.has_block_comment():
@@ -461,11 +460,11 @@ class CodeReader(BaseReader):
 				self.consume_inline_comment()
 				continue
 
-			self.consume()
+			buffer += self.consume()
 
 
 		if eof:
-			return self.from_pos(pos_begin).strip()
+			return buffer.strip()
 		else:
 			self.move_to(pos_begin)
 			self.error('Expected to find %s, found End Of File.' % end)

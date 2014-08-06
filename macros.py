@@ -10,9 +10,42 @@ from collections import OrderedDict
 class MacroReader(CodeReader):
 	""" Code reader with support for directives """
 
+	# opts
+	keep_macro_newlines = True
+	keep_macro_indent = False
+
 	def _consume_directive_name(self, name):
 		""" Consume #<name> """
 		return self.consume_exact('#'+name)
+
+
+	def __define_get_whitespace(self, j):
+		""" Extract whitespace to keep, from j ("junk") """
+
+		white = ''
+
+		if self.keep_macro_newlines:
+
+			if len(j) > 0:
+
+				if j.count('\n') >= 2:
+					white += '\n\n'
+
+				elif j.count('\n') == 1:
+					white += '\n'
+
+
+				c = len(j)-1
+
+				if self.keep_macro_indent:
+					while c >= 0 and j[c] in ['\t', ' ']:
+						white += j[c]
+						c -= 1
+
+		else:
+			white = ' '
+
+		return white
 
 
 
@@ -53,10 +86,11 @@ class MacroReader(CodeReader):
 
 			if self.has_inline_comment():
 				# consume comment
-				self.sweep()
+				j = self.sweep()
+				white = self.__define_get_whitespace(j)
 
 				if last_was_backslash:
-					buffer = buffer_before_backslash.strip() + ' '
+					buffer = buffer_before_backslash.strip() + white
 					last_was_backslash = False
 					continue
 				else:
@@ -64,13 +98,19 @@ class MacroReader(CodeReader):
 
 
 			if self.has_block_comment():
-				trash = self.sweep()
-				if trash.count('\n') > 0:
+
+				j = self.sweep()
+
+				white = self.__define_get_whitespace(j)
+
+				if j.count('\n') > 0:
 					# was more lines
 
 					if last_was_backslash:
-						buffer = buffer_before_backslash.strip() + ' '
+						buffer = buffer_before_backslash.strip() + white
 						last_was_backslash = False
+				else:
+					buffer += ' '
 
 				continue
 
@@ -87,8 +127,11 @@ class MacroReader(CodeReader):
 					last_was_backslash = False
 
 					# new line of macro
-					self.sweep()
-					buffer = buffer_before_backslash.strip() + ' '
+					j = self.sweep()
+
+					white = self.__define_get_whitespace(j)
+
+					buffer = buffer_before_backslash.strip() + white
 
 					continue
 				else:
@@ -166,7 +209,7 @@ class MacroReader(CodeReader):
 		if self.has_end():
 			return False
 
-		return self.matches(r'#^[a-zA-Z_][a-zA-Z0-9_]+(?:[^a-zA-Z0-9_]|$)')
+		return self.matches(r'^#[a-zA-Z_][a-zA-Z0-9_]+(?:[^a-zA-Z0-9_]|$)')
 
 
 
@@ -613,10 +656,11 @@ class D_Define(Token):
 				generated += dt.text
 			else:
 				va_empty_done = False
+
 				if self.vararg_pos != None and dt.name == self.args[self.vararg_pos]:
 					# this is variadic argument
 
-					if re.match(r'\A.*?,[ \t]*##[ \t]?\Z', generated):
+					if re.match(r'.*,\s*##\s*\Z', generated, re.S):
 						# preceded by a concatenation operator
 
 						if len(a2v[dt.name].strip()) == 0:
@@ -624,7 +668,7 @@ class D_Define(Token):
 							generated = generated[:generated.rindex(',')] # remove since last comma
 							va_empty_done = True
 						else:
-							generated = generated[:-2] # just remove the ##
+							generated = generated[:generated.rindex('#')-1] # just remove the ##
 
 				if not va_empty_done:
 					generated += a2v[dt.name]
@@ -1017,6 +1061,8 @@ class MacroProcessor:
 						args = []
 						for a in t.tokens:
 							args.append(a.value)
+
+						# print(args)
 
 						for mm in macros:
 							if mm.is_functionlike():
