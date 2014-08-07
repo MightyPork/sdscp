@@ -1259,7 +1259,13 @@ class Tokenizer:
 
 
 def show_tokenlist(tokens, level='  '):
-	""" Show a token list """
+	""" Show a token list, recursively.
+
+	Args:
+		tokens (Token[]): Tokens to show
+		level (str, optional): Indentation for this level
+
+	"""
 
 	if len(tokens) == 0:
 		print(level + '-empty-')
