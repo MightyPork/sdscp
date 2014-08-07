@@ -1,4 +1,0 @@
-
-do
-	bar();
-until (foo);

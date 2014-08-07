@@ -20,23 +20,15 @@ class Token:
 	Attributes:
 		value (str): the source that generated this token; may be
 			cleaned and processed to be more meaninful.
-		tokens (list of Token): for composite token, the sub-tokens
-			are stored here. Defaults to None.
 
 	"""
 
 	def __init__(self, value):
 		self.value = value.strip()
-		self.tokens = None
 
 
 	def is_composite(self):
-		""" Get if this token is composite (has sub-tokens)
-
-		Returns:
-			True if the token is composite
-
-		"""
+		""" Get if this token is composite (has sub-tokens) """
 		return False
 
 
@@ -82,10 +74,25 @@ class Token:
 
 
 class CompositeToken(Token):
-	""" Token that has sub-tokens """
+	""" Token that has sub-tokens
+
+	Attributes:
+		value (str): source, same as Token
+		tokens (list of Token): the sub-tokens are stored here.
+			Defaults to None.
+
+	"""
+
+
+	def __init__(self, value):
+
+		self.value = value.strip()
+		self.tokens = None  # None = not yet tokenized
+
 
 	def is_composite(self):
-		""" Returns true, for the token is composite """
+		""" Returns true, because this token is composite """
+
 		return True
 
 
@@ -97,6 +104,11 @@ class CompositeToken(Token):
 			', '.join([str(a) for a in (self.tokens or [])])
 		)
 
+
+	def _add(self, token):
+		""" Add a token to the tokens array """
+
+		self.tokens.append(token)
 
 
 # --- keywords ---
@@ -193,21 +205,6 @@ class T_WHILE(TokenKeyword):
 	"""
 
 
-class T_UNTIL(TokenKeyword):
-	""" The UNTIL keyword (while not)
-
-	Like a while loop, but the condition is negated.
-	The loop runs until the condition is true.
-
-	Follows:
-		T_Paren(EXPR): The loop condition
-
-		- unless used in T_DO -
-		<statement>: The loop body
-
-	"""
-
-
 class T_SWITCH(TokenKeyword):
 	""" The SWITCH keyword
 
@@ -259,7 +256,7 @@ class T_DO(TokenKeyword):
 
 	Follows:
 		<statement>: Body of the loop
-		T_WHILE or T_UNTIL: Denotes meaning of the condition
+		T_WHILE
 		T_Paren(EXPR): The loop condition
 		T_Semicolon
 
@@ -334,9 +331,7 @@ class T_CONTINUE(TokenKeyword):
 	""" The CONTINUE keyword
 
 	Jump to the condition of the enclosing loop.
-
-	In case of DO_WHILE or DO_UNTIL, that is at the
-	end of the body; otherwise it may be at the beginning.
+	(End current cycle)
 
 	"""
 
@@ -413,6 +408,20 @@ class T_FUNCTION(TokenKeyword):
 
 class T_Name(Token):
 	""" Any identifier not recognized as a keyword """
+
+	def equals(self, other):
+		""" Check for value equality
+
+		Args:
+			other (T_Name): compared name token
+
+		Returns:
+			True if they are equal.
+
+		"""
+
+		return self.value == other.value
+
 
 
 class T_Semicolon(Token):
@@ -599,22 +608,54 @@ class T_Paren(CompositeToken):
 
 	To parse this token, a `ParenType` must be selected.
 
+	Args:
+		value (str): the source code
+
+	Attributes:
+		ptype (ParenType): Parenthesis type;
+			Determines tokenization method.
+
+	Attributes (ParenType.EXPR):
+		expression (T_Expression): In case of EXPR paren, the
+			expression token is stored here (it is also stored
+			as the only sub-token)
+
+	Attributes (ParenType.FOR):
+		for_init (Token[]):
+			For loop init statements
+		for_init_s (str):
+			Source of the for_init
+
+		for_cond (T_Expression):
+			For condition expr
+		for_cond_s (str):
+			Source of the for_cond
+
+		for_iter (Token[]):
+			For loop iter statements
+		for_iter_s (str):
+			Source of the for_iter
+
+
 	"""
 
 	def __init__(self, value):
 		super().__init__(value)
 
-		self.type = ParenType.UNKNOWN
+		self.ptype = ParenType.UNKNOWN
 
 
-	def set_type(self, type):
+	def set_type(self, ptype):
 		""" Set the paren type
 
 		Changes the way the paren is tokenized
 
+		Args:
+			ptype (ParenType): The requested type
+
 		"""
 
-		self.type = type
+		self.ptype = ptype
 
 
 	def _collect_expr(self, rd):
@@ -627,6 +668,7 @@ class T_Paren(CompositeToken):
 		s = rd.consume_all()
 		t = T_Expression(s)
 		self.tokens.append(t)
+		self.expression = t
 
 
 	def _collect_argvals(self, rd):
@@ -681,7 +723,8 @@ class T_Paren(CompositeToken):
 			self.for_cond_s = s
 
 		# iter statement
-		s = rd.consume_code(end=';', eof=True, keep_end=False).strip() + ';'
+		s = rd.consume_code(end=';', eof=True, keep_end=False).strip()
+		s += ';'  # add the semicolon to make a complete statement
 		tt = Tokenizer(s)
 		self.for_iter = tt.tokenize()  # tokenlist
 		self.for_iter_s = s
@@ -689,37 +732,37 @@ class T_Paren(CompositeToken):
 
 	def _tokenize(self):
 
-		if self.type == ParenType.UNKNOWN:
+		if self.ptype == ParenType.UNKNOWN:
 			print('Paren has no type, cannot tokenize: ' + str(self))
 			return
 
 		rd = CodeReader(self.value[1:-1].strip())
 
-		if self.type == ParenType.EXPR:
+		if self.ptype == ParenType.EXPR:
 			# single expression
 			self._collect_expr(rd)
 
-		elif self.type == ParenType.ARGVALS:
+		elif self.ptype == ParenType.ARGVALS:
 			# comma-separated list of expressions, can be empty
 			self._collect_argvals(rd)
 
-		elif self.type == ParenType.ARGNAMES:
+		elif self.ptype == ParenType.ARGNAMES:
 			# comma-separated list of argument names
 			self._collect_argnames(rd)
 
-		elif self.type == ParenType.FOR:
+		elif self.ptype == ParenType.FOR:
 			# arguments for a FOR loop
 			self._collect_for(rd)
 
 
 	def __str__(self):
 
-		s = type(self).__name__ + ' (...) : ' + str(self.type.name)
+		s = type(self).__name__ + ' (...) : ' + str(self.ptype.name)
 
-		if self.type == ParenType.UNKNOWN:
+		if self.ptype == ParenType.UNKNOWN:
 			s += ', Content: ' + self.value
 
-		elif self.type == ParenType.FOR:
+		elif self.ptype == ParenType.FOR:
 			self.tokenize()
 			s += ' (INIT %s  | COND %s  | ITER %s )' % (
 				self.for_init_s, self.for_cond_s, self.for_iter_s
@@ -1046,10 +1089,6 @@ class Tokenizer:
 		# the various loops
 		elif kwd == 'while':
 			self._add( T_WHILE() )
-			self._collect_paren(rd, ParenType.EXPR)
-
-		elif kwd == 'until':
-			self._add( T_UNTIL() )
 			self._collect_paren(rd, ParenType.EXPR)
 
 		elif kwd == 'for':
