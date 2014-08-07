@@ -6,175 +6,437 @@ from enum import Enum
 
 
 class Token:
+	""" A token
+
+	Token is a meaningful code unit, which can be further
+	structured (have sub-tokens).
+
+	Token does NOT neccessarily represent a whole statement.
+
+	Args:
+		value (str): a piece of the source code the Token is meant
+			to represent
+
+	Attributes:
+		value (str): the source that generated this token; may be
+			cleaned and processed to be more meaninful.
+		tokens (list of Token): for composite token, the sub-tokens
+			are stored here. Defaults to None.
+
+	"""
+
 	def __init__(self, value):
 		self.value = value.strip()
 		self.tokens = None
 
+
 	def is_composite(self):
+		""" Get if this token is composite (has sub-tokens)
+
+		Returns:
+			True if the token is composite
+
+		"""
 		return False
 
-	def get_value(self):
-		return self.value
 
 	def tokenize(self):
+		""" Parse the value string to something meaningful
+
+		For composite tokens, extract the sub-tokens; otherwise,
+		this method may extract information from the source string.
+
+		Returns:
+			a list of the sub-tokens.
+
+		"""
+
 		if not self.is_composite():
 			raise Exception('Cannot tokenize atomic token.')
 
-		if self.tokens != None:
-			return self.tokens
-
-		self.tokens = []
-		self.do_tokenize()
+		if self.tokens is None:
+			self.tokens = []
+			self._tokenize()
 
 		return self.tokens
 
-	def do_tokenize(self):
-		raise Exception('STUB')
+
+	def _tokenize(self):
+		""" Perform the actual tokenization.
+
+		The `tokenize()` method already takes care of caching and
+		rejecting to tokenize non-composite tokens.
+
+		The tokens should be stored in `self.tokens`
+
+		"""
+
+		raise NotImplementedError()
+
 
 	def __str__(self):
+		""" Get a human readable representation of the token """
+
 		return type(self).__name__ + '  ' + re.sub(r'\s+', ' ', self.value)
 
 
+
 class CompositeToken(Token):
-	""" Token that has sub-tokens and needs to be further tokenized """
+	""" Token that has sub-tokens """
 
 	def is_composite(self):
+		""" Returns true, for the token is composite """
 		return True
 
 
-	# def __str__(self):
-	# 	return type(self).__name__
-
 	def __str__(self):
+		# return type(self).__name__
 		self.tokenize()
 		return '%s{ %s }' % (
-				type(self).__name__,
-				', '.join([str(a) for a in (self.tokens or [])])
+			type(self).__name__,
+			', '.join([str(a) for a in (self.tokens or [])])
 		)
 
-# --- keywords ---
 
+
+# --- keywords ---
 class TokenKeyword(Token):
-	""" A token representing a keyword """
+	""" A token representing a keyword
+
+	The token class must be called `T_{KEYWORD}`, for the
+	`KEYWORD` (turned lowercase) will be used as the value.
+
+	"""
 
 	def __init__(self):
-		super().__init__( type(self).__name__[2:].lower() )
+		super().__init__(type(self).__name__[2:].lower())
+
 
 	def __str__(self):
 		return type(self).__name__
 
 
+
 class T_IF(TokenKeyword):
-	""" The IF keyword """
+	""" The IF keyword
+
+	A IF-THEN-ELSE statement
+
+	If the ELSE branch is missing, an empty statement will be used.
+
+	The "dangling else" problem...
+
+		IF a IF b foo; ELSE bar;
+
+	...is resolved like so:
+
+		IF a {
+			IF b {
+				foo;
+			} ELSE {
+				bar;
+			}
+		}
+
+
+	Follows:
+		T_Paren(EXPR): The branch condition
+		<statement>: The TRUE statement
+		-optionally-
+		T_ELSE:
+		<statement>: The FALSE branch
+
+	"""
 
 
 class T_ELSE(TokenKeyword):
-	""" The ELSE keyword (in if) """
+	""" The ELSE keyword
+
+	Starts the FALSE branch of T_IF.
+
+	Follows:
+		<statement>: The branch body
+
+	"""
 
 
 class T_FOR(TokenKeyword):
-	""" The FOR keyword """
+	""" The FOR keyword
+
+	A for loop.
+
+	Follows:
+		T_Paren(FOR): A "for" paren
+			- for_init:
+				<statement[]>: Statements to be executed
+					before the loop first runs
+			- for_cond:
+				T_Expression: Loop condition; tested before every loop cycle.
+			- for_iter:
+				<statement[]>: Statements executed at the end of every loop cycle.
+		<statement>: The loop body
+
+	"""
 
 
 class T_WHILE(TokenKeyword):
-	""" The WHILE keyword """
+	""" The WHILE keyword
+
+	A loop that runs while the condition is true.
+
+	Follows:
+		T_Paren(EXPR): The loop condition
+
+		- unless used in T_DO -
+		<statement>: The loop body
+
+	"""
 
 
 class T_UNTIL(TokenKeyword):
-	""" The DEFAULT keyword (while not) """
+	""" The UNTIL keyword (while not)
+
+	Like a while loop, but the condition is negated.
+	The loop runs until the condition is true.
+
+	Follows:
+		T_Paren(EXPR): The loop condition
+
+		- unless used in T_DO -
+		<statement>: The loop body
+
+	"""
 
 
 class T_SWITCH(TokenKeyword):
-	""" The SWITCH keyword """
+	""" The SWITCH keyword
+
+	A switch control structure
+
+	Follows:
+		T_Paren(EXPR): The expression compared with the cases
+		T_CodeBlock: The switch body
+			May contain any number of T_CASE, and optionally
+			one T_DEFAULT. The T_DEFAULT can be anywhere in the
+			switch body.
+			A T_BREAK in the body jumps to the end of the switch
+			statement.
+
+	"""
 
 
 class T_CASE(TokenKeyword):
-	""" The CASE keyword (in switch) """
+	""" The CASE keyword (in switch)
+
+	Starts a SWITCH branch.
+
+	Unless there is a T_BREAK in the case body, the next branch
+	will be executed unconditionally.
+
+	Follows:
+		T_Expression: Value for this switch branch
+		<statement[]>: Body of the branch
+
+	"""
 
 
 class T_DEFAULT(TokenKeyword):
-	""" The DEFAULT keyword (in switch) """
+	""" The DEFAULT keyword (in switch)
+
+	Starts the default case.
+
+	Follows:
+		T_Colon
+
+	"""
 
 
 class T_DO(TokenKeyword):
-	""" The DO keyword (loop with condition at the end) """
+	"""
+	The DO keyword
+
+	A loop with condition at the end.
+
+	Follows:
+		<statement>: Body of the loop
+		T_WHILE or T_UNTIL: Denotes meaning of the condition
+		T_Paren(EXPR): The loop condition
+		T_Semicolon
+
+	"""
 
 
 class T_VAR(TokenKeyword):
-	""" The VAR keyword """
+	""" The VAR keyword
+
+	Create a variable. If the variable already exists, a syntax
+	error is raised.
+
+	Follows:
+		T_Name: The variable name
+		T_Rvalue (optional): Assigning an initial value
+			The Rvalue must not use "extended equals" (eg. +=).
+			Doing so is a syntax error.
+		T_Semicolon
+
+	When a Rvalue is missing, the default value 0 is used instead.
+
+	"""
 
 
 class T_GOTO(TokenKeyword):
-	""" The GOTO keyword """
+	""" The GOTO keyword
+
+	Jump to a label.
+
+	It is possible to jump only to a label within the same
+	function. Still, doing so may cause unexpected behavior.
+
+	It is recommended to avoid GOTO wherever possible, and
+	if it cannot be avoided, check the generated code for
+	potential errors.
+
+	Follows:
+		T_Name: Label to jump to
+		T_Semicolon
+
+	"""
 
 
 class T_BREAK(TokenKeyword):
-	""" The BREAK keyword """
+	"""	The BREAK keyword
+
+	Jump to the end of the closest loop or switch.
+	Doing so leaves the loop scope.
+
+	"""
 
 
 class T_RETURN(TokenKeyword):
-	""" The RETURN keyword """
+	""" The RETURN keyword
+
+	Leaves a function.
+	Doing so leaves the function scope, discarding any
+	local variables.
+
+	Follows:
+		T_Expression (optional): A return value
+		T_Semicolon
+
+	If the return value is missing, a default return
+	value is used. Whether that is 1 or 0 depends on
+	the compiler configuration.
+
+	"""
 
 
 class T_CONTINUE(TokenKeyword):
-	""" The CONTINUE keyword """
+	""" The CONTINUE keyword
 
+	Jump to the condition of the enclosing loop.
 
-class T_CONTINUE(TokenKeyword):
-	""" The CONTINUE keyword """
+	In case of DO_WHILE or DO_UNTIL, that is at the
+	end of the body; otherwise it may be at the beginning.
+
+	"""
 
 
 class T_SET(TokenKeyword):
-	""" The SET keyword (synthetic, for var assignment) """
+	""" The SET keyword
+
+	Indicate the start of a variable assignment statement.
+	This token is synthetic.
+
+	Unlike T_VAR, the assigned variable must already be
+	defined in the current scope. If it is not, a syntax
+	error is raised.
+
+	Follows:
+		T_Name: Name of the assigned variable
+		T_Rvalue: The assigned value
+		T_Semicolon
+
+	"""
 
 
 class T_LABEL(TokenKeyword):
-	""" The LABEL keyword (synthetic, for labels) """
+	""" The LABEL keyword
+
+	Marks a jump target. This token is generated
+	if not explicitly used in the source code.
+
+	Follows:
+		T_Name: A name of the label
+		T_Colon
+
+	"""
 
 
 class T_CALL(TokenKeyword):
-	""" The CALL keyword (synthetic, for call without assigning retval) """
+	""" The CALL keyword
+
+	Call a function/routine.
+	This token is synthetic.
+
+	This statement is essentially equivalent to "GOSUB", for
+	the return value is discarded.
+
+	Follows:
+		T_Name: Name of the called function
+		T_Paren(ARGVALS): Call parameters
+		T_Semicolon
+
+	"""
 
 
 class T_FUNCTION(TokenKeyword):
-	""" The FUNCTION keyword (synthetic, for function/routine declaration) """
+	""" The FUNCTION keyword
 
+	Declare a function.
+	This token is synthetic.
 
-# --- end of keywords ---
+	A function has a variable scope and a return value.
+
+	To leave the function with a return value, use T_RETURN
+	anywhere within the body.
+
+	The function statement must be in the top-level scope.
+	Nesting function in any other statement is a syntax error.
+
+	Follows:
+		T_Name: Name of the function
+		T_Paren(ARGNAMES): The arguments for the function
+		T_CodeBlock: The function body
+
+	"""
 
 
 class T_Name(Token):
 	""" Any identifier not recognized as a keyword """
 
 
-class TokenSymbol(Token):
-	""" A token representing a symbol """
+class T_Semicolon(Token):
+	""" Semicolon
+
+	Marks the end of a statement
+
+	"""
 
 	def __init__(self):
-		super().__init__('')
-
-	def __str__(self):
-		return type(self).__name__
+		super().__init__(';')
 
 
-class T_Comma(TokenSymbol):
-	""" , """
 
+class T_Colon(Token):
+	""" Colon
 
-class T_Semicolon(TokenSymbol):
-	""" ; """
+	Marks the end of a CASE, LABEL or DEFAULT.
 
+	"""
 
-class T_Colon(TokenSymbol):
-	""" : """
+	def __init__(self):
+		super().__init__(':')
 
-
-class T_Increment(TokenSymbol):
-	""" ++ """
-
-
-class T_Decrement(TokenSymbol):
-	""" -- """
 
 
 class T_String(Token):
@@ -197,10 +459,27 @@ class T_AssignOperator(Token):
 	""" Assignment operator at the beginning of a Rvalue """
 
 
-class T_Expression(CompositeToken):
-	""" An expression """
 
-	def do_tokenize(self):
+class T_Expression(CompositeToken):
+	""" An expression
+
+	Contains:
+		<tokens>: The expression tokens.
+
+	Possible tokens:
+		- T_Operator ... an arithmetic operator
+		- T_Name ....... a name (meaning is context sensitive)
+		- T_Paren ...... a paren
+			EXPR for changing evaluation order
+			ARGVALS arguments for a function call (after a name)
+		- T_Bracket .... an array index (after a name)
+		- T_Char ....... a char literal
+		- T_String ..... a string literal
+		- T_Number ..... a number literal
+
+	"""
+
+	def _tokenize(self):
 		""" Parse expression sub-tokens """
 
 		rd = CodeReader(self.value)
@@ -233,8 +512,6 @@ class T_Expression(CompositeToken):
 
 					self.tokens.append(t)
 
-
-
 			elif rd.has_paren():
 				# Parenthesised sub-expression
 				s = rd.consume_block()
@@ -242,13 +519,11 @@ class T_Expression(CompositeToken):
 				t.set_type(ParenType.EXPR)
 				self.tokens.append(t)
 
-
 			elif rd.has_number():
 				# Number literal
 				s = rd.consume_number()
 				t = T_Number(s)
 				self.tokens.append(t)
-
 
 			elif rd.has_operator():
 				# Operator
@@ -256,13 +531,11 @@ class T_Expression(CompositeToken):
 				t = T_Operator(s)
 				self.tokens.append(t)
 
-
 			elif rd.has_char():
 				# Char literal
 				s = rd.consume_char()
 				t = T_Char(s)
 				self.tokens.append(t)
-
 
 			elif rd.has_string():
 				# String literal
@@ -277,11 +550,15 @@ class T_Expression(CompositeToken):
 
 class T_Rvalue(CompositeToken):
 	""" A right-hand-side of an assignment
-	including the assignment operator as the first sub-token
+
+	Contains:
+		T_AssignOperator: =, +=, %= etc.
+		T_Expression: The assigned value
+
 	"""
 
-	def do_tokenize(self):
-		rd = CodeReader( self.value )
+	def _tokenize(self):
+		rd = CodeReader(self.value)
 
 		s = rd.consume_until(end='=')
 		t = T_AssignOperator(s)
@@ -295,16 +572,34 @@ class T_Rvalue(CompositeToken):
 
 class ParenType(Enum):
 	""" Kind of parenthesis (parsing method) """
+
 	UNKNOWN = 0
+	""" Paren whose meaning is not resolved yet """
+
 	EXPR = 1
+	""" Paren as part of an expression.
+	A single expression is expected.
+	"""
+
 	FOR = 2
+	""" Paren as part of the FOR statement
+	Three sections are expected, separated by semicolons;
+	"""
+
 	ARGVALS = 3
+	""" Function call parameters, separated by commas """
+
 	ARGNAMES = 4
+	""" Function argument names, separated by commas """
 
 
 
 class T_Paren(CompositeToken):
-	""" Parenthesised block """
+	""" Parenthesised block
+
+	To parse this token, a `ParenType` must be selected.
+
+	"""
 
 	def __init__(self, value):
 		super().__init__(value)
@@ -312,14 +607,18 @@ class T_Paren(CompositeToken):
 		self.type = ParenType.UNKNOWN
 
 
-
 	def set_type(self, type):
+		""" Set the paren type
+
+		Changes the way the paren is tokenized
+
+		"""
+
 		self.type = type
 
 
-
-	def __collect_expr(self, rd):
-		""" parse as single expression """
+	def _collect_expr(self, rd):
+		""" Parse as single expression """
 
 		rd.sweep()
 		if rd.has_end():
@@ -330,90 +629,87 @@ class T_Paren(CompositeToken):
 		self.tokens.append(t)
 
 
-
-	def __collect_argvals(self, rd):
-		""" parse as function call argument list """
+	def _collect_argvals(self, rd):
+		""" Parse as function call argument list """
 
 		while not rd.has_end():
 
 			rd.sweep()
 			if rd.has_end():
-				break # end of args after some junk
+				break  # end of args after some junk
 
 			s = rd.consume_code(end=',', eof=True, keep_end=False)
 			t = T_Expression(s)
 			self.tokens.append(t)
 
 
-
-	def __collect_argnames(self, rd):
-		""" parse as argument name list """
+	def _collect_argnames(self, rd):
+		""" Parse as argument name list """
 
 		while not rd.has_end():
 
 			rd.sweep()
 			if rd.has_end():
-				break # end of args after some junk
+				break  # end of args after some junk
 
 			s = rd.consume_identifier()
 			t = T_Name(s)
 			self.tokens.append(t)
 
+			rd.sweep()
+			if rd.starts(','):
+				rd.consume()  # remove comma
 
 
-	def __collect_for(self, rd):
-		""" parse as for loop paren """
+	def _collect_for(self, rd):
+		""" Parse as FOR loop paren """
 
 		# init statement
 		s = rd.consume_code(end=';', eof=False, keep_end=True).strip()
 
 		tt = Tokenizer(s)
-		self.for_init = tt.tokenize() # tokenlist
+		self.for_init = tt.tokenize()  # tokenlist
 		self.for_init_s = s
 
 		# condition
 		s = rd.consume_code(end=';', eof=False, keep_end=False).strip()
 		if len(s) == 0:
-			self.for_cond = T_Expression('1') # true
+			self.for_cond = T_Expression('1')  # true
 			self.for_cond_s = '1'
 		else:
-			self.for_cond = T_Expression(s) # one expression token
+			self.for_cond = T_Expression(s)  # one expression token
 			self.for_cond_s = s
 
 		# iter statement
 		s = rd.consume_code(end=';', eof=True, keep_end=False).strip() + ';'
 		tt = Tokenizer(s)
-		self.for_iter = tt.tokenize() # tokenlist
+		self.for_iter = tt.tokenize()  # tokenlist
 		self.for_iter_s = s
 
 
+	def _tokenize(self):
 
-	def do_tokenize(self):
-
-		if self.type == None:
+		if self.type == ParenType.UNKNOWN:
 			print('Paren has no type, cannot tokenize: ' + str(self))
-			pass # Cannot parse without context
+			return
 
-		rd = CodeReader( self.value[1:-1].strip() )
+		rd = CodeReader(self.value[1:-1].strip())
 
 		if self.type == ParenType.EXPR:
 			# single expression
-			self.__collect_expr(rd)
-
+			self._collect_expr(rd)
 
 		elif self.type == ParenType.ARGVALS:
 			# comma-separated list of expressions, can be empty
-			self.__collect_argvals(rd)
-
+			self._collect_argvals(rd)
 
 		elif self.type == ParenType.ARGNAMES:
 			# comma-separated list of argument names
-			self.__collect_argnames(rd)
-
+			self._collect_argnames(rd)
 
 		elif self.type == ParenType.FOR:
 			# arguments for a FOR loop
-			self.__collect_for(rd)
+			self._collect_for(rd)
 
 
 	def __str__(self):
@@ -425,7 +721,10 @@ class T_Paren(CompositeToken):
 
 		elif self.type == ParenType.FOR:
 			self.tokenize()
-			s += ' (INIT %s  | COND %s  | ITER %s )' % (self.for_init_s, self.for_cond_s, self.for_iter_s)
+			s += ' (INIT %s  | COND %s  | ITER %s )' % (
+				self.for_init_s, self.for_cond_s, self.for_iter_s
+			)
+
 			s += '\n - INIT {%s}\n - COND {%s}\n - ITER {%s} )' % (
 				', '.join([str(a) for a in self.for_init]),
 				str(self.for_cond),
@@ -437,14 +736,18 @@ class T_Paren(CompositeToken):
 
 
 class T_Bracket(CompositeToken):
-	""" Square bracket """
+	""" Square bracket
 
-	def __init__(self, value):
-		super().__init__(value)
+	Used to specify an array index.
 
+	Contains:
+		T_Expression: The array index
 
-	def do_tokenize(self):
-		rd = CodeReader( self.value[1:-1].strip() )
+	"""
+
+	def _tokenize(self):
+
+		rd = CodeReader(self.value[1:-1].strip())
 
 		rd.sweep()
 
@@ -455,34 +758,58 @@ class T_Bracket(CompositeToken):
 		rd.sweep()
 
 		if not rd.has_end():
-			raise Exception('Invalid array index (must be single expression).')
+			raise Exception(
+				'Invalid array index (must be single expression).'
+			)
 
 
 	def __str__(self):
+
 		return type(self).__name__ + ' [...]'
 
 
 
 class T_CodeBlock(CompositeToken):
-	""" Braced code block """
+	""" Braced code block
+
+	Contains:
+		<statement[]>: The block body
+
+	"""
 
 	def __init__(self, value):
+
 		super().__init__(value)
 
-	def do_tokenize(self):
-		rd = Tokenizer( self.value[1:-1] )
+
+	def _tokenize(self):
+
+		rd = Tokenizer(self.value[1:-1])
 		self.tokens = rd.tokenize()
 
+
 	def __str__(self):
+
 		return type(self).__name__ + ' {...}'
 
 
 
 class Tokenizer:
 	""" Source tokenizer
-	 - checks for obvious errors
-	 - removes comments
-	 - creates a token list
+
+	Creates a token list for input source code.
+
+	Args:
+		source (str): Source code to tokenize
+		filename (str, optional): The file this source came from.
+			Used mainly for error reporting.
+
+	Attributes:
+		filename (str): The filename provided in constructor
+		source (str): The source provided in constructor
+		tokens (Token[]): List of tokens, created by
+			calling `tokenize()`. Used for caching.
+
 	"""
 
 	def __init__(self, source, filename=None):
@@ -492,12 +819,26 @@ class Tokenizer:
 		self.tokens = None
 
 
+	def _add(self, token):
+		""" Add a token to the list
+
+		Args:
+			token (Token): The added token
+
+		"""
+
+		self.tokens.append(token)
 
 
 	def tokenize(self):
-		""" Convert to tokens, get token list """
+		""" Convert to tokens, get token list
 
-		if self.tokens != None:
+		Returns:
+			A list of obtained tokens, recursively tokenized.
+
+		"""
+
+		if self.tokens is not None:
 			return self.tokens
 
 		self.tokens = []
@@ -516,83 +857,139 @@ class Tokenizer:
 			# <identifier>
 			elif rd.has_identifier():
 
-				self.__tokenize_identifier(rd)
-
+				self._tokenize_identifier(rd)
 
 			# {...stuff...}
 			elif rd.has_code_block():
 
 				s = rd.consume_block()
-				self.tokens.append( T_CodeBlock(s) )
-
+				self._add( T_CodeBlock(s) )
 
 			# ;
 			elif rd.starts(';'):
 
-				self.__collect_semicolon(rd)
-
+				self._collect_semicolon(rd)
 
 			else:
 				rd.error('Unexpected syntax here.')
 
+		# tokenize all composite tokens
+		for t in self.tokens:
+			if t.is_composite():
+				t.tokenize()
 
 		return self.tokens
 
 
-	def __collect_assign_stmt(self, rd):
-		""" Collect a varname = value statement from reader and add as tokens """
+	def _collect_assign_stmt(self, rd):
+		""" Collect a varname = value statement from the reader
+		and add it as tokens.
+
+		Leading whitespace is ignored.
+
+		Args:
+			rd (CodeReader): the reader
+
+		"""
+
 		rd.sweep()
 
 		s = rd.consume_identifier()
 		tok = T_Name(s)
-		self.tokens.append(tok)
+		self._add(tok)
 
 		rd.sweep()
 
 		# array index bracket
 		if rd.has_bracket():
 			s = rd.consume_block()
-			self.tokens.append(T_Bracket(s))
+			self._add(T_Bracket(s))
 			rd.sweep()
 
-
-		if rd.starts('++') or rd.starts('--') :
+		# increment or decrement statement
+		if rd.starts('++') or rd.starts('--'):
 			sign = rd.consume()
-			rd.consume() # discard the second
-			self.tokens.append( T_Rvalue( "%s=1" % sign ) )
+			rd.consume()  # discard the second
+			self._add(T_Rvalue( "%s=1" % sign ))
+
 		elif rd.has_rvalue():
-			self.tokens.append( T_Rvalue( rd.consume_rvalue() ) )
+			self._add(
+				T_Rvalue(rd.consume_rvalue())
+			)
+
 		else:
 			rd.error('Unexpected syntax.')
 
 
-	def __collect_semicolon(self, rd):
+	def _collect_semicolon(self, rd):
+		""" Collect a semicolon from the reader and add it
+		as a token.
+
+		Leading whitespace is ignored.
+
+		Args:
+			rd (CodeReader): the reader
+
+		"""
+
 		rd.sweep()
 
 		rd.consume_exact(';')
-		self.tokens.append( T_Semicolon() )
+		self._add( T_Semicolon() )
 
 
-	def __collect_colon(self, rd):
+	def _collect_colon(self, rd):
+		""" Collect a colon from the reader
+		and add it as a token.
+
+		Leading whitespace is ignored.
+
+		Args:
+			rd (CodeReader): the reader
+
+		"""
+
 		rd.sweep()
 
 		rd.consume_exact(':')
-		self.tokens.append( T_Colon() )
+		self._add( T_Colon() )
 
 
-	def __collect_label(self, rd):
+	def _collect_label(self, rd):
+		""" Collect a `label:` from the reader
+		and add it as tokens (T_LABEL, T_Name, T_Colon)
+
+		The `label` keyword should already be consumed, if present.
+
+		Leading whitespace is ignored.
+
+		Args:
+			rd (CodeReader): the reader
+
+		"""
 		rd.sweep()
 
 		lbl = rd.consume_identifier()
-		self.tokens.append( T_LABEL() )
-		self.tokens.append( T_Name(lbl) )
+		self._add( T_LABEL() )
+		self._add( T_Name(lbl) )
 
 		rd.sweep()
 		rd.consume_exact(':')
-		self.tokens.append( T_Colon() )
+		self._add( T_Colon() )
 
 
-	def __collect_paren(self, rd, paren_type):
+	def _collect_paren(self, rd, paren_type):
+		""" Collect a parenthesis of a given type from the reader
+		and add it as a token.
+
+		Leading whitespace is ignored.
+
+		Args:
+			rd (CodeReader): the reader
+			paren_type (ParenType): the expected type of parenthesis
+
+		"""
+
 		rd.sweep()
 
 		if not rd.has_paren():
@@ -602,13 +999,28 @@ class Tokenizer:
 
 		t = T_Paren(paren)
 		t.set_type(paren_type)
-		self.tokens.append(t)
+		self._add(t)
 
 
-	def __tokenize_identifier(self, rd):
+	def _tokenize_identifier(self, rd):
+
+		""" Read an identifier from the reader and
+		interpret it's meaning.
+
+		If the identifier is a keyword, consume and tokenize all
+		that is directly associated with the keyword and check for
+		syntax errors in the process.
+
+		Leading whitespace is ignored.
+
+		Args:
+			rd (CodeReader): the reader
+
+		"""
+
 		rd.sweep()
 
-		pos_before_s = rd.get_pos()
+		pos_before_s = rd.pos
 
 		s = rd.consume_identifier()
 
@@ -620,87 +1032,74 @@ class Tokenizer:
 
 		# if-elseif-else
 		if kwd == 'if':
-			self.tokens.append( T_IF() )
-			self.__collect_paren(rd, ParenType.EXPR)
-
+			self._add( T_IF() )
+			self._collect_paren(rd, ParenType.EXPR)
 
 		elif kwd == 'else':
-			self.tokens.append( T_ELSE() )
-
+			self._add( T_ELSE() )
 
 		elif kwd == 'elseif':
-			self.tokens.append( T_ELSE() )
-			self.tokens.append( T_IF() )
-			self.__collect_paren(rd, ParenType.EXPR)
-
-
+			self._add( T_ELSE() )
+			self._add( T_IF() )
+			self._collect_paren(rd, ParenType.EXPR)
 
 		# the various loops
 		elif kwd == 'while':
-			self.tokens.append( T_WHILE() )
-			self.__collect_paren(rd, ParenType.EXPR)
-
+			self._add( T_WHILE() )
+			self._collect_paren(rd, ParenType.EXPR)
 
 		elif kwd == 'until':
-			self.tokens.append( T_UNTIL() )
-			self.__collect_paren(rd, ParenType.EXPR)
-
+			self._add( T_UNTIL() )
+			self._collect_paren(rd, ParenType.EXPR)
 
 		elif kwd == 'for':
-			self.tokens.append( T_FOR() )
-			self.__collect_paren(rd, ParenType.FOR)
-
+			self._add( T_FOR() )
+			self._collect_paren(rd, ParenType.FOR)
 
 		elif kwd == 'do':
-			self.tokens.append( T_DO() )
-
+			self._add( T_DO() )
 
 		elif kwd == 'continue':
-			self.tokens.append( T_CONTINUE() )
-
+			self._add( T_CONTINUE() )
 
 		elif kwd == 'break':
-			self.tokens.append( T_BREAK() )
+			self._add( T_BREAK() )
 
 		# the switch statemnt
 		elif kwd == 'switch':
-			self.tokens.append( T_SWITCH() )
-			self.__collect_paren(rd, ParenType.EXPR)
-
+			self._add( T_SWITCH() )
+			self._collect_paren(rd, ParenType.EXPR)
 
 		elif kwd == 'case':
-			self.tokens.append( T_CASE() )
+			self._add( T_CASE() )
 
 			expr = rd.consume_code(end=':', consume_end=False)
 			t = T_Expression(expr)
-			self.tokens.append(t)
+			self._add(t)
 
-			self.__collect_colon(rd)
-
+			self._collect_colon(rd)
 
 		elif kwd == 'default':
-			self.tokens.append( T_DEFAULT() )
+			self._add( T_DEFAULT() )
 
-			self.__collect_colon(rd)
-
-
+			self._collect_colon(rd)
 
 		elif kwd == 'var':
 
 			while True:
-				self.tokens.append( T_VAR() )
+				self._add( T_VAR() )
 				rd.sweep()
 
-				#varname
+				# varname
 				name = rd.consume_identifier()
-				self.tokens.append( T_Name(name) )
+				self._add( T_Name(name) )
 
 				rd.sweep()
 
 				# initial value assignment
 				if rd.has_rvalue():
 					v = rd.consume_rvalue()
-					self.tokens.append( T_Rvalue(v) )
+					self._add( T_Rvalue(v) )
 
 				rd.sweep()
 
@@ -708,112 +1107,110 @@ class Tokenizer:
 				if rd.starts(','):
 					# more vars
 
-					rd.consume() # the comma
+					rd.consume()  # the comma
 
-					self.tokens.append( T_Semicolon() ) # start new statement
+					self._add( T_Semicolon() )  # start new statement
 
-					continue # to next var name
+					continue  # to next var name
 
 				elif rd.starts(';'):
 					# end of it
-					rd.consume() # the sc
-					self.tokens.append( T_Semicolon() )
-					break # to next statement
+					rd.consume()  # the sc
+					self._add( T_Semicolon() )
+					break  # to next statement
 
 				else:
 					rd.error('Expected , or ; here.')
 
-
-
 		elif kwd == 'goto':
-			self.tokens.append( T_GOTO() )
+			self._add( T_GOTO() )
 
 			lbl = rd.consume_identifier()
 			t = T_Name(lbl)
-			self.tokens.append(t)
+			self._add(t)
 
-			self.__collect_semicolon(rd)
-
+			self._collect_semicolon(rd)
 
 		elif kwd == 'label':
 			# the label keyword (optional for labels)
-			rd.move_to(pos_before_s) # backtrack
-			self.__collect_label(rd)
-
+			rd.pos = pos_before_s  # backtrack
+			self._collect_label(rd)
 
 		elif kwd == 'return':
-			self.tokens.append( T_RETURN() )
+			self._add( T_RETURN() )
 
 			if not rd.starts(';'):
 				# return with no value
 				expr = rd.consume_code(end=';', consume_end=False)
 				t = T_Expression(expr)
-				self.tokens.append(t)
+				self._add(t)
 
 			# the semicolon
-			self.__collect_semicolon(rd)
-
+			self._collect_semicolon(rd)
 
 		elif rd.has_paren():
 			# function call or declaration
 
-			paren = rd.consume_block() # consume the paren
+			paren = rd.consume_block()  # consume the paren
 
 			rd.sweep()
 
 			if rd.starts(';'):
 				# a call
-				self.tokens.append( T_CALL() )
-				self.tokens.append( T_Name(s) )
+				self._add( T_CALL() )
+				self._add( T_Name(s) )
 
 				t = T_Paren(paren)
 				t.set_type(ParenType.ARGVALS)
-				self.tokens.append(t)
+				self._add(t)
 
-				self.__collect_semicolon(rd)
-
+				self._collect_semicolon(rd)
 
 			elif rd.has_code_block():
 				# a declaration
-				self.tokens.append( T_FUNCTION() )
-				self.tokens.append( T_Name(s) )
+				self._add( T_FUNCTION() )
+				self._add( T_Name(s) )
 
 				t = T_Paren(paren)
 				t.set_type(ParenType.ARGNAMES)
-				self.tokens.append(t)
+				self._add(t)
 
 				rd.sweep()
 
 				cbl = rd.consume_block()
-				self.tokens.append( T_CodeBlock(cbl) )
+				self._add( T_CodeBlock(cbl) )
 
-
-		elif rd.has_bracket() or rd.has_rvalue() or rd.starts('++') or rd.starts('--'):
+		elif (
+			rd.has_bracket() or
+			rd.has_rvalue() or
+			rd.starts('++') or
+			rd.starts('--')
+		):
 
 			# foo = bar, other = baz;
-			self.tokens.append( T_SET() )
+			self._add( T_SET() )
 
-			rd.move_to(pos_before_s) # rewind
+			rd.pos = pos_before_s  # rewind
 
-			self.__collect_assign_stmt(rd)
+			self._collect_assign_stmt(rd)
 
 			rd.sweep()
 
 			if rd.starts(';'):
-				self.__collect_semicolon(rd)
+				self._collect_semicolon(rd)
 
 			elif rd.starts(','):
-				rd.consume() # the comma
+				rd.consume()  # the comma
 
 				while True:
 					rd.sweep()
 
 					if rd.has_identifier():
 
-						self.tokens.append( T_Semicolon() ) # start new statement
-						self.tokens.append( T_SET() )
+						self._add( T_Semicolon() )  # start new statement
+						self._add( T_SET() )
 
-						self.__collect_assign_stmt(rd)
+						self._collect_assign_stmt(rd)
 
 					else:
 						rd.error('Missing identifier.')
@@ -825,12 +1222,11 @@ class Tokenizer:
 						continue
 
 					elif rd.starts(';'):
-						self.__collect_semicolon(rd)
+						self._collect_semicolon(rd)
 						break
 
 					else:
 						rd.error('Expected , or ; here.')
-
 
 		else:
 			# just a name
@@ -839,9 +1235,9 @@ class Tokenizer:
 			if rd.starts(':'):
 				# was a label without "label" keyword
 
-				rd.move_to(pos_before_s)
+				rd.pos = pos_before_s
 
-				self.__collect_label(rd)
+				self._collect_label(rd)
 
 				return
 
@@ -849,11 +1245,13 @@ class Tokenizer:
 			rd.error("Unexpected syntax: Don't know what %s means here." % s)
 
 
-
 	def show(self):
-		""" Print tokens to console """
+		""" Print tokens to console
 
-		if self.tokens == None:
+		Used for debugging the tokenizer.
+		"""
+
+		if self.tokens is None:
 			raise Esception('Not parsed yet.')
 
 		show_tokenlist(self.tokens)
@@ -862,6 +1260,7 @@ class Tokenizer:
 
 def show_tokenlist(tokens, level='  '):
 	""" Show a token list """
+
 	if len(tokens) == 0:
 		print(level + '-empty-')
 
@@ -871,52 +1270,4 @@ def show_tokenlist(tokens, level='  '):
 			print(level + str(tok))
 
 			if tok.is_composite():
-				show_tokenlist(tok.tokenize(), level+'  ')
-
-
-
-
-
-class TokenWalker:
-	""" Utility for walking a token list """
-
-	def __init__(self, tokens):
-		self.tokens = tokens
-		self.cursor = 0
-
-
-
-	def has_next(self):
-		""" Get if the walker has more tokens to walk """
-		return self.cursor < self.tokens.length
-
-
-
-	def has_prev(self):
-		""" Get if the walker is not at the beginning """
-		return self.cursor > 0
-
-
-
-	def peek(self, offset=1):
-		""" Peek at the n-th token relative to cursor """
-
-		i = self.cursor + offset
-
-		if not i in range(0, len(self.tokens)):
-			raise Exception('Index out of range: %d' % i)
-
-		return self.tokens[i]
-
-
-
-	def has(self, kind, offset=1):
-		""" Get if the next (or offset) token is of given type """
-
-		return isinstance(self.peek(offset), kind)
-
-
-	def move(self, steps=1):
-		""" Move the cursor """
-
-		self.pos += steps
+				show_tokenlist(tok.tokenize(), level + '  ')

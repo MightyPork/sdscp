@@ -150,7 +150,7 @@ def prepare_for_sdsc(code):
 			out += rd.consume_whitespace()
 
 			if rd.has_paren():
-				pp = rd.get_pos()
+				pp = rd.pos
 				paren = rd.consume_block()
 
 				if re.match(r'\(\s*\)', paren):
@@ -162,7 +162,7 @@ def prepare_for_sdsc(code):
 						out += paren
 						out += after
 				else:
-					rd.move_to(pp) # go back
+					rd.pos = pp # go back
 
 			elif rd.has_bracket():
 				# collect whole bracket

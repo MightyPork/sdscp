@@ -8,19 +8,56 @@ from collections import OrderedDict
 
 
 class MacroReader(CodeReader):
-	""" Code reader with support for directives """
+	""" Code reader with support for directives
 
-	# opts
-	keep_macro_newlines = True
-	keep_macro_indent = False
+	Args:
+		source (str): The source code
+		filename (str, optional):
+			The name of the file it came from.
+			Defaults to None.
+
+	Attributes:
+		keep_macro_newlines (bool):
+			Config option, whether to keep newlines in
+			long macros.
+		keep_macro_indent (bool):
+			Config option, whether to keep indentation in
+			multi-line macros.
+
+	"""
+
+	def __init__(self, source, filename=None):
+		super().__init__(source, filename)
+
+		# opts
+		self.keep_macro_newlines = True
+		self.keep_macro_indent = False
+
 
 	def _consume_directive_name(self, name):
-		""" Consume #<name> """
-		return self.consume_exact('#'+name)
+		""" Consume #<name>
+
+		Args:
+			name (str): Name of the consumed directive
+
+		Returns:
+			The consumed directive, including the #
+
+		"""
+
+		return self.consume_exact('#' + name)
 
 
-	def __define_get_whitespace(self, j):
-		""" Extract whitespace to keep, from j ("junk") """
+	def _define_get_whitespace(self, j):
+		""" Extract whitespace to keep, from j ("junk")
+
+		Args:
+			j (str): Junk (collected using `rd.sweep()`)
+
+		Returns:
+			replacement for the junk, based on config options.
+
+		"""
 
 		white = ''
 
@@ -35,10 +72,10 @@ class MacroReader(CodeReader):
 					white += '\n'
 
 
-				c = len(j)-1
+				c = len(j) - 1
 
 				if self.keep_macro_indent:
-					while c >= 0 and j[c] in ['\t', ' ']:
+					while c >= 0 and j[c] in ' \t':
 						white += j[c]
 						c -= 1
 
@@ -48,9 +85,16 @@ class MacroReader(CodeReader):
 		return white
 
 
-
 	def consume_define_directive(self):
-		""" consume a #define macro """
+		""" Consume a #define macro
+
+		Filters out comments and useless whitespace, takes
+		care of multi-line macros (with backslashes).
+
+		Returns:
+			The consumed and cleaned macro, complete with the #define.
+
+		"""
 
 		pos_begin = self.pos
 
@@ -76,7 +120,7 @@ class MacroReader(CodeReader):
 
 		if trash.count('\n') > 0:
 			# was no-body macro
-			buffer += '1' # add '1' as value
+			buffer += '1'  # add '1' as value
 			return buffer
 
 		buffer_before_backslash = buffer
@@ -87,7 +131,7 @@ class MacroReader(CodeReader):
 			if self.has_inline_comment():
 				# consume comment
 				j = self.sweep()
-				white = self.__define_get_whitespace(j)
+				white = self._define_get_whitespace(j)
 
 				if last_was_backslash:
 					buffer = buffer_before_backslash.strip() + white
@@ -96,12 +140,11 @@ class MacroReader(CodeReader):
 				else:
 					return buffer.strip()
 
-
 			if self.has_block_comment():
 
 				j = self.sweep()
 
-				white = self.__define_get_whitespace(j)
+				white = self._define_get_whitespace(j)
 
 				if j.count('\n') > 0:
 					# was more lines
@@ -119,17 +162,17 @@ class MacroReader(CodeReader):
 				buffer_before_backslash = buffer
 				last_was_backslash = True
 
-			elif re.match(r'[ \t]', char): # whitespace except newline
-				pass # add to macro
+			elif re.match(r'[ \t]', char):  # whitespace except newline
+				pass  # add to macro
 
-			elif char == '\n': # newline
+			elif char == '\n':  # newline
 				if last_was_backslash:
 					last_was_backslash = False
 
 					# new line of macro
 					j = self.sweep()
 
-					white = self.__define_get_whitespace(j)
+					white = self._define_get_whitespace(j)
 
 					buffer = buffer_before_backslash.strip() + white
 
@@ -146,9 +189,13 @@ class MacroReader(CodeReader):
 		return self.from_pos(pos_begin)
 
 
-
 	def consume_include_directive(self):
-		""" consume a #include directive """
+		""" consume a #include directive
+
+		Returns:
+			The #include directive.
+
+		"""
 
 		buffer = self._consume_directive_name('include')
 		buffer += ' '
@@ -158,9 +205,13 @@ class MacroReader(CodeReader):
 		return buffer
 
 
-
 	def consume_ifdef_directive(self):
-		""" consume #ifdef """
+		""" consume #ifdef
+
+		Returns:
+			The #ifdef directive.
+
+		"""
 
 		buffer = self._consume_directive_name('ifdef')
 		buffer += ' '
@@ -172,7 +223,12 @@ class MacroReader(CodeReader):
 
 
 	def consume_ifndef_directive(self):
-		""" consume a #ifndef """
+		""" consume a #ifndef
+
+		Returns:
+			The #ifndef directive.
+
+		"""
 
 		buffer = self._consume_directive_name('ifndef')
 		buffer += ' '
@@ -184,7 +240,12 @@ class MacroReader(CodeReader):
 
 
 	def consume_else_directive(self):
-		""" consume a #else directive """
+		""" consume a #else directive
+
+		Returns:
+			The #else directive.
+
+		"""
 
 		if self.has_end():
 			return False
@@ -194,7 +255,12 @@ class MacroReader(CodeReader):
 
 
 	def consume_endif_directive(self):
-		""" consume a #endif directive """
+		""" consume a #endif directive
+
+		Returns:
+			The #endif directive.
+
+		"""
 
 		if self.has_end():
 			return False
@@ -204,7 +270,14 @@ class MacroReader(CodeReader):
 
 
 	def has_directive(self):
-		""" Check if next token is #<something> """
+		""" Check if next token is a directive
+
+		A directive is a # followed by an identifier.
+
+		Returns:
+			True if there is a directive.
+
+		"""
 
 		if self.has_end():
 			return False
@@ -273,7 +346,16 @@ class MacroReader(CodeReader):
 
 
 	def find_directive_block_end(self, can_else=True):
-		""" Find #else or #endif position """
+		""" Find #else or #endif position
+
+		The current `pos` should be AFTER the opening
+		directive (#ifdef / #ifndef / #else)
+
+		Returns:
+			pos at the beginning of the closing directive
+			(at the #)
+
+		"""
 
 		pos_begin = self.pos
 
@@ -283,7 +365,7 @@ class MacroReader(CodeReader):
 
 			# print('At: %s' % re.sub(r'[\n\t ]+', ' ', self.peek(20)) )
 
-			self.sweep() # comments and whitespace
+			self.sweep()  # comments and whitespace
 
 			if self.has_end():
 				break
@@ -297,7 +379,7 @@ class MacroReader(CodeReader):
 					self.consume_char()
 
 				else:
-					self.consume() # any char...
+					self.consume()  # any char...
 
 				continue
 
@@ -332,7 +414,7 @@ class MacroReader(CodeReader):
 					if nest == 0:
 						# found it
 						pos = self.pos
-						self.pos = pos_begin # restore to previous pos
+						self.pos = pos_begin  # restore to previous pos
 						return pos
 
 					else:
@@ -341,7 +423,7 @@ class MacroReader(CodeReader):
 						self.consume_else_directive()
 
 						# skip to end
-						self.pos = self.find_directive_block_end(can_else = False)
+						self.pos = self.find_directive_block_end(can_else=False)
 
 
 				elif self.has_endif_directive():
@@ -349,7 +431,7 @@ class MacroReader(CodeReader):
 					if nest == 0:
 						# found it
 						pos = self.pos
-						self.pos = pos_begin # restore to previous pos
+						self.pos = pos_begin  # restore to previous pos
 						return pos
 
 					else:
@@ -362,41 +444,71 @@ class MacroReader(CodeReader):
 
 
 
-
 # helper tokens for use within define macro
 class DT_Code:
-	""" Define macro code fragment sub-token """
+	""" #define sub-token of a code fragment
+
+	Args:
+		text (str): The code fragment
+
+	Attributes:
+		text (str): The code fragment is stored here
+
+	"""
+
 	def __init__(self, text):
 		self.text = text
-
-	def is_var(self):
-		return False
 
 	def __str__(self):
 		return 'DT_Code: ' + self.text
 
 
 
-
-
 class DT_Var:
-	""" Define macro argument-occurence sub-token """
+	""" #define sub-token of an argument occurence
+
+	Args:
+		name (str): The argument name
+
+	Attributes:
+		name (str): The name is stored here
+
+	"""
 
 	def __init__(self, name):
 		self.name = name
-
-	def is_var(self):
-		return True
 
 	def __str__(self):
 		return 'DT_Var: ' + self.name
 
 
 
-
-
 class D_Define(Token):
-	""" #define name(args) body """
+	""" The #define directive
+
+	#define name(args) body
+
+	Takes care of parsing the macro and generating a replacement.
+
+	Args:
+		value (str): The macro source (#define ... )
+
+	Attributes:
+		name (str): The macro name
+		arraylike (bool):
+			True if this macro is array-like (square brackets)
+		functionlike (bool):
+			True if this macro is function-like
+		args (str[]):
+			List of argument names, None for constant macros
+		vararg_pos:
+			Index of argument that is variadic.
+			None if there is no such argument.
+		tokens:
+			#define sub-tokens.
+			Used to generate the replacements.
+
+	"""
 
 
 	def __init__(self, value):
@@ -422,7 +534,7 @@ class D_Define(Token):
 		#print(str(rd.has_bracket()))
 
 		if rd.has_paren():
-			tmp = rd.consume_block()[1:-1] # inside the paren
+			tmp = rd.consume_block()[1:-1]  # inside the paren
 			self.args = []
 			for a in tmp.split(','):
 				a = a.strip()
@@ -431,7 +543,7 @@ class D_Define(Token):
 					if a[-3:] == '...':
 						# a is a variadic argument
 
-						if self.vararg_pos != None:
+						if self.vararg_pos is not None:
 							rd.error('Macro can have only one variadic argument!')
 
 						self.vararg_pos = len(self.args)
@@ -442,7 +554,7 @@ class D_Define(Token):
 			self.functionlike = True
 
 		elif rd.has_bracket():
-			tmp = rd.consume_block()[1:-1].strip() # inside the bracket
+			tmp = rd.consume_block()[1:-1].strip()  # inside the bracket
 
 			if not re.match(r'\A[a-zA-Z_][a-zA-Z0-9_]*\Z', tmp):
 				rd.error('Invalid argument format for macro "%s": %s' % (self.name, tmp))
@@ -463,19 +575,19 @@ class D_Define(Token):
 
 
 	def __parse_body(self):
-		""" parse macro content """
+		""" parse macro content, store subtokens """
 
-		if self.args == None:
+		if self.args is None:
 			self.tokens.append( DT_Code(self.body) )
 		else:
 			rd = CodeReader(self.body)
 			buff = ''
 			while not rd.has_end():
 				if rd.has_identifier():
-					tmp = rd.consume_identifier()
+					ident = rd.consume_identifier()
 
 					# check if macro argument
-					if tmp in self.args:
+					if ident in self.args:
 
 						# append collected code fragment
 						if len(buff) > 0:
@@ -484,11 +596,11 @@ class D_Define(Token):
 							self.tokens.append(t)
 
 						# append the var
-						t = DT_Var(tmp)
+						t = DT_Var(ident)
 						self.tokens.append(t)
 
 					else:
-						buff += tmp
+						buff += ident
 
 				elif rd.has_string():
 					buff += rd.consume_string()
@@ -511,7 +623,7 @@ class D_Define(Token):
 
 		s = 'MACRO: %s' % self.name
 
-		if self.args == None:
+		if self.args is None:
 			s += ' '
 		elif self.arraylike:
 			s += '[%s] ' % self.args[0]
@@ -527,6 +639,7 @@ class D_Define(Token):
 				n += 1
 			s += ') '
 
+
 		if len(s) < 30:
 			s = (s + '.'*35)[:35]
 		else:
@@ -538,54 +651,74 @@ class D_Define(Token):
 
 
 	def is_arraylike(self):
-		""" Get if this macro is array-like """
+		""" Get if this macro is array-like (bool) """
 
 		return self.arraylike
 
 
 	def is_functionlike(self):
-		""" Get if this macro is function-like """
+		""" Get if this macro is function-like (bool) """
 
 		return self.functionlike
 
 
 	def is_constant(self):
-		""" Get if this macro is constant """
+		""" Get if this macro is constant (bool) """
 
 		return (not self.functionlike) and not (self.arraylike)
 
 
 	def can_use_args(self, args):
-		""" Check if this macro could be used with the given arguments """
+		""" Check if this macro ca work with the given arguments
 
-		if (self.args == None) != (args == None):
+		Args:
+			args (str[]):
+				List of arguments to check against.
+				Can be Null for use without parentheses (const)
+
+		Returns:
+			True if the macro is compatible with the arguments.
+
+		"""
+
+		if (self.args is None) != (args is None):
 			return False
 
-		if self.args != None:
+		if self.args is not None:
 
-			if self.vararg_pos == None:
+			if self.vararg_pos is None:
 				if len(self.args) != len(args):
 					return False
 			else:
-				if len(self.args)-1 > len(args): # variadic arg can be missing
+				if len(self.args)-1 > len(args):  # variadic arg can be missing
 					return False
 
 		return True
 
 
-
 	def equals_signature(self, other):
-		""" Check if this macro can seamlessly substitute another macro """
+		""" Test for signature equality
+
+		Compare macro parameters to other macro, test whether
+		the other replaces this one.
+
+		Args:
+			other (D_Define): Other macro
+
+		Returns:
+			True if they are equal in type and attribute count.
+
+		"""
 
 		# the name must be the same
 		if self.name != other.name:
 			return False
 
-		if (self.args == None) != (other.args == None):
+		if (self.args is None) != (other.args is None):
 			# one has args and the other not
 			return False
 
-		if self.args != None:
+		if self.args is not None:
 
 			if len(self.args) != len(other.args):
 				# differ in number of args
@@ -604,23 +737,31 @@ class D_Define(Token):
 		return True
 
 
-
 	def generate(self, args=None):
-		""" Generate replacement for given arguments """
+		""" Generate replacement for given arguments
+
+		Args:
+			args (str[]): List of arguments,
+				can be None for const macro.
+
+		Returns:
+			code that replaces the macro occurence.
+
+		"""
 
 		if not self.can_use_args(args):
 			raise Exception('Macro %s cannot be used with arguments %s!' % (self.name, ','.join(args)) )
 
 
 		# no-args macro
-		if self.args == None:
+		if self.args is None:
 			return self.tokens[0].text
 
 
 		# argument->value map
 		a2v = {}
 
-		if self.vararg_pos == None:
+		if self.vararg_pos is None:
 			for i in range(0, len(self.args)):
 				a2v[ self.args[i] ] = args[i]
 		else:
@@ -633,7 +774,6 @@ class D_Define(Token):
 
 			post_from = va_to
 			post_to = len(args)
-
 
 			for i in range(pre_from, pre_to):
 				a2v[ self.args[i] ] = args[i]
@@ -648,16 +788,15 @@ class D_Define(Token):
 			for i in range(post_from, post_to):
 				a2v[ self.args[i-len(va)+1] ] = args[i]
 
-
 		generated = ''
 
 		for dt in self.tokens:
-			if not dt.is_var():
+			if not isinstance(dt, DT_Var):
 				generated += dt.text
 			else:
 				va_empty_done = False
 
-				if self.vararg_pos != None and dt.name == self.args[self.vararg_pos]:
+				if self.vararg_pos is not None and dt.name == self.args[self.vararg_pos]:
 					# this is variadic argument
 
 					if re.match(r'.*,\s*##\s*\Z', generated, re.S):
@@ -677,9 +816,16 @@ class D_Define(Token):
 
 
 
-
 class D_Include(Token):
-	""" #include "file" """
+	""" #include directive
+
+	Args:
+		value (str): The directive code
+
+	Attributes:
+		file (str): The included filename.
+
+	"""
 
 	def __init__(self, value):
 		super().__init__(value)
@@ -696,9 +842,16 @@ class D_Include(Token):
 
 
 
-
 class D_Ifdef(Token):
-	""" #ifdef NAME """
+	""" #ifdef directive
+
+	Args:
+		value (str): The directive code
+
+	Attributes:
+		name (str): Name of the tested macro (the condition)
+
+	"""
 
 	def __init__(self, value):
 		super().__init__(value)
@@ -715,7 +868,15 @@ class D_Ifdef(Token):
 
 
 class D_Ifndef(Token):
-	""" #ifndef NAME """
+	""" #ifndef directive
+
+	Args:
+		value (str): The directive code
+
+	Attributes:
+		name (str): Name of the tested macro (the condition)
+
+	"""
 
 	def __init__(self, value):
 		super().__init__(value)
@@ -732,7 +893,12 @@ class D_Ifndef(Token):
 
 
 def _load_file(filename):
-	""" load a file """
+	""" Load a file to string
+
+	Args:
+		filename (str): The file path to load
+
+	"""
 
 	f = open(filename, 'r')
 	text = f.read()
@@ -740,8 +906,30 @@ def _load_file(filename):
 	return text
 
 
+
 class MacroProcessor:
-	""" Macro processor """
+	""" Macro processor
+
+	Interprets and evaluates macros in a source file,
+	producing a clean output source code.
+
+	Args:
+		main_file (str): The main source file to load
+
+	Attributes:
+		main_file (str): The main file path
+		source (str): Text of the main file
+		output (str): The output source code
+		defines:
+			Storage of defined macros.
+
+			It is a dict {"name" -> D_Define[]}, where the list
+			contains variants of the macro (overloading)
+
+		keep_comments:
+			Config option, whether to keep comments in the source code.
+
+	"""
 
 	def __init__(self, main_file):
 		self.main_file = main_file
@@ -753,7 +941,15 @@ class MacroProcessor:
 
 
 	def add_defines(self, new_defines):
-		""" Add extra defines to the processor """
+		""" Add extra defines to the processor
+
+		If any of the current defines
+
+		Args:
+			new_defines: Dict of defines, in the same format as the
+				self.defines dict.
+
+		"""
 
 		for (name, macros) in new_defines.items():
 			#print('macro name %s' % name)
@@ -778,21 +974,31 @@ class MacroProcessor:
 							del self.defines[name][j]
 
 
-
 	def get_defines(self):
-		""" Get defines """
+		""" Get defines
+
+		Returns:
+			The dict of defines
+
+		"""
 
 		return self.defines
 
 
-
 	def get_output(self):
-		""" Get the result of process() """
+		""" Get the result of process()
+
+		process() must be called first, otherwise you will get None.
+
+		Returns:
+			result of process()
+
+		"""
 
 		return self.output
 
 
-	def __handle_whitespace(self, rd):
+	def _handle_whitespace(self, rd):
 		out = ''
 		# handle whitespace
 		if self.keep_comments:
@@ -820,7 +1026,15 @@ class MacroProcessor:
 
 
 	def process(self):
-		""" Process all the directives in the source """
+		""" Extract all directives and resolve the # branching.
+
+		Keeps the produced code in `self.output`, and all
+		macros in the `self.defines` dict.
+
+		Returns:
+			The produced code (before replacing macros)
+
+		"""
 
 		rd = MacroReader(self.source, self.main_file)
 		self.built = ''
@@ -833,7 +1047,7 @@ class MacroProcessor:
 
 		while not rd.has_end():
 
-			out += self.__handle_whitespace(rd)
+			out += self._handle_whitespace(rd)
 			if rd.has_end():
 				break
 
@@ -850,9 +1064,8 @@ class MacroProcessor:
 				to_c = rd.pos2col( to_pos )
 
 				print('=== JUMP in file "%s":  %d:%d --> %d:%d ===' % (self.main_file, from_l, from_c, to_l, to_c))
-				rd.move_to( skip_dict[rd.pos] )
+				rd.pos =  skip_dict[rd.pos]
 				continue
-
 
 			# #define - add a new macro
 			if rd.has_define_directive():
@@ -863,7 +1076,6 @@ class MacroProcessor:
 					self.defines[d.name] = []
 
 				self.defines[d.name].append(d)
-
 
 			# #include - include external file
 			elif rd.has_include_directive():
@@ -877,7 +1089,6 @@ class MacroProcessor:
 						raise Exception('Could not find file: %s (nor %s)' % (d.file, ff))
 					else:
 						d.file = ff
-
 
 				print('including %s' % d.file)
 
@@ -893,7 +1104,6 @@ class MacroProcessor:
 
 				# add back defines collected from the external file
 				self.add_defines( mp.get_defines() )
-
 
 			# #ifdef
 			elif rd.has_ifdef_directive() or rd.has_ifndef_directive():
@@ -929,15 +1139,15 @@ class MacroProcessor:
 					# is defined
 
 					# remember current pos
-					pp = rd.get_pos()
+					pp = rd.pos
 
 					# let's find the end of this branch
 					endpos = rd.find_directive_block_end()
-					rd.move_to(endpos)
+					rd.pos = endpos
 
 					if rd.has_endif_directive():
 						# there is no else branch to skip
-						rd.move_to(pp) # back to saved pos
+						rd.pos = pp # back to saved pos
 						continue
 
 					elif rd.has_else_directive():
@@ -950,7 +1160,7 @@ class MacroProcessor:
 						# remember where to skip
 						skip_dict[endpos] = endpos2
 
-						rd.move_to(pp) # back to saved pos
+						rd.pos = pp # back to saved pos
 						continue
 					else:
 						rd.error('Wtf?')
@@ -958,7 +1168,7 @@ class MacroProcessor:
 				else:
 					# cond not met
 					endpos = rd.find_directive_block_end()
-					rd.move_to(endpos)
+					rd.pos = endpos
 
 					# consume the directive
 					if rd.has_else_directive():
@@ -968,16 +1178,13 @@ class MacroProcessor:
 
 					continue
 
-
 			# #else
 			elif rd.has_else_directive():
-				rd.error('Unexpected #else') # is consumed in jump -> cant be here
-
+				rd.error('Unexpected #else')  # is consumed in jump -> cant be here
 
 			# #endif
 			elif rd.has_endif_directive():
-				rd.consume_endif_directive() # probably due to jump
-
+				rd.consume_endif_directive()  # probably due to jump
 
 			# "..."
 			elif rd.has_string():
@@ -999,24 +1206,32 @@ class MacroProcessor:
 
 		self.output = out
 
+		return out
 
 
 	def apply_macros(self):
-		""" Apply macros in the output """
+		""" Recursively apply macros to the output of `process()`
+
+		To be called after `process()`.
+		The `output` variable is overwritten by this.
+
+		Returns:
+			The final source code after applying all
+			macro replacements.
+
+		"""
 
 		if len(self.output) == 0:
 			print('There is no source code.')
 			return
 
-		applied_count = 0
-
 		rd = CodeReader(self.output)
 
+		applied_count = 0
 		out = ''
-
 		while not rd.has_end():
 
-			out += self.__handle_whitespace(rd)
+			out += self._handle_whitespace(rd)
 			if rd.has_end():
 				break
 
@@ -1042,7 +1257,7 @@ class MacroProcessor:
 									replacement = mm.generate([bracket])
 									break
 
-						if replacement == None:
+						if replacement is None:
 							out += ident + ident_whitesp
 							out += '[%s]' % bracket
 						else:
@@ -1070,7 +1285,7 @@ class MacroProcessor:
 									replacement = mm.generate(args)
 									break
 
-						if replacement == None:
+						if replacement is None:
 							out += ident + ident_whitesp + paren
 							print(
 								'[W] Macro "%s" defined, but can\'t use arguments (%s)'
@@ -1078,7 +1293,6 @@ class MacroProcessor:
 						else:
 							out += replacement
 							applied_count += 1
-
 
 					else:
 						# const macro
@@ -1088,25 +1302,24 @@ class MacroProcessor:
 								replacement = mm.generate(None)
 								break
 
-						if replacement == None:
+						if replacement is None:
 							out += ident + ident_whitesp
 						else:
 							out += replacement + ident_whitesp
 							applied_count += 1
 
 				else:
-					out += ident + ident_whitesp # give it back
+					out += ident + ident_whitesp  # give it back
 
 			# "...", and "sdgfsd""JOINED"  "This too"
 			elif rd.has_string():
 				# handle string concatenation
 				s = ''
 				while rd.has_string():
-					s += rd.consume_string()[1:-1] # drop quotes
+					s += rd.consume_string()[1:-1]  # drop quotes
 					rd.sweep()
 
 				out += '"%s"' % s
-
 
 			# //...
 			elif rd.has_inline_comment():
@@ -1122,7 +1335,8 @@ class MacroProcessor:
 
 		self.output = out
 
-
 		# take care of macros in macros
 		if applied_count > 0:
 			return self.apply_macros()
+		else:
+			return out

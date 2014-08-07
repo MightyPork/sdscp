@@ -3,9 +3,24 @@
 import re
 
 class BaseReader:
-	""" Utility for scanning through a text """
+	""" Utility for scanning through a text
+
+	Args:
+		source (str): The text to read
+		filename (str): The file the text came from
+			Used for error reporting.
+
+	Attributes:
+		text (str): The scanned text
+		filename (str): The file the text came from
+		pos (int): Current cursor position in the text
+		length (int): Length of the text
+
+	"""
 
 	def __init__(self, source, filename=None):
+
+		# Initialize instance varibales
 		self.text = source
 		self.filename = filename
 		self.pos = 0
@@ -13,7 +28,14 @@ class BaseReader:
 
 
 	def near(self):
-		""" Get something near the current cursor, for error messages. """
+		""" Get something near the current cursor,
+		for error messages.
+
+		Format:
+			At: >>Stuff That Follows<<,
+			Near: >>A Bit Before And A Bit After<<
+
+		"""
 
 		begin = self.pos-20
 		end = self.pos+20
@@ -27,20 +49,34 @@ class BaseReader:
 		near = re.sub(r'[\n\t ]+', ' ', self.text[begin:end])
 		fwd = re.sub(r'[\n\t ]+', ' ', self.text[self.pos:self.pos+20])
 
-		return '>>%s<<\nNear: >>%s<<' % (fwd, near)
-
+		return 'At: >>%s<<\nNear: >>%s<<' % (fwd, near)
 
 
 	def pos2line(self, pos):
-		""" Convert absolute pos to line number """
+		""" Convert absolute pos to line number
+
+		Args:
+			pos (int): Character position in the text
+
+		Returns:
+			Line number the `pos` is at.
+
+		"""
 
 		processed = self.text[:pos]
 		return processed.count('\n') + 1
 
 
-
 	def pos2col(self, pos):
-		""" Convert absolute pos to column number """
+		""" Convert absolute pos to column number
+
+		Args:
+			pos (int): Character position in the text
+
+		Returns:
+			Column number the `pos` is at.
+
+		"""
 
 		processed = self.text[:pos]
 		lineno = processed.count('\n') + 1
@@ -51,37 +87,64 @@ class BaseReader:
 			return len(processed) - processed.rindex('\n')
 
 
-
 	def error(self, message):
-		""" Report an error """
+		""" Report an error
+
+		Raise a SyntaxError with the current position,
+		what's "near" and the given error message.
+
+		Args:
+			message (str): The error message
+
+		"""
 
 		lineno = self.pos2line(self.pos)
 		column = self.pos2col(self.pos)
 
-		if self.filename == None:
-			raise SyntaxError(message + '\nAt: ' + self.near())
+		if self.filename is None:
+			raise SyntaxError(message + '\n' + self.near())
 		else:
-			raise SyntaxError(message + '\nIn file %s at line %d, col %d,\nAt: %s' % (self.filename, lineno, column, self.near()))
+			raise SyntaxError(
+				message +
+				'\nIn file %s at line %d, col %d,\n%s' % (
+					self.filename, lineno, column, self.near()
+				)
+			)
 
 
+	def peek(self, chars=1, offset=0):
+		""" Look at the next chars
 
-	def get_pos(self):
-		""" Get current pos """
+		Does not change current `pos`.
 
-		return self.pos
+		Args:
+			chars (str): Number of chars to get (max)
+			offset (int, optional):
+				How many characters to skip before taking the "peek".
+				Counted from the current pos; defualt is 0.
 
+		Returns:
+			`chars` characters starting at the current `pos`.
 
-
-	def peek(self, chars=1):
-		""" Look at the next chars """
+		"""
 
 		self.validate_cursor()
 
-		return self.text[self.pos:self.pos+chars]
+		return self.text[self.pos + offset : self.pos + offset + chars]
 
 
 	def from_pos(self, pos_begin):
-		""" Get text from_pos the given pos (start fo some matching) """
+		""" Get text from `pos_begin` to the current `pos`.
+
+		The character at the current `pos` is not included.
+
+		Args:
+			pos_begin (int): Start of the retrieved chunk of text
+
+		Returns:
+			characters from `pos_begin` to the current `pos`
+
+		"""
 
 		if pos_begin > self.pos:
 			raise Exception('pos_begin must be <= current pos.')
@@ -89,72 +152,86 @@ class BaseReader:
 		return self.text[pos_begin : self.pos]
 
 
-
-	def peek_offset(self, offset=0, chars=1):
-		""" Look at the next chars (with offset) """
-
-		self.validate_cursor()
-
-		return self.text[self.pos + offset: chars]
-
-
-
-	def peek_back(self, chars=1):
-		""" Look at previous chars """
-
-		self.validate_cursor()
-
-		return self.text[self.pos-chars:self.pos]
-
-
-
 	def starts(self, expected):
-		""" Get if a part of the text starting at current pos equals the given string """
+		""" Get if the following text starts with
+		the given string. By "following" is meant the portion
+		from the current `pos`.
+
+		Args:
+			expected (str): The tested string
+
+		Returns:
+			True if the following text starts with `expected`
+		"""
 
 		self.validate_cursor()
 
 		return expected == self.text[ self.pos : self.pos+len(expected) ]
 
 
+	def matches(self, regex, flags=0):
+		""" Get if the following text matches the given regex.
 
-	def matches(self, expected_regex, flags=0):
-		""" Get if text starting at current pos matches the given regex """
+		By "following" is meant the portion from the current `pos`.
+
+		Args:
+			regex (str/regex): The tested regex
+			flags (int): re flags
+
+		Returns:
+			True if the following text matches the `regex`
+
+		"""
 
 		self.validate_cursor()
 
-		return re.match(expected_regex, self.text[self.pos:], flags)
-
+		return re.match(regex, self.text[self.pos:], flags)
 
 
 	def move(self, chars=1):
-		""" Move the cursor """
+		""" Move the cursor
+
+		Args:
+			chars (int, optional):
+				Number of chars to skip, defaults to 1.
+
+		"""
 
 		self.pos += chars
 
 
-
-	def move_to(self, pos):
-		""" Move the cursor to pos """
-
-		self.pos = pos
-
-
 	def end_reached(self):
-		""" Get if the cursor is at the end of string """
+		""" Get if the cursor is at the end of string
+
+		Returns:
+			True if the cursor is beyond the last character.
+
+		"""
 
 		return self.pos >= self.length
 
 
-
 	def validate_cursor(self):
-		""" Assert that the cursor is not outside string bounds """
+		""" Assert that the cursor is not outside text bounds.
+
+		If the assertion is not met, an error is raised.
+		"""
+
 		if self.pos >= self.length or self.pos < 0:
 			self.error('Unexpected end of scope. Maybe something like missing semicolon?')
 
 
-
 	def consume(self, chars=1):
-		""" Advance forth and return the found characters """
+		""" Advance forth and return the found characters
+
+		Args:
+			chars (int, optional):
+				Number of characters to consume, defaults to 1.
+
+		Returns:
+			The consumed characters
+
+		"""
 
 		self.validate_cursor()
 
@@ -163,9 +240,23 @@ class BaseReader:
 		return self.from_pos(pos_begin)
 
 
-
 	def consume_exact(self, to_consume):
-		""" Consume the given string """
+		""" Consume the given string
+
+		Does the same as
+
+			consume(len(to_consume))
+
+		but only if the following text starts with
+		the expetced string.
+
+		Args:
+			to_consume (str): The string to consume
+
+		Returns:
+			The consumed string.
+
+		"""
 
 		self.validate_cursor()
 
@@ -175,9 +266,28 @@ class BaseReader:
 		return self.consume( len(to_consume) )
 
 
+	def consume_until(self, end, eof=False, consume_end=True, keep_end=True):
+		""" Consume characters until the `end` is found or the
+		end of text is reached.
 
-	def consume_until(self, end, eof=False, keep_end=True, consume_end=True):
-		""" Consume until 'end', or EOF if the eof flag is True """
+		Args:
+			end (str): The end mark, can be multiple characters long.
+			eof (bool, optional):
+				Whether to allow EOF instead of the `end` mark.
+				False to raise error if `end` is not found.
+				Defaults to False.
+			consume_end (bool, optional):
+				Whether to include the `end` mark in the consumed string.
+				Defaults to True.
+			keep_end:
+				Whether to keep the `end`, if it is found an consumed.
+				Set to False to discard the `end` mark.
+				Defaults to True.
+
+		Returns:
+			The consumed string.
+
+		"""
 
 		self.validate_cursor()
 
@@ -210,32 +320,39 @@ class BaseReader:
 			self.error('Expected to find %s, reached end of file.' % end)
 
 
-
 	def consume_line(self):
 		""" Consume until newline or EOF, including the newline """
 
 		return self.consume_until('\n', eof=True) # until newline or EOF
 
 
-
 	def consume_all(self):
-		""" Consume until EOF """
+		""" Consume all until EOF """
+
 		pos_begin = self.pos
 		self.pos = self.length
 		return self.from_pos(pos_begin)
 
 
 	def assert_matches(self, regex):
-		""" Raise error if the given regex does not match """
+		""" Raise error if the given regex does not match
+
+		Args:
+			regex (str/regex): The texted regex
+
+		"""
 
 		if not self.matches(regex):
 			self.error('Unexpected character, expected to match: ' + regex.pattern)
 
 
-
 	def assert_starts(self, string):
-		""" Raise error if the next portion of text
-		does not start with the given piece
+		""" Raise error if the following text
+		does not start with the given piece.
+
+		Args:
+			string (str): The expected string.
+
 		"""
 
 		if not self.starts(string):
@@ -245,70 +362,94 @@ class BaseReader:
 
 
 class CodeReader(BaseReader):
-	""" Utility for scanning through C-like source code """
+	""" Utility for scanning through C-like source code
+
+	Args:
+		source (str): The source code text
+		filename (str, optional):
+			Name of the file the text came from.
+			Defaults to None.
+
+	Attributes:
+		Various regexes
+
+	"""
+
+
+	RE_IDENTIFIER_START = re.compile(r'[a-z_]', re.I|re.A) # ignorecase | ascii
+	RE_IDENTIFIER_BODY  = re.compile(r'\w', re.I|re.A)
+
+	RE_IDENTIFIER       = re.compile(
+		r''' # identifier
+		^[a-z_]
+		\w*
+		(?:[^\w]|\Z)
+		''', re.I|re.A|re.X
+	)
+
+	RE_STRING_QUOTE = re.compile(r'^"')
+	RE_CHAR_QUOTE   = re.compile(r'^\'')
+
+	RE_PAREN_OPEN  = re.compile(r'^[\[({]')
+	RE_PAREN_CLOSE = re.compile(r'^[\])}]')
+
+	COMMENT       = '//'
+	COMMENT_OPEN  = '/*'
+	COMMENT_CLOSE = '*/'
+
+	RE_COMMENT_OPEN  = re.compile(r'^/\*')
+	RE_COMMENT_CLOSE = re.compile(r'^\*/')
+
+	RE_RVALUE_EXTENDED_EQUALS = re.compile(r'^[-*+/%&|^]=')
+
+	RE_OPERATOR = re.compile(
+		r''' # operator
+		(?:
+			[-<>+*/%|&^~!]	# short operators
+			| &&			# long operators
+			| \|\|
+			| <<
+			| >>
+			| >=
+			| <=
+			| ==
+			| !=
+			| \+\+
+			| --
+		)
+		''', re.I|re.X
+	)
+
+
+	RE_LABEL = re.compile(
+		r''' # label
+		^
+		( label[ \t]+ )?	# optional label keyword
+		[a-z_]	# identifier
+		\w*
+		:
+		''', re.I|re.A|re.X
+	)
+
+	# assoc array of left-to-right parens
+	PARENS = {
+		'(': ')',
+		'[': ']',
+		'{': '}'
+	}
+
 
 	def __init__(self, source, filename=None):
 		super().__init__(source, filename)
 
-		self.RE_IDENTIFIER_START = re.compile(r'[a-z_]', re.I|re.A) # ignorecase | ascii
-		self.RE_IDENTIFIER_BODY  = re.compile(r'\w', re.I|re.A)
-		self.RE_IDENTIFIER       = re.compile(r'''
-				^[a-z_] # start of identifier
-				\w*		# body of identifier
-				(?:[^\w]|\Z)
-				''', re.I|re.A|re.X)
-
-		self.RE_STRING_QUOTE = re.compile(r'^"')
-		self.RE_CHAR_QUOTE   = re.compile(r'^\'')
-
-		self.RE_PAREN_OPEN  = re.compile(r'^[\[({]')
-		self.RE_PAREN_CLOSE = re.compile(r'^[\])}]')
-
-		self.COMMENT       = '//'
-		self.COMMENT_OPEN  = '/*'
-		self.COMMENT_CLOSE = '*/'
-
-		self.RE_COMMENT_OPEN  = re.compile(r'^/\*')
-		self.RE_COMMENT_CLOSE = re.compile(r'^\*/')
-
-		self.RE_RVALUE_EXTENDED_EQUALS = re.compile(r'^[-*+/%&|^]=')
-
-		self.RE_OPERATOR = re.compile(r'''
-				(?:
-					[-<>+*/%|&^~!]	# short operators
-					| &&			# long operators
-					| \|\|
-					| <<
-					| >>
-					| >=
-					| <=
-					| ==
-					| !=
-					| \+\+
-					| --
-				)
-				''', re.I|re.X)
-
-
-		self.RE_LABEL = re.compile(r'''
-				^
-				( label[ \t]+ )?	# optional label keyword
-				[a-z_]	# start of identifier
-				\w*		# body of identifier
-				:		# colon
-				''', re.I|re.A|re.X)
-
-		# assoc array of left-to-right parens
-		self.PARENS = {
-			'(': ')',
-			'[': ']',
-			'{': '}'
-		}
-
-
 
 	def sweep(self):
-		""" Consume comments and whitespace """
+		""" Consume comments and whitespace
+
+		Returns:
+			The consumed whitespace and comments
+
+		"""
 
 		pos_begin = self.pos
 
@@ -334,9 +475,18 @@ class CodeReader(BaseReader):
 		return self.from_pos(pos_begin)
 
 
-
 	def consume_block(self, keep_parens=True):
-		""" Consume until matching close parenthesis """
+		""" Consume until matching close parenthesis
+
+		Args:
+			keep_parens (boo, optional):
+				Whether to keep the parentheses in the
+				returned string. They are consumed either way.
+
+		Returns:
+			The consumed block (), {} or []
+
+		"""
 
 		pos_begin = self.pos
 		opening = self.peek()
@@ -345,9 +495,8 @@ class CodeReader(BaseReader):
 
 		closing = self.PARENS.get(opening)
 
-		if closing == None:
+		if closing is None:
 			self.error('Invalid opening paren/bracket: %s' % opening)
-
 
 		nested = 0
 		self.consume()
@@ -380,13 +529,17 @@ class CodeReader(BaseReader):
 				else:
 					nested -= 1
 
-		self.move_to(pos_begin)
+		self.set_pos(pos_begin)
 		self.error( 'Unterminated %s...%s block' % (opening, closing) )
 
 
-
 	def consume_block_comment(self):
-		""" Consume a block comment """
+		""" Consume a block comment
+
+		Returns:
+			The consumed comment
+
+		"""
 
 		pos_begin = self.pos
 
@@ -396,28 +549,43 @@ class CodeReader(BaseReader):
 		return self.from_pos(pos_begin)
 
 
-
 	def consume_inline_comment(self):
-		""" Consume a inline comment """
+		""" Consume a inline comment
+
+		Returns:
+			The consumed comment
+
+		"""
 
 		return self.consume_line()
 
 
+	def consume_code(self, end=';', eof=False, consume_end=True, keep_end=True):
+		""" Consume code chunk until the given `end` delimiter.
 
-	def consume_code(self, end=';', eof=False, keep_end=True, consume_end=True):
-		""" consume code chunk until the given end delimiter
-		Taking care of nested parentheses and strings.
+		Takes care of nested parentheses, comments and strings.
 
-		end ... end sign
-		eof ... accept EOF instead of "end" as end sign
-		consume_end ... whether to consume the end mark or let it be.
-		keep_end ...... when end is consumed, whether to add end to the output string or not
+		Args:
+			end (str): The end mark, can be multiple characters long.
+			eof (bool, optional):
+				Whether to allow EOF instead of the `end` mark.
+				False to raise error if `end` is not found.
+				Defaults to False.
+			consume_end (bool, optional):
+				Whether to include the `end` mark in the consumed string.
+				Defaults to True.
+			keep_end:
+				Whether to keep the `end`, if it is found an consumed.
+				Set to False to discard the `end` mark.
+				Defaults to True.
+
+		Returns:
+			The consumed code
 
 		"""
 
 		if type(end) == str:
 			end = [end] # wrap as array
-
 
 		pos_begin = self.pos
 		buffer = ''
@@ -462,17 +630,20 @@ class CodeReader(BaseReader):
 
 			buffer += self.consume()
 
-
 		if eof:
 			return buffer.strip()
 		else:
-			self.move_to(pos_begin)
+			self.set_pos(pos_begin)
 			self.error('Expected to find %s, found End Of File.' % end)
 
 
-
 	def consume_char(self):
-		""" Consume a char literal """
+		""" Consume a char literal
+
+		Returns:
+			The consumed char literal, including the quotes.
+
+		"""
 
 		pos_begin = self.pos
 
@@ -501,15 +672,18 @@ class CodeReader(BaseReader):
 		buffer += endq
 
 		if endq != quote:
-			self.error( 'Invalid char syntax (expected single quote, found %s)' % endq )
+			self.error( 'Invalid char syntax. For strings, use DOUBLE quotes!' )
 
 		return buffer
 
 
-
 	def consume_string(self):
-		""" Consume till the end of string
-		Cursor must be at the position of the opening quote
+		""" Consume a string literal.
+		The cursor must be at the opening quote.
+
+		Returns:
+			The consumed string literal, including the quotes.
+
 		"""
 
 		pos_begin = self.pos
@@ -529,13 +703,17 @@ class CodeReader(BaseReader):
 			elif char == quote:
 				return self.from_pos(pos_begin) # end quote
 
-		self.move_to(pos_begin)
+		self.set_pos(pos_begin)
 		self.error('Unterminated string literal.')
 
 
-
 	def consume_whitespace(self):
-		""" Consume any next whitespace """
+		""" Consume any following whitespace
+
+		Returns:
+			The consumed whitespace
+
+		"""
 
 		pos_begin = self.pos
 
@@ -550,9 +728,13 @@ class CodeReader(BaseReader):
 		return self.from_pos(pos_begin) # all till the end
 
 
-
 	def consume_inline_whitespace(self):
-		""" Consume any next inline whitespace """
+		""" Consume any following inline whitespace
+
+		Returns:
+			The consumed whitespace
+
+		"""
 
 		pos_begin = self.pos
 
@@ -566,9 +748,13 @@ class CodeReader(BaseReader):
 		return self.from_pos(pos_begin) # all the rest
 
 
-
 	def consume_number(self):
-		""" Consume hex, bin or dec number. """
+		""" Consume hex, bin or dec number.
+
+		Returns:
+			The number literal
+
+		"""
 
 		pos_begin = self.pos
 
@@ -607,9 +793,13 @@ class CodeReader(BaseReader):
 		return self.from_pos(pos_begin) # whole number
 
 
-
 	def consume_operator(self):
-		""" Consume an operator. """
+		""" Consume an operator.
+
+		Returns:
+			The operator
+
+		"""
 
 		# always single so just consume it
 		# * / % ~ ^
@@ -631,10 +821,15 @@ class CodeReader(BaseReader):
 		self.error('Expected operator, found something else.')
 
 
-
 	def consume_rvalue(self):
-		""" Consume rvalue (equals sign followed by assigned value)
-		Works also for extended equals sign += etc.
+		""" Consume an rvalue - extended equals and expression.
+
+		The rvalue can be terminated by either , or ;
+		This terminator is not consumed.
+
+		Returns:
+			The rvalue
+
 		"""
 
 		buffer = ''
@@ -656,9 +851,15 @@ class CodeReader(BaseReader):
 		return buffer
 
 
-
 	def consume_identifier(self):
-		""" Consume next identifier """
+		""" Consume next identifier
+
+		An identifier can be eg. a keyword, variable or function name.
+
+		Returns:
+			The identifier
+
+		"""
 
 		pos_begin = self.pos
 
@@ -676,36 +877,18 @@ class CodeReader(BaseReader):
 		return self.from_pos(pos_begin) # all the rest
 
 
-
-	def consume_label(self):
-		""" Consume a label """
-
-		# optional label keyword
-		if self.matches(r'^label[ \t]+'):
-			return self.consume_exact('label')
-
-		self.consume_inline_whitespace()
-		label = self.consume_identifier()
-
-		self.assert_starts(':')
-		self.consume() # colon
-
-		return label + ':'
-
-
-
 	def has_char(self):
 		""" Check if next token is a char literal """
+
 		if self.has_end(): return False
 		return self.matches( self.RE_CHAR_QUOTE )
 
 
-
 	def has_string(self):
 		""" Check if next token is a string literal """
+
 		if self.has_end(): return False
 		return self.matches( self.RE_STRING_QUOTE )
-
 
 
 	def has_number(self):
@@ -724,65 +907,65 @@ class CodeReader(BaseReader):
 			return True # dec
 
 
-
 	def has_operator(self):
 		""" Check if next token is an operator """
+
 		if self.has_end(): return False
 		return self.matches(self.RE_OPERATOR)
 
 
-
 	def has_inline_comment(self):
 		""" Check if next token is a line comment """
+
 		if self.has_end(): return False
 		return self.starts(self.COMMENT)
 
 
-
 	def has_block_comment(self):
 		""" Check if next token is a block comment """
+
 		if self.has_end(): return False
 		return self.starts(self.COMMENT_OPEN)
-
 
 
 	def has_identifier(self):
 		""" Check if next token is an identifier
 		(may also be keyword, not distinguished here)
 		"""
+
 		if self.has_end(): return False
 		return self.matches(self.RE_IDENTIFIER)
 
 
-
 	def has_label(self):
 		""" Check if next token is a label """
+
 		if self.has_end(): return False
 		return self.matches(self.RE_LABEL)
 
 
 	def has_paren(self):
-		""" Check if next token is a parenthesis block (func. arguments etc) """
+		""" Check if next token is a parenthesis """
 		if self.has_end(): return False
 		return self.starts('(')
 
 
-
 	def has_bracket(self):
 		""" Check if next token is a bracket block (array index) """
+
 		if self.has_end(): return False
 		return self.starts('[')
 
 
-
 	def has_code_block(self):
 		""" Check if next token is a brace block (code block) """
+
 		if self.has_end(): return False
 		return self.starts('{')
 
 
 	def has_rvalue(self):
-		""" Check if next token is a RValue (*equals and expression) """
+		""" Check if next token is a RValue """
 
 		if self.has_end():
 			return False
