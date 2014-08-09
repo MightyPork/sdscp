@@ -256,7 +256,8 @@ try:
 		tk.show()
 		print('')
 
-	else:
+
+	if DEST != None or SHOW_OUTPUT:
 		# perform tweaks to match some of SDS-C's broken syntax
 		for_sds = prepare_for_sdsc(processed)
 
