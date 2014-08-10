@@ -660,7 +660,7 @@ class S_For(Statement):
 			Tested before each cycle.
 		iter (Statement[]): the iter statement;
 			Executed after each cycle.
-		body (Statement): the loop body statement
+		body_st (Statement): the loop body statement
 
 	"""
 
@@ -718,7 +718,7 @@ class S_Switch(Statement):
 		value (Expression): The switch value;
 			The CASE values are compared with it.
 
-		body (T_Block): The switch body.
+		body_st (T_Block): The switch body.
 
 	"""
 

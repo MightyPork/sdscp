@@ -125,7 +125,7 @@ class E_Group(Expression):
 
 
 	def __str__(self):
-		return '(%s)' % ' '.join( [str(a) for a in self.children] )
+		return 'EGrp(%s)' % ' '.join( [str(a) for a in self.children] )
 
 
 
@@ -137,7 +137,7 @@ class E_Literal(Expression):
 
 	Attributes:
 		token (Token): The literal token
-		value (str): The value is kept here
+		value (str): The value of the token is kept here
 
 	"""
 

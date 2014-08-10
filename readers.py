@@ -164,6 +164,9 @@ class BaseReader:
 			True if the following text starts with `expected`
 		"""
 
+		if self.has_end():
+			return False
+
 		self.validate_cursor()
 
 		return expected == self.text[ self.pos : self.pos+len(expected) ]

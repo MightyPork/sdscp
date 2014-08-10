@@ -9,6 +9,7 @@ import traceback
 from directives import DirectiveProcessor
 from tokens import Tokenizer
 from readers import CodeReader
+from renderers import BasicRenderer
 import statements
 
 # ==================== Command Line Arguments processing =======================
@@ -16,13 +17,20 @@ import statements
 parser = argparse.ArgumentParser(description='SDS-C macro preprocessor')
 
 parser.add_argument(
-	'source',
-	help='The source file to process'
+		'source',
+		help='The source file to process'
 )
 
 parser.add_argument(
-	'-o', '--output',
-	help='The output file. To just print the output, use -d'
+		'-o', '--output',
+		help='The output file. To just print the output, use -d'
+)
+
+parser.add_argument(
+		'-d', '--display',
+		action='store_true',
+		default=False,
+		help='Show the final source (D stands for Display)'
 )
 
 parser.add_argument(
@@ -38,41 +46,47 @@ parser.add_argument(
 		default=False,
 		help='Show all optional debug info.'
 )
+
 parser.add_argument(
-		'-s', '--show-source',
+		'-S', '--show-source',
 		action='store_true',
 		default=False,
 		help='Show original source (only main file)'
 )
+
 parser.add_argument(
-		'-m', '--show-macros',
+		'-M', '--show-macros',
 		action='store_true',
 		default=False,
 		help='List all macros'
 )
+
 parser.add_argument(
-		'-r', '--show-resolved',
+		'-R', '--show-resolved',
 		action='store_true',
 		default=False,
 		help='Show code after processing includes and # branching.'
 )
+
 parser.add_argument(
-		'-p', '--show-processed',
+		'-P', '--show-processed',
 		action='store_true',
 		default=False,
 		help='Show code after replacing macros (preprocessor output)'
 )
+
 parser.add_argument(
-		'-t', '--show-tokens',
+		'-T', '--show-tokens',
 		action='store_true',
 		default=False,
 		help='Show tokenization.'
 )
+
 parser.add_argument(
-		'-d', '--show-output',
+		'-I', '--show-statements',
 		action='store_true',
 		default=False,
-		help='Show the final source (D stands for Display)'
+		help='Show statements (I stands for Interpreted).'
 )
 
 args = parser.parse_args()
@@ -88,8 +102,8 @@ SHOW_RESOLVED = args.verbose or args.show_resolved
 
 SHOW_MACROS = args.verbose or args.show_macros
 SHOW_SOURCE = args.verbose or args.show_source
-SHOW_SOURCE = args.verbose or args.show_source
-SHOW_OUTPUT = args.verbose or args.show_output
+SHOW_STATEMENTS = args.verbose or args.show_statements
+SHOW_OUTPUT = args.verbose or args.display
 
 DO_CLEAN = args.clean
 
@@ -248,23 +262,34 @@ try:
 		print(prep4disp(processed) + '\n')
 
 
-	if SHOW_TOKENS:
-		banner('TOKENIZED', '-')
-		print('Tokenization of the processed code:\n')
+	if SHOW_TOKENS or SHOW_STATEMENTS:
 
 		tk = Tokenizer(processed)
 		tokens = tk.tokenize()
-		tk.show()
-		print('')
 
-		banner('STATEMENTIFIED', '-')
+		if SHOW_TOKENS:
+			banner('TOKENIZED', '-')
+			print('Tokenization of the processed code:\n')
+			tk.show()
+			print('')
 
-		st = statements.parse(tokens)
 
-		for s in st:
-			print(str(s))
+		if SHOW_STATEMENTS:
+			banner('STATEMENTS', '-')
+			print('Tokens interpreted as statements:\n')
 
-		print('')
+			st = statements.parse(tokens)
+
+			for s in st:
+				print(str(s))
+
+
+			banner('REFLOW', '-')
+
+			rndr = BasicRenderer(st)
+			print(prep4disp(rndr.render()))
+
+			print('')
 
 
 	if DEST != None or SHOW_OUTPUT:

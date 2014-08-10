@@ -555,6 +555,9 @@ class T_Expression(CompositeToken):
 			else:
 				raise Exception('Unexpected expression token near' + rd.peek(10))
 
+		for t in self.tokens:
+			if t.is_composite():
+				t.tokenize()
 
 
 class T_Rvalue(CompositeToken):
