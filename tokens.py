@@ -786,6 +786,10 @@ class T_Bracket(CompositeToken):
 	Contains:
 		T_Expression: The array index
 
+	Attributes:
+		(same as CompositeToken) +
+		index (T_Expression): The index expression
+
 	"""
 
 	def _tokenize(self):
@@ -797,6 +801,7 @@ class T_Bracket(CompositeToken):
 		s = rd.consume_code(end=',', eof=True, keep_end=False)
 		t = T_Expression(s)
 		self.tokens.append(t)
+		self.index = t
 
 		rd.sweep()
 
@@ -1172,7 +1177,7 @@ class Tokenizer:
 
 		elif kwd == 'label':
 			# the label keyword (optional for labels)
-			rd.pos = pos_before_s  # backtrack
+
 			self._collect_label(rd)
 
 		elif kwd == 'return':
@@ -1316,3 +1321,102 @@ def show_tokenlist(tokens, level='  '):
 
 			if tok.is_composite():
 				show_tokenlist(tok.tokenize(), level + '  ')
+
+class TokenWalker:
+	""" Recognizes nodes in a token list
+
+	Args:
+		tokens (Token[]): token list to walk
+
+	Attributes:
+		pos (int): index of current token
+		tokens (Token[]): the token list is stored here
+
+	"""
+
+	def __init__(self, tokens):
+
+		# initialize instance variables
+		self.pos = 0
+		self.tokens = tokens
+
+
+	def has_next(self):
+		""" Get if the walker has more tokens to walk """
+		return self.pos < len(self.tokens)
+
+
+	def peek(self, offset=0):
+		""" Peek at the n-th token relative to cursor """
+
+		i = self.pos + offset
+
+		if not i in range(0, len(self.tokens)):
+			return None  # EOL
+
+		return self.tokens[i]
+
+
+	def has(self, cls, offset=0):
+		""" Get if the next (or offset) token is of given type """
+
+		return isinstance(self.peek(offset), cls)
+
+
+	def move(self, steps=1):
+		""" Move the cursor """
+
+		self.pos += steps
+
+
+	def consume_paren(self, ptype):
+		""" Consume a paren, assert it is of the
+		given type.
+
+		Args:
+			ptype (ParenType): The required type
+
+		Returns:
+			the paren token
+		"""
+
+		paren = self.consume(T_Paren)
+
+		if not paren.ptype == ptype:
+			raise Exception(
+				'Found paren of type %s, expected %s' % (
+					paren.ptype.name, ptype.name
+				)
+			)
+
+		return paren
+
+
+	def consume(self, cls=None):
+		""" Consume one token, move the cursor.
+		Asserts it is of the right type
+
+		Args:
+			cls (Token class): required token class
+
+		Returns:
+			the token
+		"""
+
+		if not self.has_next():
+			raise Exception(
+				'Unexpected end of token list.'
+			)
+
+		if cls is not None:
+			if not self.has(cls):
+				raise Exception(
+					'Expected ' +
+					cls.__name__ +
+					', found ' +
+					type(self.peek()).__name__
+				)
+
+		t = self.peek()
+		self.move()
+		return t

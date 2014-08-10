@@ -6,9 +6,10 @@ import math
 import re
 import traceback
 
-from macros import MacroProcessor
+from directives import DirectiveProcessor
 from tokens import Tokenizer
 from readers import CodeReader
+import statements
 
 # ==================== Command Line Arguments processing =======================
 
@@ -202,24 +203,24 @@ try:
 	print('Reading file:', SRC)
 
 	# read the file
-	mp = MacroProcessor(SRC)
-	mp.keep_comments = not DO_CLEAN
+	dproc = DirectiveProcessor(SRC)
+	dproc.keep_comments = not DO_CLEAN
 
 	if SHOW_SOURCE:
 		banner('SOURCE', '-')
-		print(prep4disp( mp.source ) + '\n')
+		print(prep4disp( dproc.source ) + '\n')
 
 	# ---------------- Resolve directives ------------------
 
 
 	# include files, resolve branching, find macros...
-	mp.process()
+	dproc.process()
 
 
 	if SHOW_MACROS:
 		banner('MACROS', '-')
 		print('List of all found macros, in definition order:\n')
-		for d in mp.get_defines().values():
+		for d in dproc.get_defines().values():
 			for m in d:
 				print('  ' + str(m))
 		print()
@@ -229,15 +230,15 @@ try:
 	if SHOW_RESOLVED:
 		banner('RESOLVED', '-')
 		print('Code after resolving includes, # branching, and extracting macros:\n')
-		print(prep4disp( mp.get_output() ) + '\n')
+		print(prep4disp( dproc.get_output() ) + '\n')
 
 
 	# -------------------- Apply macros --------------------
 
 	# perform macro replacements
-	mp.apply_macros()
+	dproc.apply_macros()
 	# get output code
-	processed = mp.get_output()
+	processed = dproc.get_output()
 
 
 	if SHOW_PROCESSED:
@@ -252,11 +253,21 @@ try:
 		print('Tokenization of the processed code:\n')
 
 		tk = Tokenizer(processed)
-		tk.tokenize()
+		tokens = tk.tokenize()
 		tk.show()
 		print('')
 
-	else:
+		banner('STATEMENTIFIED', '-')
+
+		st = statements.parse(tokens)
+
+		for s in st:
+			print(str(s))
+
+		print('')
+
+
+	if DEST != None or SHOW_OUTPUT:
 		# perform tweaks to match some of SDS-C's broken syntax
 		for_sds = prepare_for_sdsc(processed)
 
@@ -270,7 +281,7 @@ try:
 			f.write(for_sds)
 			f.close()
 		else:
-			print('[!] No output file specified.')
+			print('No output file specified.')
 
 
 	print('\nDone.\n')

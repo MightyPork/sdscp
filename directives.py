@@ -1,10 +1,11 @@
 #!/bin/env python3
 
 import re
-from readers import CodeReader
-from tokens import Token, T_Paren, ParenType
 import os.path
 from collections import OrderedDict
+
+from readers import CodeReader
+from tokens import Token, T_Paren, ParenType
 
 
 class MacroReader(CodeReader):
@@ -907,7 +908,7 @@ def _load_file(filename):
 
 
 
-class MacroProcessor:
+class DirectiveProcessor:
 	""" Macro processor
 
 	Interprets and evaluates macros in a source file,
@@ -1093,7 +1094,7 @@ class MacroProcessor:
 				print('including %s' % d.file)
 
 				# create a nested macro processor
-				mp = MacroProcessor(d.file)
+				mp = DirectiveProcessor(d.file)
 
 				# inject current defines
 				mp.add_defines(self.defines)
