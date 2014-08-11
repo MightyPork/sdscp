@@ -9,7 +9,7 @@ import traceback
 from directives import DirectiveProcessor
 from tokens import Tokenizer
 from readers import CodeReader
-from renderers import BasicRenderer
+from renderers import *
 import statements
 
 # ==================== Command Line Arguments processing =======================
@@ -30,14 +30,14 @@ parser.add_argument(
 		'-d', '--display',
 		action='store_true',
 		default=False,
-		help='Show the final source (D stands for Display)'
+		help='Show the final source (Can be used together with -o)'
 )
 
 parser.add_argument(
-		'-c', '--clean',
+		'-G', '--show-generated',
 		action='store_true',
 		default=False,
-		help='Remove some whitespace and all comments'
+		help='Show the code generated from statements.'
 )
 
 parser.add_argument(
@@ -48,7 +48,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-		'-S', '--show-source',
+		'-O', '--show-original',
 		action='store_true',
 		default=False,
 		help='Show original source (only main file)'
@@ -72,40 +72,39 @@ parser.add_argument(
 		'-P', '--show-processed',
 		action='store_true',
 		default=False,
-		help='Show code after replacing macros (preprocessor output)'
+		help='Show code after replacing macros'
 )
 
 parser.add_argument(
 		'-T', '--show-tokens',
 		action='store_true',
 		default=False,
-		help='Show tokenization.'
+		help='Show tokens (source divided to pieces).'
 )
 
 parser.add_argument(
-		'-I', '--show-statements',
+		'-S', '--show-statements',
 		action='store_true',
 		default=False,
-		help='Show statements (I stands for Interpreted).'
+		help='Show statements (high-level code abstraction).'
 )
 
 args = parser.parse_args()
 
 
-SRC = args.source
-DEST = args.output
+SRC		= args.source
+DEST	= args.output
 
-SHOW_TOKENS = args.verbose or args.show_tokens
 
-SHOW_PROCESSED = args.verbose or args.show_processed
-SHOW_RESOLVED = args.verbose or args.show_resolved
+SHOW_ORIGINAL	= args.verbose or args.show_original
 
-SHOW_MACROS = args.verbose or args.show_macros
-SHOW_SOURCE = args.verbose or args.show_source
-SHOW_STATEMENTS = args.verbose or args.show_statements
-SHOW_OUTPUT = args.verbose or args.display
-
-DO_CLEAN = args.clean
+SHOW_RESOLVED	= args.verbose or args.show_resolved
+SHOW_MACROS		= args.verbose or args.show_macros
+SHOW_PROCESSED	= args.verbose or args.show_processed
+SHOW_TOKENS		= args.verbose or args.show_tokens
+SHOW_STATEMENTS	= args.verbose or args.show_statements
+SHOW_GENERATED	= args.verbose or args.show_generated
+SHOW_OUTPUT		= args.verbose or args.display
 
 
 # ==================== Utils =======================
@@ -124,90 +123,6 @@ def prep4disp(code):
 	return c
 
 
-def prepare_for_sdsc(code):
-	""" Do some finishing touches to the syntax """
-	rd = CodeReader(code)
-
-	out = ''
-
-	while not rd.has_end():
-
-		if rd.has_inline_comment():
-			out += rd.consume_inline_comment()
-			continue
-
-		elif rd.has_block_comment():
-			out += rd.consume_block_comment()
-			continue
-
-		elif rd.has_string():
-			# collect whole string
-			# convert quotes to apos
-			s = rd.consume_string()
-			s = s[1:-1]
-
-			if s.count("'") > 0:
-				raise SyntaxError('Sorry, SDS-C compiler is TOO STUPID to handle \' in string.')
-
-			s = re.sub(r'\\"', '"', s)
-
-			out += "'%s'" % s
-			continue
-
-		elif rd.has_char():
-			# collect whole char literal
-			out += rd.consume_char()
-			continue
-
-		elif rd.has_identifier():
-			# remove empty paren after function name
-			out += rd.consume_identifier()
-			out += rd.consume_whitespace()
-
-			if rd.has_paren():
-				pp = rd.pos
-				paren = rd.consume_block()
-
-				if re.match(r'\(\s*\)', paren):
-					after = rd.consume_whitespace()
-					if rd.has_code_block():
-						# omit the empty paren
-						out += after
-					else:
-						out += paren
-						out += after
-				else:
-					rd.pos = pp # go back
-
-			elif rd.has_bracket():
-				# collect whole bracket
-
-				br = rd.consume_block()
-				br_in = br[1:-1].strip()
-
-				if re.match(r'^\([a-zA-Z_][a-zA-Z0-9_]*\)$', br_in):
-					br_in = br_in[1:-1]
-				elif re.match(r'^\((?:0x|0b)?[0-9]+\)$', br_in):
-					br_in = br_in[1:-1]
-				elif re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', br_in):
-					pass
-				elif re.match(r'^(?:0x|0b)?[0-9]+$', br_in):
-					pass
-				else:
-					raise SyntaxError('Sorry, %s appears to be invalid array index for SDS-C.' % br_in)
-
-				out += '[%s]' % br_in
-
-			continue
-
-		else:
-			# any other char is just used the same
-			out += rd.consume()
-
-	return out
-
-
-
 # ==================== MAIN TASK =======================
 
 try:
@@ -218,9 +133,8 @@ try:
 
 	# read the file
 	dproc = DirectiveProcessor(SRC)
-	dproc.keep_comments = not DO_CLEAN
 
-	if SHOW_SOURCE:
+	if SHOW_ORIGINAL:
 		banner('SOURCE', '-')
 		print(prep4disp( dproc.source ) + '\n')
 
@@ -262,39 +176,41 @@ try:
 		print(prep4disp(processed) + '\n')
 
 
-	if SHOW_TOKENS or SHOW_STATEMENTS:
+	tk = Tokenizer(processed)
 
-		tk = Tokenizer(processed)
-		tokens = tk.tokenize()
-
-		if SHOW_TOKENS:
-			banner('TOKENIZED', '-')
-			print('Tokenization of the processed code:\n')
-			tk.show()
-			print('')
+	tokens = tk.tokenize()
+	sts = statements.parse(tokens)
 
 
-		if SHOW_STATEMENTS:
-			banner('STATEMENTS', '-')
-			print('Tokens interpreted as statements:\n')
-
-			st = statements.parse(tokens)
-
-			for s in st:
-				print(str(s))
+	if SHOW_TOKENS:
+		banner('TOKENIZED', '-')
+		print('Tokenization of the processed code:\n')
+		tk.show()
+		print('')
 
 
-			banner('REFLOW', '-')
+	if SHOW_STATEMENTS:
+		banner('STATEMENTS', '-')
+		print('Source code abstraction:\n')
 
-			rndr = BasicRenderer(st)
-			print(prep4disp(rndr.render()))
 
-			print('')
+		for s in sts:
+			print(str(s))
+
+
+	if SHOW_GENERATED:
+		banner('GENERATED', '-')
+		print('Code generated from statements:\n')
+
+		rndr = BasicRenderer(sts)
+		print(prep4disp(rndr.render()))
 
 
 	if DEST != None or SHOW_OUTPUT:
+
 		# perform tweaks to match some of SDS-C's broken syntax
-		for_sds = prepare_for_sdsc(processed)
+		rndr = SdsRendererCollectVariables(sts)
+		for_sds = rndr.render()
 
 		if SHOW_OUTPUT:
 			banner('OUTPUT SDS-C CODE', '-')

@@ -110,7 +110,6 @@ class BasicRenderer(Renderer):
 
 		# remove whitespace at ends
 		src = self._do_render_any(s)
-		src = src.strip()
 
 		if indent_first:
 			# add newline in front of it, to trigger indentation
@@ -124,9 +123,12 @@ class BasicRenderer(Renderer):
 			# remove the added newline
 			src = src[1:]
 
-		if append_newline:
+		if append_newline or isinstance(s, S_Function):
 			# add trailing newline
 			src += '\n'
+
+		if isinstance(s, S_Function):
+			src = '\n' + src
 
 		return src
 
@@ -248,9 +250,11 @@ class BasicRenderer(Renderer):
 
 	def _render_function(self, s):  # S_Function
 
-		src = s.name + '('
-		src += ', '.join(s.args)
-		src += ')\n'
+		src = '%s(%s)\n' % (
+			s.name,
+			', '.join(s.args)
+		)
+
 		src += self._render_any(s.body_st)
 
 		return src
@@ -269,21 +273,19 @@ class BasicRenderer(Renderer):
 
 
 	def _render_return(self, s):  # S_Return
-		return 'return ' + self._render_expr(s.value) + ';'
+		return 'return %s;' % self._render_expr(s.value)
 
 
 	def _render_goto(self, s):  # S_Goto
-		return 'goto ' + s.name + ';'
+		return 'goto %s;' % s.name
 
 
 	def _render_label(self, s):  # S_Label
-		return s.name + ':'
+		return 'label %s:' % s.name
 
 
 	def _render_if(self, s):  # S_If
-		src = 'if ('
-		src += self._render_expr(s.cond)
-		src += ') '
+		src = 'if (%s) ' % self._render_expr(s.cond)
 
 		if isinstance(s.then_st, S_Block):
 			# big THEN
@@ -324,31 +326,24 @@ class BasicRenderer(Renderer):
 		return src
 
 
-
 	def _render_switch(self, s):  # S_Switch
-		src = 'switch ('
-		src += self._render_expr(s.value)
-		src += ') '
+		src = 'switch (%s) ' % self._render_expr(s.value)
+
 		src += self._render_switch_block(s.body_st)
 
 		return src
 
 
-
 	def _render_case(self, s):  # S_Case
-		return 'case ' + self._render_expr(s.value) + ':'
-
+		return 'case %s:' % self._render_expr(s.value)
 
 
 	def _render_default(self, s):  # S_Case
 		return 'default:'
 
 
-
 	def _render_while(self, s):  # S_While
-		src = 'while ('
-		src += self._render_expr(s.cond)
-		src += ') '
+		src = 'while (%s) ' % self._render_expr(s.cond)
 
 		if isinstance(s.body_st, S_Block):
 			src += self._render_any(s.body_st)
@@ -358,7 +353,6 @@ class BasicRenderer(Renderer):
 				level=1)
 
 		return src
-
 
 
 	def _render_dowhile(self, s):  # S_While
@@ -374,12 +368,9 @@ class BasicRenderer(Renderer):
 				s.body_st,
 				level=1)
 
-		src += 'while ('
-		src += self._render_expr(s.cond)
-		src += ');'
+		src += 'while (%s);' % self._render_expr(s.cond)
 
 		return src
-
 
 
 	def _render_for(self, s):  # S_For
@@ -410,15 +401,12 @@ class BasicRenderer(Renderer):
 		return src
 
 
-
 	def _render_break(self, s):  # S_Break
 		return 'break;'
 
 
-
 	def _render_continue(self, s):  # S_Continue
 		return 'continue;'
-
 
 
 	def _render_var(self, s):  # S_Var
@@ -426,8 +414,10 @@ class BasicRenderer(Renderer):
 
 		src += s.var.name
 
-		src += ' = '
-		src += self._render_expr(s.value)
+		if s.value is not None:
+			src += ' = '
+			src += self._render_expr(s.value)
+
 		src += ';'
 
 		return src
@@ -435,12 +425,10 @@ class BasicRenderer(Renderer):
 
 	def _render_assign(self, s):  # S_Assign
 
-		src = s.var.name
-		if s.var.index is not None:
-			src += '[%s]' % self._render_expr(s.var.index)
+		src = self._render_expr_variable(s.var)
 
 		src += ' %s ' % s.op.value
-		src += self._render_expr(s.value)
+		src += self._render_subexpr(s.value)
 		src += ';'
 
 		return src
@@ -459,37 +447,133 @@ class BasicRenderer(Renderer):
 		else:
 			return self._render_subexpr(e)
 
-	def _render_subexpr(self, e):  # Expression
+
+	def _render_subexpr(self, e):  # Expression nested in another
 
 		if isinstance(e, E_Literal):
-			return e.value
+			return self._render_expr_literal(e)
 
 		if isinstance(e, E_Operator):
-			return e.value
+			return self._render_expr_operator(e)
 
 		if isinstance(e, E_Group):
-			src = ''
-			for ee in e.children:
-				src += ' ' + self._render_subexpr(ee)
-
-			return '(%s)' % src.strip()
+			return self._render_expr_group(e)
 
 		if isinstance(e, E_Variable):
-			src = e.name
-
-			if e.index is not None:
-				src += '[%s]' % self._render_subexpr(e.index)
-
-			return src
+			return self._render_expr_variable(e)
 
 		if isinstance(e, E_Call):
-
-			inner = []
-			for a in e.args:
-				inner.append(self._render_expr(a))
-
-			src = e.name + '(%s)' % ', '.join(inner)
-
-			return src
+			return self._render_expr_call(e)
 
 		raise Exception('Cannot render expr token %s' % str(e))
+
+
+	def _render_expr_literal(self, e):  # E_Literal
+		return e.value
+
+
+	def _render_expr_operator(self, e):  # E_Operator
+		return e.value
+
+
+	def _render_expr_group(self, e):  # E_Group
+		src = ''
+		for ee in e.children:
+			src += ' ' + self._render_subexpr(ee)
+
+		return '(%s)' % src.strip()
+
+
+	def _render_expr_variable(self, e):  # E_Variable
+		src = e.name
+
+		if e.index is not None:
+			src += '[%s]' % self._render_expr(e.index)
+
+		return src
+
+
+	def _render_expr_call(self, e):  # E_Call
+		inner = []
+		for a in e.args:
+			inner.append(self._render_expr(a))
+
+		src = e.name + '(%s)' % ', '.join(inner)
+
+		return src
+
+
+class SdsSyntaxRenderer(BasicRenderer):
+	""" Modifies syntax to match SDS-C better """
+
+	def _render_expr_literal(self, e):
+
+		# convert quotes for string
+		if e.is_string():
+			s = e.value[1:-1]
+
+			if s.count("'") > 0:
+				raise SyntaxError('Sorry, SDS-C compiler can\'t handle \' in string.')
+
+			s = s.replace(r'\"', '"')
+
+			return "'%s'" % s
+
+		return super()._render_expr_literal(e)
+
+
+	def _render_function(self, s):  # S_Function
+
+		if len(s.args) > 0:
+			raise SyntaxError('Sorry, SDS-C does not support function arguments.')
+
+		src = s.name + '\n'
+		src += self._render_any(s.body_st)
+
+		return src
+
+
+	def _render_expr_variable(self, e):  # E_Variable
+		src = e.name
+
+		if e.index is not None:
+
+			if isinstance(e.index, E_Group):
+				if len(e.index.children) > 1:
+					raise SyntaxError('Sorry, SDS-C compiler can\'t handle expression as array index.')
+
+			src += '[%s]' % self._render_expr(e.index)
+
+		return src
+
+
+	def _render_return(self, s):  # S_Return
+
+		if self._render_expr(s.value) != '0':
+			raise SyntaxError('Sorry, SDS-C does not support return values.')
+
+		return 'return;'
+
+
+class SdsRendererCollectVariables(SdsSyntaxRenderer):
+	""" Experimental renderer that collects
+	variable declarations at the top
+
+	"""
+
+	def _prepare(self, src):
+
+		variables = []
+		functions = []
+
+		for s in src:
+			if isinstance(s, S_Var):
+				variables.append(s)
+			elif isinstance(s, S_Function):
+				functions.append(s)
+			else:
+				raise Exception(
+					'Illegal statement in root scope: %s' % str(s)
+				)
+
+		return variables + functions

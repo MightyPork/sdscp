@@ -1134,7 +1134,7 @@ class DirectiveProcessor:
 						print('[W] Macro %s is not constant.' % (d.name) )
 						defined = False
 
-					print('- Checking # condition: %s is %s' % (d.name, [0,1][defined]) )
+					# print('- Checking # condition: %s is %s' % (d.name, [0,1][defined]) )
 
 				if positive == defined:
 					# is defined

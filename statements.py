@@ -485,13 +485,16 @@ class S_Var(Statement):
 
 		else:
 			# synthetic zero value
-			self.value = E_Literal(T_Number('0'))
+			self.value = None
 
 		tw.consume(T_Semicolon)
 
 
 	def __str__(self):
-		return 'ALLOC %s = %s' % (self.var, str(self.value))
+		if self.value is not None:
+			return 'ALLOC %s = %s' % (self.var, str(self.value))
+		else:
+			return 'ALLOC %s' % self.var
 
 
 class S_Assign(Statement):
