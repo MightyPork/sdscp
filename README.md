@@ -6,31 +6,9 @@ This project's goal is to enable better syntax in [SDS-C](http://wiki.mereniener
 
 It's a python script that works as a processor, digesting your source to a form which the SDS-C compiler can understand.
 
-For details on the new code features, see the [SDSCP wiki](https://github.com/MightyPork/sdscp/wiki).
-
-## How to use SDSCP
-
-To run SDSCP, you need Python 3 installed.
-
-It is designed for use on Linux, some small adjustments may be needed to use it on other systems. (Not tested)
-
-There is a bunch of python files in the project, the `sdscp` one being the main executable. Add this to your PATH and you're good.
-
-Then, use `sdscp -h` for the most up-to-date info on command line arguments.
-
-The most basic use is like so:
-
-```bash
-# show output code on screen
-sdscp input.c -d
-
-# store output code to a file
-sdscp input.c -o output.c
-```
-
-SDSCP generates a SDS-C compatible source code, or warns you if there is some problem.
-
 ## Features
+
+For more detailed info, see the **[SDSCP wiki](https://github.com/MightyPork/sdscp/wiki)**.
 
 ### Already implemented
 
@@ -56,3 +34,25 @@ SDSCP generates a SDS-C compatible source code, or warns you if there is some pr
 - Expression as array index
 - Reimplemented functions (with arguments and return values)
 
+
+## How to use SDSCP
+
+To run SDSCP, you need Python 3 installed.
+
+It is designed for use on Linux, some small adjustments may be needed to use it on other systems. (Not tested)
+
+There is a bunch of python files in the project, the `sdscp` one being the main executable. Add this to your PATH and you're good.
+
+Then, use `sdscp -h` for the most up-to-date info on command line arguments.
+
+The most basic use is like so:
+
+```bash
+# show output code on screen
+sdscp input.c -d
+
+# store output code to a file
+sdscp input.c -o output.c
+```
+
+SDSCP generates a SDS-C compatible source code, or warns you if there is some problem.
