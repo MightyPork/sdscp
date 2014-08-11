@@ -80,13 +80,13 @@ It's a python script that works as a macro processor, and later will be added a 
 - Double quotes for strings
 - Code branching with `#ifdef`, `#ifndef` etc...
 - Tokenizer
+- Conversion of tokens to Statements
+- Basic conversion of Statements to source code
 
 
 ### Planned Features
 
 - Fixing SDS-C bugs (expression as array index, etc.)
-- Token -> AST conversion
-- AST -> source coversion (allowing AST manipulations to alter output code)
 - Extra control structures
   - `FOR`
   - `WHILE`
@@ -199,7 +199,7 @@ At the time of writing this, you would get:
 
 ```none
 $ sdscp -h
-usage: sdscp [-h] [-o OUTPUT] [-c] [-v] [-s] [-m] [-r] [-p] [-t] [-d] source
+usage: sdscp [-h] [-o OUTPUT] [-d] [-v] [-G] [-O] [-M] [-R] [-P] [-T] [-S] source
 
 SDS-C macro preprocessor
 
@@ -210,14 +210,16 @@ optional arguments:
   -h, --help            show this help message and exit
   -o OUTPUT, --output OUTPUT
                         The output file. To just print the output, use -d
-  -c, --clean           Remove some whitespace and all comments
+  -d, --display         Show the final source (Works together with -o)
   -v, --verbose         Show all optional debug info.
-  -s, --show-source     Show original source (only main file)
-  -m, --show-macros     List all macros
-  -r, --show-resolved   Show code after processing includes and # branching.
-  -p, --show-processed  Show code after replacing macros (preprocessor output)
-  -t, --show-tokens     Show tokenization.
-  -d, --show-output     Show the final source (D stands for Display)
+  -G, --show-generated  Show the code generated from statements.
+  -O, --show-original   Show original source (only main file)
+  -M, --show-macros     List all macros
+  -R, --show-resolved   Show code after processing includes and # branching.
+  -P, --show-processed  Show code after replacing macros
+  -T, --show-tokens     Show tokens (source divided to pieces).
+  -S, --show-statements
+                        Show statements (high-level code abstraction).
 
 ```
 
@@ -231,9 +233,6 @@ sdscp -d input.c
 # store the output to a file
 sdscp input.c -o output.c
 
-# clean the produced code
-sdscp input.c -c -o output.c
-
 # verbose mode (show tons of debug info)
 sdscp input.c -v
 
@@ -243,21 +242,22 @@ Setups for unit testing:
 
 ```bash
 # for the macro tests
-sdscp input.c -smpc
+sdscp input.c -OMP
 
 # for tokenizer tests
-sdscp input.c -ptc
+sdscp input.c -PT
 
-# to test the "pretty" to "SDS-C" filter
-sdscp input.c -pdc
+# to test the statement parser
+sdscp input.c -TS
+
+# to test the basic renderer
+sdscp input.c -SG
 ```
 
 
 SDSCP generates a SDS-C compatible source code, or warns you if there is some problem.
 
-Since the tokenizer is not yet finished, it will not catch all errors (eg. missing braces).
-But stay assured that SDS-C will loudly complain.
-
+*Note:* Some parts of the process are done only if needed, so you may not get all error messages, unless you run the full task (ie. with `-d` or `-o`).
 
 ## Available Features
 

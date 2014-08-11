@@ -30,14 +30,7 @@ parser.add_argument(
 		'-d', '--display',
 		action='store_true',
 		default=False,
-		help='Show the final source (Can be used together with -o)'
-)
-
-parser.add_argument(
-		'-G', '--show-generated',
-		action='store_true',
-		default=False,
-		help='Show the code generated from statements.'
+		help='Show the final source (Works together with -o)'
 )
 
 parser.add_argument(
@@ -45,6 +38,13 @@ parser.add_argument(
 		action='store_true',
 		default=False,
 		help='Show all optional debug info.'
+)
+
+parser.add_argument(
+		'-G', '--show-generated',
+		action='store_true',
+		default=False,
+		help='Show the code generated from statements.'
 )
 
 parser.add_argument(
