@@ -161,6 +161,7 @@ class T_IF(TokenKeyword):
 	"""
 
 
+
 class T_ELSE(TokenKeyword):
 	""" The ELSE keyword
 
@@ -170,6 +171,7 @@ class T_ELSE(TokenKeyword):
 		<statement>: The branch body
 
 	"""
+
 
 
 class T_FOR(TokenKeyword):
@@ -191,6 +193,7 @@ class T_FOR(TokenKeyword):
 	"""
 
 
+
 class T_WHILE(TokenKeyword):
 	""" The WHILE keyword
 
@@ -203,6 +206,7 @@ class T_WHILE(TokenKeyword):
 		<statement>: The loop body
 
 	"""
+
 
 
 class T_SWITCH(TokenKeyword):
@@ -222,6 +226,7 @@ class T_SWITCH(TokenKeyword):
 	"""
 
 
+
 class T_CASE(TokenKeyword):
 	""" The CASE keyword (in switch)
 
@@ -237,6 +242,7 @@ class T_CASE(TokenKeyword):
 	"""
 
 
+
 class T_DEFAULT(TokenKeyword):
 	""" The DEFAULT keyword (in switch)
 
@@ -246,6 +252,7 @@ class T_DEFAULT(TokenKeyword):
 		T_Colon
 
 	"""
+
 
 
 class T_DO(TokenKeyword):
@@ -261,6 +268,7 @@ class T_DO(TokenKeyword):
 		T_Semicolon
 
 	"""
+
 
 
 class T_VAR(TokenKeyword):
@@ -279,6 +287,7 @@ class T_VAR(TokenKeyword):
 	When a Rvalue is missing, the default value 0 is used instead.
 
 	"""
+
 
 
 class T_GOTO(TokenKeyword):
@@ -300,6 +309,7 @@ class T_GOTO(TokenKeyword):
 	"""
 
 
+
 class T_BREAK(TokenKeyword):
 	"""	The BREAK keyword
 
@@ -307,6 +317,7 @@ class T_BREAK(TokenKeyword):
 	Doing so leaves the loop scope.
 
 	"""
+
 
 
 class T_RETURN(TokenKeyword):
@@ -327,6 +338,7 @@ class T_RETURN(TokenKeyword):
 	"""
 
 
+
 class T_CONTINUE(TokenKeyword):
 	""" The CONTINUE keyword
 
@@ -334,6 +346,7 @@ class T_CONTINUE(TokenKeyword):
 	(End current cycle)
 
 	"""
+
 
 
 class T_SET(TokenKeyword):
@@ -354,6 +367,7 @@ class T_SET(TokenKeyword):
 	"""
 
 
+
 class T_LABEL(TokenKeyword):
 	""" The LABEL keyword
 
@@ -365,6 +379,7 @@ class T_LABEL(TokenKeyword):
 		T_Colon
 
 	"""
+
 
 
 class T_CALL(TokenKeyword):
@@ -382,6 +397,7 @@ class T_CALL(TokenKeyword):
 		T_Semicolon
 
 	"""
+
 
 
 class T_FUNCTION(TokenKeyword):
@@ -404,6 +420,7 @@ class T_FUNCTION(TokenKeyword):
 		T_CodeBlock: The function body
 
 	"""
+
 
 
 class T_Name(Token):
@@ -452,16 +469,20 @@ class T_String(Token):
 	""" String literal """
 
 
+
 class T_Char(Token):
 	""" Char literal """
+
 
 
 class T_Number(Token):
 	""" Dec, hex or bin number literal """
 
 
+
 class T_Operator(Token):
 	""" Any operator in an expression """
+
 
 
 class T_AssignOperator(Token):
@@ -558,6 +579,7 @@ class T_Expression(CompositeToken):
 		for t in self.tokens:
 			if t.is_composite():
 				t.tokenize()
+
 
 
 class T_Rvalue(CompositeToken):
@@ -1324,6 +1346,8 @@ def show_tokenlist(tokens, level='  '):
 
 			if tok.is_composite():
 				show_tokenlist(tok.tokenize(), level + '  ')
+
+
 
 class TokenWalker:
 	""" Recognizes nodes in a token list

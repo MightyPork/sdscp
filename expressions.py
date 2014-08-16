@@ -92,6 +92,7 @@ class Expression:
 		return type(self).__name__
 
 
+
 class E_Group(Expression):
 	""" An expression group. Visually, a parenthesis.
 
@@ -157,6 +158,7 @@ class E_Literal(Expression):
 	def is_number(self):
 		return isinstance(self.token, T_Number)
 
+
 	def __str__(self):
 		return self.value
 
@@ -176,8 +178,10 @@ class E_Operator(Expression):
 	def __init__(self, value):
 		self.value = value
 
+
 	def __str__(self):
 		return self.value
+
 
 
 class E_Variable(Expression):
@@ -210,11 +214,13 @@ class E_Variable(Expression):
 
 		return self.index is None
 
+
 	def __str__(self):
 		s = self.name
 		if self.index is not None:
 			s += '[%s]' % self.index
 		return s
+
 
 
 class E_Call(Expression):
@@ -237,6 +243,7 @@ class E_Call(Expression):
 	def __init__(self, name, args=[]):
 		self.name = name
 		self.args = args
+
 
 	def __str__(self):
 		s = self.name + '(%s)' % ', '.join( [str(a) for a in self.args] )

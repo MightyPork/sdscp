@@ -222,7 +222,6 @@ class MacroReader(CodeReader):
 		return buffer
 
 
-
 	def consume_ifndef_directive(self):
 		""" consume a #ifndef
 
@@ -239,7 +238,6 @@ class MacroReader(CodeReader):
 		return buffer
 
 
-
 	def consume_else_directive(self):
 		""" consume a #else directive
 
@@ -254,7 +252,6 @@ class MacroReader(CodeReader):
 		return self._consume_directive_name('else')
 
 
-
 	def consume_endif_directive(self):
 		""" consume a #endif directive
 
@@ -267,7 +264,6 @@ class MacroReader(CodeReader):
 			return False
 
 		return self._consume_directive_name('endif')
-
 
 
 	def has_directive(self):
@@ -286,7 +282,6 @@ class MacroReader(CodeReader):
 		return self.matches(r'^#[a-zA-Z_][a-zA-Z0-9_]+(?:[^a-zA-Z0-9_]|$)')
 
 
-
 	def has_ifdef_directive(self):
 		""" Check if next token is #ifdef """
 
@@ -294,7 +289,6 @@ class MacroReader(CodeReader):
 			return False
 
 		return self.starts('#ifdef')
-
 
 
 	def has_ifndef_directive(self):
@@ -306,7 +300,6 @@ class MacroReader(CodeReader):
 		return self.starts('#ifndef')
 
 
-
 	def has_else_directive(self):
 		""" Check if next token is #else """
 
@@ -314,7 +307,6 @@ class MacroReader(CodeReader):
 			return False
 
 		return self.starts('#else')
-
 
 
 	def has_endif_directive(self):
@@ -326,7 +318,6 @@ class MacroReader(CodeReader):
 		return self.starts('#endif')
 
 
-
 	def has_include_directive(self):
 		""" Check if next token is #include """
 
@@ -334,7 +325,6 @@ class MacroReader(CodeReader):
 			return False
 
 		return self.starts('#include')
-
 
 
 	def has_define_directive(self):
@@ -440,7 +430,6 @@ class MacroReader(CodeReader):
 						self.consume_endif_directive()
 						# go on
 
-
 		self.error('Reached end of file while looking for end of # branch')
 
 
@@ -460,6 +449,7 @@ class DT_Code:
 	def __init__(self, text):
 		self.text = text
 
+
 	def __str__(self):
 		return 'DT_Code: ' + self.text
 
@@ -478,6 +468,7 @@ class DT_Var:
 
 	def __init__(self, name):
 		self.name = name
+
 
 	def __str__(self):
 		return 'DT_Var: ' + self.name
@@ -838,6 +829,7 @@ class D_Include(Token):
 		# get file (discard quotes)
 		self.file = rd.consume_string()[1:-1]
 
+
 	def __str__(self):
 		return type(self).__name__ + ': File = ' + self.file
 
@@ -863,6 +855,7 @@ class D_Ifdef(Token):
 
 		self.name = rd.consume_identifier()
 
+
 	def __str__(self):
 		return type(self).__name__ + ': Name = ' + self.name
 
@@ -887,6 +880,7 @@ class D_Ifndef(Token):
 		rd.consume_inline_whitespace()
 
 		self.name = rd.consume_identifier()
+
 
 	def __str__(self):
 		return type(self).__name__ + ': Name = ' + self.name

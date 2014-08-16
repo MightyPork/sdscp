@@ -21,6 +21,7 @@ def parse(tokens):
 	return sx
 
 
+
 class StTokenWalker(TokenWalker):
 	""" Token walker with support for collecting whole
 	statements
@@ -144,6 +145,7 @@ class S_Empty(Statement):
 		if tw is not None:
 			tw.consume(T_Semicolon)
 
+
 	def __str__(self):
 		return 'EMPTY'
 
@@ -172,6 +174,7 @@ class S_Goto(Statement):
 		# a semicolon
 		tw.consume(T_Semicolon)
 
+
 	def __str__(self):
 		return 'GOTO -> %s' % self.name
 
@@ -198,6 +201,7 @@ class S_Label(Statement):
 
 		# a colon
 		tw.consume(T_Colon)
+
 
 	def __str__(self):
 		return 'LABEL: %s' % self.name
@@ -237,6 +241,7 @@ class S_Call(Statement):
 			self.args.append(expr)
 
 		tw.consume(T_Semicolon)
+
 
 	def __str__(self):
 		s = 'CALL %s' % self.name
@@ -280,6 +285,7 @@ class S_Function(Statement):
 		# get function body
 		self.body_st = S_Block(tw)
 
+
 	def __str__(self):
 		s = 'FUNC %s' % self.name
 		s += '(%s)' % ', '.join( [str(a) for a in self.args] )
@@ -317,6 +323,7 @@ class S_Return(Statement):
 
 	def __str__(self):
 		return 'RETURN %s' % str(self.value)
+
 
 
 class S_Case(Statement):
@@ -497,6 +504,7 @@ class S_Var(Statement):
 			return 'ALLOC %s' % self.var
 
 
+
 class S_Assign(Statement):
 	""" A variable assignment.
 
@@ -575,6 +583,7 @@ class S_If(Statement):
 			# add empty statement instead.
 			self.else_st = S_Empty()
 
+
 	def __str__(self):
 		return 'IF (%s) THEN \n\t%s\nELSE\n\t%s\nENDIF' % (
 			str(self.cond), str(self.then_st), str(self.else_st)
@@ -607,10 +616,12 @@ class S_While(Statement):
 		# the loop body
 		self.body_st = tw.consume_statement()
 
+
 	def __str__(self):
 		return 'WHILE (%s) %s' % (
 			str(self.cond), str(self.body_st)
 		)
+
 
 
 class S_DoWhile(Statement):
@@ -643,6 +654,7 @@ class S_DoWhile(Statement):
 
 		# end of the statement.
 		tw.consume(T_Semicolon)
+
 
 	def __str__(self):
 		return 'DO %s WHILE (%s);' % (
@@ -701,6 +713,7 @@ class S_For(Statement):
 			'; '.join([str(a) for a in self.iter]),
 			str(self.body_st)
 		)
+
 
 
 class S_Switch(Statement):

@@ -503,6 +503,7 @@ class BasicRenderer(Renderer):
 		return src
 
 
+
 class SdsSyntaxRenderer(BasicRenderer):
 	""" Modifies syntax to match SDS-C better """
 
@@ -553,6 +554,7 @@ class SdsSyntaxRenderer(BasicRenderer):
 			raise SyntaxError('Sorry, SDS-C does not support return values.')
 
 		return 'return;'
+
 
 
 class SdsRendererCollectVariables(SdsSyntaxRenderer):
