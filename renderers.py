@@ -4,6 +4,7 @@ import re
 from statements import *
 from expressions import *
 
+
 class Renderer:
 	""" Abstract code renderer.
 
@@ -78,9 +79,46 @@ class BasicRenderer(Renderer):
 
 	Extensible by overriding the individual `_render_?` methods.
 
+	Args:
+		program (Statement[]): the program to render
+
+	Attributes:
+		(attrs inherited from Renderer)
+		_render_dict:
+			dict (Statement class -> rendering func)
+			Can be used to add new statement renderers or remove
+			current ones.
+
 	"""
 
+	def __init__(self, program):
+		super().__init__(program)
+
+		# a list of statement-rendering private methods.
+		self._render_dict = {
+			S_Block:	self._render_block,
+			S_Empty:	self._render_empty,
+			S_Function:	self._render_function,
+			S_Call:		self._render_call,
+			S_Return:	self._render_return,
+			S_Goto:		self._render_goto,
+			S_Label:	self._render_label,
+			S_If:		self._render_if,
+			S_Switch:	self._render_switch,
+			S_Case:		self._render_case,
+			S_Default:	self._render_default,
+			S_While:	self._render_while,
+			S_DoWhile:	self._render_dowhile,
+			S_For:		self._render_for,
+			S_Break:	self._render_break,
+			S_Continue:	self._render_continue,
+			S_Var:		self._render_var,
+			S_Assign:	self._render_assign
+		}
+
+
 	def _render(self, code):
+		""" Overrides render stub from Renderer """
 
 		src = ''
 
@@ -144,79 +182,15 @@ class BasicRenderer(Renderer):
 
 		"""
 
-		# code block (used in structures)
-		if isinstance(s, S_Block):
-			return self._render_block(s)
-
-		# empty statemenr
-		if isinstance(s, S_Empty):
-			return self._render_empty(s)
-
-		# a function declaration
-		if isinstance(s, S_Function):
-			return self._render_function(s)
-
-		# a function call
-		if isinstance(s, S_Call):
-			return self._render_call(s)
-
-		# return statement
-		if isinstance(s, S_Return):
-			return self._render_return(s)
-
-		# GOTO statement
-		if isinstance(s, S_Goto):
-			return self._render_goto(s)
-
-		# LABEL
-		if isinstance(s, S_Label):
-			return self._render_label(s)
-
-		# IF
-		if isinstance(s, S_If):
-			return self._render_if(s)
-
-		# a switch statement
-		if isinstance(s, S_Switch):
-			return self._render_switch(s)
-
-		# a CASE
-		if isinstance(s, S_Case):
-			return self._render_case(s)
-
-		# a DEFAULT
-		if isinstance(s, S_Default):
-			return self._render_default(s)
-
-		# while
-		if isinstance(s, S_While):
-			return self._render_while(s)
-
-		# do-while
-		if isinstance(s, S_DoWhile):
-			return self._render_dowhile(s)
-
-		# for
-		if isinstance(s, S_For):
-			return self._render_for(s)
-
-		# break
-		if isinstance(s, S_Break):
-			return self._render_break(s)
-
-		# continue
-		if isinstance(s, S_Continue):
-			return self._render_continue(s)
-
-		# var declaration
-		if isinstance(s, S_Var):
-			return self._render_var(s)
-
-		# var assignment
-		if isinstance(s, S_Assign):
-			return self._render_assign(s)
-
-		raise Exception('Cannot render statement %s' % str(s))
+		try:
+			return self._render_dict[type(s)](s)
+		except KeyError:
+			raise Exception(
+				'Cannot render statement %s (type %s)' %
+				(
+					str(s),
+					str(type(s))
+				))
 
 
 	def _render_block(self, s):  # S_Block
