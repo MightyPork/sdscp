@@ -479,7 +479,31 @@ class BasicRenderer(Renderer):
 
 
 class SdsSyntaxRenderer(BasicRenderer):
-	""" Modifies syntax to match SDS-C better """
+	""" SDS-C code renderer
+	Takes care of SDS-C pecularities &
+	refuses to render illegar statements / structures.
+
+	"""
+
+	def __init__(self, program):
+		super().__init__(program)
+
+		# disable illegal statement renderers for SDS-C
+		del self._render_dict[S_Switch]
+		del self._render_dict[S_Case]
+		del self._render_dict[S_Default]
+		del self._render_dict[S_While]
+		del self._render_dict[S_DoWhile]
+		del self._render_dict[S_For]
+		del self._render_dict[S_Break]
+		del self._render_dict[S_Continue]
+
+		# find all user funcs (for detecting invalid use in exprs)
+		self._userfuncs = []
+		for s in program:
+			if isinstance(s, S_Function):
+				self._userfuncs.append(s.name)
+
 
 	def _render_expr_literal(self, e):
 
@@ -488,7 +512,7 @@ class SdsSyntaxRenderer(BasicRenderer):
 			s = e.value[1:-1]
 
 			if s.count("'") > 0:
-				raise SyntaxError('Sorry, SDS-C compiler can\'t handle \' in string.')
+				raise SyntaxError('Can\'t use single quote in SDS-C string, at %s' % str(e))
 
 			s = s.replace(r'\"', '"')
 
@@ -500,8 +524,9 @@ class SdsSyntaxRenderer(BasicRenderer):
 	def _render_function(self, s):  # S_Function
 
 		if len(s.args) > 0:
-			raise SyntaxError('Sorry, SDS-C does not support function arguments.')
+			raise SyntaxError('SDS-C does not support function arguments, at func. %s' % str(s.name))
 
+		# only name and block, no paren.
 		src = s.name + '\n'
 		src += self._render_any(s.body_st)
 
@@ -515,7 +540,7 @@ class SdsSyntaxRenderer(BasicRenderer):
 
 			if isinstance(e.index, E_Group):
 				if len(e.index.children) > 1:
-					raise SyntaxError('Sorry, SDS-C compiler can\'t handle expression as array index.')
+					raise SyntaxError('Can\'t use expression as array index in SDS-C, at %s' % str(e))
 
 			src += '[%s]' % self._render_expr(e.index)
 
@@ -525,10 +550,17 @@ class SdsSyntaxRenderer(BasicRenderer):
 	def _render_return(self, s):  # S_Return
 
 		if self._render_expr(s.value) != '0':
-			raise SyntaxError('Sorry, SDS-C does not support return values.')
+			raise SyntaxError('SDS-C does not support return values, at %s' % str(s))
 
 		return 'return;'
 
+
+
+	def _render_expr_call(self, e):  # E_Call
+		if e.name in self._userfuncs:
+			raise SyntaxError('Can\'t use user-func in expression in SDS-C, at %s' % str(e))
+
+		return super()._render_expr_call(e)
 
 
 class SdsRendererCollectVariables(SdsSyntaxRenderer):
