@@ -5,6 +5,7 @@ import re
 from tokens import *
 import expressions
 from expressions import *
+from tree import SyntaxNode
 
 
 def parse(tokens):
@@ -114,18 +115,18 @@ class StTokenWalker(TokenWalker):
 
 		# token not recognized
 		raise Exception(
-			'Could not create statement for token %s' % (
-				str(self.peek())
+			'Could not create statement for token %s' %
+			str(self.peek())
 			)
-		)
 
 
 
-class Statement:
+class Statement(SyntaxNode):
 	""" A syntactic unit
 
 	A code piece that makes sense on it's own, and can be
 	converted to source code if needed.
+
 	"""
 
 	def __str__(self):
@@ -142,6 +143,8 @@ class S_Empty(Statement):
 	"""
 
 	def __init__(self, tw=None):
+		super().__init__()
+
 		if tw is not None:
 			tw.consume(T_Semicolon)
 
@@ -165,6 +168,15 @@ class S_Goto(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.name = None
+
+		# if created without a TW
+		if tw is None:
+			return
+
 		# keyword
 		tw.consume(T_GOTO)
 
@@ -193,6 +205,15 @@ class S_Label(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.name = None
+
+		# if created without a TW
+		if tw is None:
+			return
+
 		# keyword
 		tw.consume(T_LABEL)
 
@@ -221,6 +242,15 @@ class S_Call(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.name = None
+		self.args = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_CALL)
@@ -241,6 +271,11 @@ class S_Call(Statement):
 			self.args.append(expr)
 
 		tw.consume(T_Semicolon)
+
+
+	def _bind_children(self):
+		for a in self.args:
+			a.bind_parent(self)
 
 
 	def __str__(self):
@@ -265,6 +300,16 @@ class S_Function(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.name = None
+		self.args = None
+		self.body_st = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_FUNCTION)
@@ -284,6 +329,10 @@ class S_Function(Statement):
 
 		# get function body
 		self.body_st = S_Block(tw)
+
+
+	def _bind_children(self):
+		self.body_st.bind_parent(self)
 
 
 	def __str__(self):
@@ -307,6 +356,15 @@ class S_Return(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.value = None
+
+		# if created without a TW
+		if tw is None:
+			return
+
 		# keyword
 		tw.consume(T_RETURN)
 
@@ -319,6 +377,10 @@ class S_Return(Statement):
 			self.value = E_Literal(T_Number('0'))
 
 		tw.consume(T_Semicolon)
+
+
+	def _bind_children(self):
+		self.value.bind_parent(self)
 
 
 	def __str__(self):
@@ -339,6 +401,15 @@ class S_Case(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.value = None
+
+		# if created without a TW
+		if tw is None:
+			return
+
 		# keyword
 		tw.consume(T_CASE)
 
@@ -350,6 +421,10 @@ class S_Case(Statement):
 		tw.consume(T_Colon)
 
 
+	def _bind_children(self):
+		self.value.bind_parent(self)
+
+
 	def __str__(self):
 		return 'CASE %s' % str(self.value)
 
@@ -359,6 +434,8 @@ class S_Default(Statement):
 	""" A Default in switch. """
 
 	def __init__(self, tw):
+		super().__init__()
+
 		# keyword
 		tw.consume(T_DEFAULT)
 
@@ -380,6 +457,8 @@ class S_Break(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
 		# keyword
 		tw.consume(T_BREAK)
 
@@ -401,6 +480,8 @@ class S_Continue(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
 		# keyword
 		tw.consume(T_CONTINUE)
 
@@ -428,8 +509,13 @@ class S_Block(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
 
 		self.children = []
+
+		# allow creation without a TW
+		if tw is None:
+			return
 
 		# keyword
 		cb = tw.consume(T_CodeBlock)
@@ -446,8 +532,14 @@ class S_Block(Statement):
 				self.children.append(st)
 
 
+	def _bind_children(self):
+		for s in self.children:
+			s.bind_parent(self)
+
+
 	def __str__(self):
-		return 'BLOCK {\n%s\n}' % '\n'.join( [str(s) for s in self.children] )
+		return 'BLOCK {\n%s\n}' % (
+			'\n'.join([str(s) for s in self.children]))
 
 
 
@@ -464,6 +556,15 @@ class S_Var(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.var = None
+		self.value = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_VAR)
@@ -497,6 +598,13 @@ class S_Var(Statement):
 		tw.consume(T_Semicolon)
 
 
+	def _bind_children(self):
+		self.var.bind_parent(self)
+
+		if self.value is not None:
+			self.value.bind_parent(self)
+
+
 	def __str__(self):
 		if self.value is not None:
 			return 'ALLOC %s = %s' % (self.var, str(self.value))
@@ -519,6 +627,16 @@ class S_Assign(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.var = None
+		self.op = None
+		self.value = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_SET)
@@ -543,6 +661,12 @@ class S_Assign(Statement):
 		tw.consume(T_Semicolon)
 
 
+	def _bind_children(self):
+		self.var.bind_parent(self)
+		self.op.bind_parent(self)
+		self.value.bind_parent(self)
+
+
 	def __str__(self):
 		return 'SET %s %s %s' % (self.var, self.op.value, str(self.value))
 
@@ -563,6 +687,16 @@ class S_If(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.cond = None
+		self.then_st = None
+		self.else_st = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_IF)
@@ -584,6 +718,12 @@ class S_If(Statement):
 			self.else_st = S_Empty()
 
 
+	def _bind_children(self):
+		self.cond.bind_parent(self)
+		self.then_st.bind_parent(self)
+		self.else_st.bind_parent(self)
+
+
 	def __str__(self):
 		return 'IF (%s) THEN \n\t%s\nELSE\n\t%s\nENDIF' % (
 			str(self.cond), str(self.then_st), str(self.else_st)
@@ -600,11 +740,20 @@ class S_While(Statement):
 	Attributes:
 		cond (Expression): the loop condition.
 			Tested before each cycle.
-		body (Statement): the loop body statement
+		body_st (Statement): the loop body statement
 
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.cond = None
+		self.body_st = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_WHILE)
@@ -615,6 +764,11 @@ class S_While(Statement):
 
 		# the loop body
 		self.body_st = tw.consume_statement()
+
+
+	def _bind_children(self):
+		self.cond.bind_parent(self)
+		self.body_st.bind_parent(self)
 
 
 	def __str__(self):
@@ -633,11 +787,20 @@ class S_DoWhile(Statement):
 	Attributes:
 		cond (Expression): the loop condition.
 			Tested before each cycle.
-		body (Statement): the loop body statement
+		body_st (Statement): the loop body statement
 
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.cond = None
+		self.body_st = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_DO)
@@ -654,6 +817,11 @@ class S_DoWhile(Statement):
 
 		# end of the statement.
 		tw.consume(T_Semicolon)
+
+
+	def _bind_children(self):
+		self.cond.bind_parent(self)
+		self.body_st.bind_parent(self)
 
 
 	def __str__(self):
@@ -680,6 +848,17 @@ class S_For(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.init = None
+		self.cond = None
+		self.iter = None
+		self.body_st = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_FOR)
@@ -704,6 +883,18 @@ class S_For(Statement):
 
 		# the loop body
 		self.body_st = tw.consume_statement()
+
+
+	def _bind_children(self):
+		for s in self.init:
+			s.bind_parent(self)
+
+		self.cond.bind_parent(self)
+
+		for s in self.iter:
+			s.bind_parent(self)
+
+		self.body_st.bind_parent(self)
 
 
 	def __str__(self):
@@ -739,6 +930,15 @@ class S_Switch(Statement):
 	"""
 
 	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.value = None
+		self.body_st = None
+
+		# if created without a TW
+		if tw is None:
+			return
 
 		# keyword
 		tw.consume(T_SWITCH)
@@ -749,6 +949,12 @@ class S_Switch(Statement):
 
 		# the switch body
 		self.body_st = S_Block(tw)
+
+
+	def _bind_children(self):
+		self.value.bind_parent(self)
+
+		self.body_st.bind_parent(self)
 
 
 	def __str__(self):

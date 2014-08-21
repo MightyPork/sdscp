@@ -1,6 +1,7 @@
 #!/bin/env python3
 
 from tokens import *
+from tree import SyntaxNode
 
 def parse(expr_token):
 	""" Converts T_Expression to Expression
@@ -80,7 +81,7 @@ def parse(expr_token):
 
 
 
-class Expression:
+class Expression(SyntaxNode):
 	""" Represents an expression.
 
 	This is a higher level expression than T_Expression.
@@ -107,6 +108,7 @@ class E_Group(Expression):
 	"""
 
 	def __init__(self, children=None):
+		super().__init__()
 
 		if children is None:
 			children = []
@@ -123,6 +125,11 @@ class E_Group(Expression):
 		"""
 
 		self.children.append(child)
+
+
+	def _bind_children(self):
+		for e in self.children:
+			e.bind_parent(self)
 
 
 	def __str__(self):
@@ -143,6 +150,8 @@ class E_Literal(Expression):
 	"""
 
 	def __init__(self, token):
+		super().__init__()
+
 		self.token = token
 		self.value = token.value
 
@@ -176,6 +185,8 @@ class E_Operator(Expression):
 	"""
 
 	def __init__(self, value):
+		super().__init__()
+
 		self.value = value
 
 
@@ -196,11 +207,13 @@ class E_Variable(Expression):
 
 	Attributes:
 		name (str): Variable name
-		index (int): The array index, or None for non-array
+		index (T_Expression): The array index, or None for non-array
 
 	"""
 
 	def __init__(self, name, index=None):
+		super().__init__()
+
 		self.name = name
 
 		if isinstance(index, T_Expression):
@@ -213,6 +226,11 @@ class E_Variable(Expression):
 		""" Check if this variable is array element """
 
 		return self.index is None
+
+
+	def _bind_children(self):
+		if self.index is not None:
+			self.index.bind_parent(self)
 
 
 	def __str__(self):
@@ -241,8 +259,15 @@ class E_Call(Expression):
 	"""
 
 	def __init__(self, name, args=[]):
+		super().__init__()
+
 		self.name = name
 		self.args = args
+
+
+	def _bind_children(self):
+		for e in self.args:
+			e.bind_parent(self)
 
 
 	def __str__(self):

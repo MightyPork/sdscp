@@ -478,7 +478,14 @@ class BasicRenderer(Renderer):
 
 
 
-class SdsSyntaxRenderer(BasicRenderer):
+class CompatibilityError(SyntaxError):
+	""" Error caused by incompatibility of the source code
+	with SDS-C target syntax. The code may be valid, but not
+	supported by the compiler.
+	"""
+
+
+class BasicSdsRenderer(BasicRenderer):
 	""" SDS-C code renderer
 	Takes care of SDS-C pecularities &
 	refuses to render illegar statements / structures.
@@ -512,9 +519,11 @@ class SdsSyntaxRenderer(BasicRenderer):
 			s = e.value[1:-1]
 
 			if s.count("'") > 0:
-				raise SyntaxError('Can\'t use single quote in SDS-C string, at %s' % str(e))
+				raise CompatibilityError(
+					'Can\'t use single quote in SDS-C string, at %s'
+					% str(e))
 
-			s = s.replace(r'\"', '"')
+			s = s.replace('\\"', '"')
 
 			return "'%s'" % s
 
@@ -524,7 +533,9 @@ class SdsSyntaxRenderer(BasicRenderer):
 	def _render_function(self, s):  # S_Function
 
 		if len(s.args) > 0:
-			raise SyntaxError('SDS-C does not support function arguments, at func. %s' % str(s.name))
+			raise CompatibilityError(
+				'SDS-C does not support function arguments, at %s()' %
+				str(s.name))
 
 		# only name and block, no paren.
 		src = s.name + '\n'
@@ -540,7 +551,9 @@ class SdsSyntaxRenderer(BasicRenderer):
 
 			if isinstance(e.index, E_Group):
 				if len(e.index.children) > 1:
-					raise SyntaxError('Can\'t use expression as array index in SDS-C, at %s' % str(e))
+					raise CompatibilityError(
+						'Can\'t use expression as array index in SDS-C, at %s' %
+						str(e))
 
 			src += '[%s]' % self._render_expr(e.index)
 
@@ -550,20 +563,24 @@ class SdsSyntaxRenderer(BasicRenderer):
 	def _render_return(self, s):  # S_Return
 
 		if self._render_expr(s.value) != '0':
-			raise SyntaxError('SDS-C does not support return values, at %s' % str(s))
+			raise CompatibilityError(
+				'SDS-C does not support return values, at %s' %
+				str(s))
 
 		return 'return;'
 
 
-
 	def _render_expr_call(self, e):  # E_Call
 		if e.name in self._userfuncs:
-			raise SyntaxError('Can\'t use user-func in expression in SDS-C, at %s' % str(e))
+			raise CompatibilityError(
+				'Can\'t use user-func in expression in SDS-C, at %s' %
+				str(e))
 
 		return super()._render_expr_call(e)
 
 
-class SdsRendererCollectVariables(SdsSyntaxRenderer):
+
+class SdsRenderer(BasicSdsRenderer):
 	""" Experimental renderer that collects
 	variable declarations at the top
 
@@ -571,17 +588,85 @@ class SdsRendererCollectVariables(SdsSyntaxRenderer):
 
 	def _prepare(self, src):
 
+		code = src
+
+		# TODO: do code transformations
+
+		code = self._prep_collect_vars(code)
+
+		code = self._prep_if_braces(code)
+
+		return code
+
+
+	def _prep_collect_vars(self, code):
+		""" Move all global variables to the top of the code.
+		Currently works only for vars outside functions.
+
+		"""
+
 		variables = []
 		functions = []
 
-		for s in src:
+		for s in code:
 			if isinstance(s, S_Var):
 				variables.append(s)
 			elif isinstance(s, S_Function):
 				functions.append(s)
 			else:
-				raise Exception(
-					'Illegal statement in root scope: %s' % str(s)
-				)
+				raise CompatibilityError(
+					'Illegal statement in root scope: %s' %
+					str(s))
 
 		return variables + functions
+
+
+	def _prep_if_braces(self, code):
+		""" Make sure IF statement branches are in code blocks.
+		This is a workaround for a bug in SDS-C compiler,
+		where it fails on assignment in IF.
+
+		"""
+
+		processed = []
+		for s in code:
+			processed.append(self.__add_if_braces(s))
+
+		return processed
+
+
+	def __add_if_braces(self, s):
+
+		if isinstance(s, S_If):
+			# wrap THEN
+			if not isinstance(s.then_st, S_Block):
+				ss = S_Block(None)
+				ss.children = [self.__add_if_braces(s.then_st)]
+				s.then_st = ss
+
+			# wrap ELSE
+			if (not isinstance(s.else_st, S_Block)
+				and not isinstance(s.else_st, S_Empty)):
+
+				ss = S_Block(None)
+				ss.children = [self.__add_if_braces(s.else_st)]
+				s.else_st = ss
+
+		elif isinstance(s, S_Block):
+			c = []
+			for ss in s.children:
+				c.append(self.__add_if_braces(ss))
+
+			s.children = c
+
+		elif (isinstance(s, S_For) or
+			isinstance(s, S_While) or
+			isinstance(s, S_Switch) or
+			isinstance(s, S_Function) or
+			isinstance(s, S_DoWhile)):
+
+			s.body_st = self.__add_if_braces(s.body_st)
+
+		print(s)
+		return s
+
