@@ -667,6 +667,5 @@ class SdsRenderer(BasicSdsRenderer):
 
 			s.body_st = self.__add_if_braces(s.body_st)
 
-		print(s)
 		return s
 
