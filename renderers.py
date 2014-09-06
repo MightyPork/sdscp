@@ -638,19 +638,23 @@ class SdsRenderer(BasicSdsRenderer):
 	def __add_if_braces(self, s):
 
 		if isinstance(s, S_If):
+
 			# wrap THEN
-			if not isinstance(s.then_st, S_Block):
+			if isinstance(s.then_st, S_Block):
+				s.then_st = self.__add_if_braces(s.then_st)
+			else:  # not a block
 				ss = S_Block(None)
 				ss.children = [self.__add_if_braces(s.then_st)]
 				s.then_st = ss
 
 			# wrap ELSE
-			if (not isinstance(s.else_st, S_Block)
-				and not isinstance(s.else_st, S_Empty)):
-
-				ss = S_Block(None)
-				ss.children = [self.__add_if_braces(s.else_st)]
-				s.else_st = ss
+			if (not isinstance(s.else_st, S_Empty)):
+				if isinstance(s.else_st, S_Block):
+					s.else_st = self.__add_if_braces(s.else_st)
+				else:
+					ss = S_Block(None)
+					ss.children = [self.__add_if_braces(s.else_st)]
+					s.else_st = ss
 
 		elif isinstance(s, S_Block):
 			c = []
