@@ -28,3 +28,24 @@ class SyntaxNode:
 		""" Bind self to children as parent. """
 
 		pass  # stub
+
+
+	def get_parent(cls=None):
+		""" Get parent of given type (skips all parents of different types)
+
+		Args:
+			cls (Class): required class for the parent
+
+		Returns: parent of the given type
+		Throws: error if no such parent found.
+
+		"""
+
+		if self.parent is None:
+			raise Exception('No parent of type %s found!' % str(cls))
+
+		if isinstance(self.parent, cls):
+			return self.parent
+
+		return self.parent.get_parent(cls)
+
