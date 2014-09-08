@@ -1,6 +1,13 @@
 #!/bin/env python3
 
 
+class CompatibilityError(SyntaxError):
+	""" Error caused by incompatibility of the source code
+	with SDS-C target syntax. The code may be valid, but not
+	supported by the compiler.
+	"""
+
+
 class SyntaxNode:
 	""" Abstract syntactical node.
 

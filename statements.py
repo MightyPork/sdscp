@@ -5,7 +5,7 @@ import re
 from tokens import *
 import expressions
 from expressions import *
-from tree import SyntaxNode
+from utils import SyntaxNode
 
 
 def parse(tokens):

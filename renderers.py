@@ -3,6 +3,7 @@
 import re
 from statements import *
 from expressions import *
+from mutators import *
 
 
 class Renderer:
@@ -478,13 +479,6 @@ class BasicRenderer(Renderer):
 
 
 
-class CompatibilityError(SyntaxError):
-	""" Error caused by incompatibility of the source code
-	with SDS-C target syntax. The code may be valid, but not
-	supported by the compiler.
-	"""
-
-
 class BasicSdsRenderer(BasicRenderer):
 	""" SDS-C code renderer
 	Takes care of SDS-C pecularities &
@@ -581,95 +575,25 @@ class BasicSdsRenderer(BasicRenderer):
 
 
 class SdsRenderer(BasicSdsRenderer):
-	""" Experimental renderer that collects
-	variable declarations at the top
+	""" Final SDS renderer
+
+	Attrs:
+		same as parent, +
+		mutators (Mutator[]): mutators applied during prepare
 
 	"""
 
-	def _prepare(self, src):
+	def __init__(self, program):
+		super().__init__(program)
 
-		code = src
+		self.mutators = []
+		self.mutators.append(M_AddBraces())
+		self.mutators.append(M_CollectVars())
 
-		# TODO: do code transformations
 
-		code = self._prep_collect_vars(code)
+	def _prepare(self, code):
 
-		code = self._prep_if_braces(code)
+		for mut in self.mutators:
+			code = mut.transform(code);
 
 		return code
-
-
-	def _prep_collect_vars(self, code):
-		""" Move all global variables to the top of the code.
-		Currently works only for vars outside functions.
-
-		"""
-
-		variables = []
-		functions = []
-
-		for s in code:
-			if isinstance(s, S_Var):
-				variables.append(s)
-			elif isinstance(s, S_Function):
-				functions.append(s)
-			else:
-				raise CompatibilityError(
-					'Illegal statement in root scope: %s' %
-					str(s))
-
-		return variables + functions
-
-
-	def _prep_if_braces(self, code):
-		""" Make sure IF statement branches are in code blocks.
-		This is a workaround for a bug in SDS-C compiler,
-		where it fails on assignment in IF.
-
-		"""
-
-		processed = []
-		for s in code:
-			processed.append(self.__add_if_braces(s))
-
-		return processed
-
-
-	def __add_if_braces(self, s):
-
-		if isinstance(s, S_If):
-
-			# wrap THEN
-			if isinstance(s.then_st, S_Block):
-				s.then_st = self.__add_if_braces(s.then_st)
-			else:  # not a block
-				ss = S_Block(None)
-				ss.children = [self.__add_if_braces(s.then_st)]
-				s.then_st = ss
-
-			# wrap ELSE
-			if (not isinstance(s.else_st, S_Empty)):
-				if isinstance(s.else_st, S_Block):
-					s.else_st = self.__add_if_braces(s.else_st)
-				else:
-					ss = S_Block(None)
-					ss.children = [self.__add_if_braces(s.else_st)]
-					s.else_st = ss
-
-		elif isinstance(s, S_Block):
-			c = []
-			for ss in s.children:
-				c.append(self.__add_if_braces(ss))
-
-			s.children = c
-
-		elif (isinstance(s, S_For) or
-			isinstance(s, S_While) or
-			isinstance(s, S_Switch) or
-			isinstance(s, S_Function) or
-			isinstance(s, S_DoWhile)):
-
-			s.body_st = self.__add_if_braces(s.body_st)
-
-		return s
-

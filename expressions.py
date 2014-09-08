@@ -1,7 +1,7 @@
 #!/bin/env python3
 
 from tokens import *
-from tree import SyntaxNode
+from utils import SyntaxNode
 
 def parse(expr_token):
 	""" Converts T_Expression to Expression
