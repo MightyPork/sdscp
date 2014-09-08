@@ -122,3 +122,41 @@ class M_CollectVars(Mutator):
 					str(s))
 
 		return variables + functions
+
+
+
+class TmpVarPool:
+	""" Pool of temporary variables """
+
+	def __init__(self):
+		self.used_cnt = 0
+		self.locks = {}
+
+
+	def _gen_name(self, index):
+		return "__tmp_%d" % (index)
+
+
+	def acquire(self):
+		""" Acquire a free temporary variable """
+
+		for (name, used) in self.locks:
+			if not used:
+				self.locks[name] = True
+				return name
+
+		name = self._gen_name(self.used_cnt)
+		self.used_cnt += 1
+
+		self.locks[name] = True
+
+		return name
+
+
+	def release(self, name):
+		""" Release a temporary variable """
+
+		self.locks[name] = False
+
+
+
