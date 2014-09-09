@@ -328,7 +328,7 @@ class S_Function(Statement):
 
 		# declare instance attributes
 		self.name = None
-		self.args = None
+		self.args = []
 		self.body_st = None
 
 		# if created without a TW
