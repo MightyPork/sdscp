@@ -191,7 +191,7 @@ class S_Goto(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -228,7 +228,7 @@ class S_Label(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -265,7 +265,7 @@ class S_Call(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -323,7 +323,7 @@ class S_Function(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -379,7 +379,7 @@ class S_Return(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -424,7 +424,7 @@ class S_Case(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -457,7 +457,7 @@ class S_Case(Statement):
 class S_Default(Statement):
 	""" A Default in switch. """
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# keyword
@@ -480,7 +480,7 @@ class S_Break(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# keyword
@@ -503,7 +503,7 @@ class S_Continue(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# keyword
@@ -532,7 +532,7 @@ class S_Block(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		self.children = []
@@ -579,7 +579,7 @@ class S_Var(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -650,7 +650,7 @@ class S_Assign(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -710,7 +710,7 @@ class S_If(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -768,7 +768,7 @@ class S_While(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -815,7 +815,7 @@ class S_DoWhile(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -871,7 +871,7 @@ class S_For(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes
@@ -953,7 +953,7 @@ class S_Switch(Statement):
 
 	"""
 
-	def __init__(self, tw):
+	def __init__(self, tw=None):
 		super().__init__()
 
 		# declare instance attributes

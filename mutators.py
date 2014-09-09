@@ -2,7 +2,7 @@
 
 from statements import *
 from expressions import *
-from utils import CompatibilityError
+from utils import CompatibilityError, Obj
 
 class Mutator:
 	""" Code mutator
@@ -160,3 +160,132 @@ class TmpVarPool:
 
 
 
+class ArgPool:
+	""" Pool of transport variables for arguments """
+
+	def __init__(self):
+		self.used_cnt = 0
+		self.ptr = 0
+		self.vars = []
+
+
+	def _gen_name(self, index):
+		return "__arg_%d" % (index)
+
+
+	def rewind(self):
+		""" Rewind to start """
+		self.ptr = 0
+
+
+	def acquire(self):
+		""" Get a free arg variable """
+		if self.ptr >= self.used_cnt:
+			# must add new one
+			self.vars.append(self._gen_name(self.ptr))
+			self.used_cnt += 1
+
+		name = self.vars[self.ptr]
+		self.ptr += 1
+
+		return name
+
+
+
+class LabelPool:
+	""" Generates unique label names """
+
+	def __init__(self):
+		self.counters = {}
+		self.used = []
+
+
+	def make(self, prefix='label'):
+		""" Make a unique label with given prefix """
+		if prefix in self.counters:
+			self.counters[prefix] += 1
+		else:
+			self.counters[prefix] = 0
+
+		name = '__%s_%d' % (prefix, self.counters[prefix])
+		self.register(name)
+
+		return name
+
+
+	def register(self, name):
+		""" Add a label name to the list - for checking existence
+		Used also for user labels.
+		"""
+
+		self.used.append(name)
+
+
+	def exists(self, name):
+		""" Check if given label exists in the program """
+
+		return name in self.used
+
+
+
+class M_Grand(Mutator):
+	""" The master mutator for SDSCP extra features """
+
+	def _transform(self, code):
+		self.globals_declare = []
+		self.globals_assign = []
+		self.functions = []
+		self.tmp_pool = TmpVarPool()
+		self.arg_pool = ArgPool()
+		self.labels = LabelPool()
+		self.ret_var = '__retval'
+
+		self.init_generated = []
+		self.init_userfn = None
+		self.main_generated = []
+		self.main_userfn = []
+
+		# iterate through top level statements
+		for s in code:
+			if isinstance(s, S_Var):
+				self._add_global_var(s.var.name, s.value)
+
+			elif isinstance(s, S_Function):
+				if s.name == 'main':
+					self.main_userfn = s
+				elif s.name == 'init':
+					self.init_userfn = s
+				else:
+					functions.append(s)
+
+			else:
+				raise CompatibilityError(
+					'Illegal statement in root scope: %s' %
+					str(s))
+
+
+	def _add_global_var(self, name, value=None):
+
+		v = S_Var()
+		v.var = E_Variable(name)
+
+		self.globals_declare.append(v)
+
+		if value is not None:
+			a = S_Assign()
+			a.var = v.var
+			a.value = value
+			self.globals_assign.append(v)
+
+
+	def _decorate_fn(self, fn):
+		fn.meta = Obj()
+
+		# list of tmp vars modified within the scope of this function
+		fn.meta.changed_tmps = []
+
+		# dict of translations of "local" var names to acquired tmp vars used instead
+		fn.meta.local_tmp_dict = {}
+
+		# mapping arguments to tmp vars (order is kept) - vars must also be added to local_tmp_dict
+		fn.meta.arg_tmps = []
