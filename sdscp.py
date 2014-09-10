@@ -209,7 +209,7 @@ try:
 	if DEST != None or SHOW_OUTPUT:
 
 		# perform tweaks to match some of SDS-C's broken syntax
-		rndr = SdsRenderer(sts)
+		rndr = SdsRenderer2(sts)
 		for_sds = rndr.render()
 
 		if SHOW_OUTPUT:

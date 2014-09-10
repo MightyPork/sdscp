@@ -114,7 +114,8 @@ class BasicRenderer(Renderer):
 			S_Break:	self._render_break,
 			S_Continue:	self._render_continue,
 			S_Var:		self._render_var,
-			S_Assign:	self._render_assign
+			S_Assign:	self._render_assign,
+			S_Comment:	self._render_comment
 		}
 
 
@@ -223,6 +224,14 @@ class BasicRenderer(Renderer):
 		return ';'
 
 
+	def _render_comment(self, s):  # S_Comment
+
+		if s.text.count('\n') == 0:
+			return '// %s' % s.text
+		else:
+			return '/* %s */' % s.text
+
+
 	def _render_function(self, s):  # S_Function
 
 		src = '%s(%s)\n' % (
@@ -262,8 +271,11 @@ class BasicRenderer(Renderer):
 	def _render_if(self, s):  # S_If
 		src = 'if (%s) ' % self._render_expr(s.cond)
 
+		small_then = True
+
 		if isinstance(s.then_st, S_Block):
 			# big THEN
+			small_then = False
 			src += self._render_any(
 				s.then_st,
 				append_newline=False)
@@ -276,11 +288,13 @@ class BasicRenderer(Renderer):
 				level=1,  # indent the statement
 				indent_first=True,
 				append_newline=False)
-			src += '\n'
 
 
 		if not isinstance(s.else_st, S_Empty):
 			# there is some ELSE
+
+			if small_then:
+				src += '\n'
 
 			src += 'else '
 
@@ -589,6 +603,32 @@ class SdsRenderer(BasicSdsRenderer):
 		self.mutators = []
 		self.mutators.append(M_AddBraces())
 		self.mutators.append(M_CollectVars())
+
+
+	def _prepare(self, code):
+
+		for mut in self.mutators:
+			code = mut.transform(code);
+
+		return code
+
+
+
+class SdsRenderer2(BasicSdsRenderer):
+	""" Final SDS renderer
+
+	Attrs:
+		same as parent, +
+		mutators (Mutator[]): mutators applied during prepare
+
+	"""
+
+	def __init__(self, program):
+		super().__init__(program)
+
+		self.mutators = []
+		self.mutators.append(M_AddBraces())
+		self.mutators.append(M_Grand())
 
 
 	def _prepare(self, code):

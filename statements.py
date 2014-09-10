@@ -655,7 +655,7 @@ class S_Assign(Statement):
 
 		# declare instance attributes
 		self.var = None
-		self.op = None
+		self.op = T_AssignOperator('=')
 		self.value = None
 
 		# if created without a TW

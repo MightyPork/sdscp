@@ -1,8 +1,18 @@
 #!/bin/env python3
 
+import statements
+from tokens import Tokenizer
 from statements import *
 from expressions import *
-from utils import CompatibilityError, Obj
+from utils import *
+
+def synth(source):
+	""" Parse source & convert to statements """
+
+	tk = Tokenizer(source)
+	tokens = tk.tokenize()
+	return statements.parse(tokens)
+
 
 class Mutator:
 	""" Code mutator
@@ -38,7 +48,6 @@ class Mutator:
 		"""
 
 		return code
-
 
 
 class M_AddBraces(Mutator):
@@ -140,7 +149,7 @@ class TmpVarPool:
 	def acquire(self):
 		""" Acquire a free temporary variable """
 
-		for (name, used) in self.locks:
+		for (name, used) in self.locks.items():
 			if not used:
 				self.locks[name] = True
 				return name
@@ -157,6 +166,14 @@ class TmpVarPool:
 		""" Release a temporary variable """
 
 		self.locks[name] = False
+
+
+	def release_all(self):
+		""" Release all tmp vars """
+
+		for n in self.locks.keys():
+			self.locks[n] = False
+		self.used_cnt = 0
 
 
 	def get_names(self):
@@ -193,6 +210,10 @@ class ArgPool:
 		self.ptr += 1
 
 		return name
+
+
+	def get_names(self):
+		return self.vars
 
 
 
@@ -232,6 +253,109 @@ class LabelPool:
 
 
 
+class FnRegistry:
+	""" Registry of function labels and translations """
+
+	def __init__(self, label_pool):
+		self.counter = 0
+		self.name2index = {}
+
+		self.index2label = {}
+
+		self.labels = label_pool
+
+		self.call_counter = 0
+
+
+	def register(self, name):
+		""" Register a function. Returns index """
+
+		i = self.counter
+
+		begin = self.get_begin(i)
+		end = self.get_end(i)
+
+		self.name2index[name] = i
+		self.index2label[i] = begin
+
+		self.labels.register(begin)
+		self.labels.register(end)
+
+		self.counter += 1
+
+		return name
+
+
+	def register_call(self):
+		""" Register a call. Get index. """
+
+		i = self.counter
+		label = self.get_call_label(i)
+
+		self.index2label[i] = label
+
+		self.labels.register(label)
+
+		self.counter += 1;
+
+		return name
+
+
+	def get_begin(self, index):
+		""" Get start label for a function
+
+		Args:
+			index: name or function index
+
+		Returns:
+			label name
+
+		"""
+
+		if type(index) == str:
+			index = self.name2index[index]
+
+		return "__fn_begin_%d" % index
+
+
+	def get_end(self, index):
+		""" Get end label of a function (for return)
+
+		Args:
+			index: name or function index
+
+		Returns:
+			label name
+
+		"""
+
+		if type(index) == str:
+			index = self.name2index[index]
+
+		return "__fn_end_%d" % index
+
+
+	def get_call_label(self, index):
+		""" Get return-from-call label
+
+		Args:
+			index: index of the call
+
+		Returns:
+			label name
+
+		"""
+
+		return "__retpos_%s" % index
+
+
+	def get_trampoline_map(self):
+		""" Get index -> label map """
+
+		return self.index2label
+
+
+
 class M_Grand(Mutator):
 	""" The master mutator for SDSCP extra features """
 
@@ -240,19 +364,21 @@ class M_Grand(Mutator):
 		self.globals_declare = []
 		self.globals_assign = []
 
-		self.functions = []
+		functions = []
+		func_names = []
+
 		self.tmp_pool = TmpVarPool()
 		self.arg_pool = ArgPool()
 		self.labels = LabelPool()
-
-		self.init_generated = []
-		self.main_generated = []
+		self.fn_pool = FnRegistry(self.labels)
 
 		init_userfn = None
 		main_userfn = None
 
-		# register return value
-		self._add_global_var('__retval')
+		# register helper vars
+		self._add_global_var('__retval')  # return value
+		self._add_global_var('__sp', 512)  # stack pointer at RAMEND (grows towards lower addrs)
+		self._add_global_var('__addr')  # jump address pointer
 
 		# iterate through top level statements
 		for s in code:
@@ -260,12 +386,22 @@ class M_Grand(Mutator):
 				self._add_global_var(s.var.name, s.value)
 
 			elif isinstance(s, S_Function):
+
+				if s.name in func_names:
+					raise Exception('Duplicate function: %s()' % s.name)
+
+				func_names.append(s.name)
+
 				if s.name == 'main':
-					self.main_userfn = s
+					main_userfn = s
+
 				elif s.name == 'init':
-					self.init_userfn = s
+					init_userfn = s
+
 				else:
+					func_names.append(s.name)
 					functions.append(s)
+					self.fn_pool.register(s.name)
 
 			else:
 				raise CompatibilityError(
@@ -276,51 +412,82 @@ class M_Grand(Mutator):
 		# == TODO == prepate boilerplate (trampoline, stack utils etc)
 
 
+		# process init()
 		if init_userfn is not None:
 			init_userfn_processed = self._process_fn(init_userfn, naked=True)
 
+		# process main()
 		if main_userfn is not None:
 			main_userfn_processed = self._process_fn(main_userfn, naked=True)
 
 
-		# == TODO == process all other functions, create trampolines etc.
+		# process user functions except main() & init()
 		functions_processed = []
-
+		for fn in functions:
+			functions_processed.append(self._process_fn(fn))
 
 
 		# Add used tmps to globals declare
 		for name in self.tmp_pool.get_names():
 			self._add_global_var(name)
 
+		# Add args to globals
+		for name in self.arg_pool.get_names():
+			self._add_global_var(name)
+
 		# Compose output code
-		output_code = self.globals_declare
+		output_code = []
+		append(output_code, S_Comment('==== Globals declaration ===='))
+		append(output_code, self.globals_declare)
 
 		# main func body statements
 		sts = []
-		sts.append(self._mk_label('__reset'))
+
+		# goto reset (skip trampolines)
+		append(sts, self._mk_goto('__reset'))
+
+
+		# trampoline
+		append(sts, S_Comment('==== Redirection vector ===='))
+		append(sts, self._mk_label('__trampoline'))
+
+		for (i, n) in self.fn_pool.get_trampoline_map().items():
+			append(sts, synth("""
+				if (__addr == %d) goto %s;
+			""" % (i, n)))
+
+		append(sts, S_Comment('Fall-through for invalid address'))
+		append(sts, self._mk_error('Bad address!'))
+
+		# reset label
+		append(sts, S_Comment('==== init() ===='))
+		append(sts, self._mk_label('__reset'))
 
 		# assign global vars default values
-		sts += self.globals_assign
-
-		# extra generated stuff
-		if len(self.init_generated) > 0:
-			sts += self.init_generated
+		append(sts, S_Comment('-- Assign global variables --'))
+		append(sts, self.globals_assign)
 
 		# user init function
 		if init_userfn is not None:
-			sts += init_userfn_processed
+			append(sts, S_Comment('-- User init() code --'))
+			append(sts, init_userfn_processed)
 
 		# infinite main loop
-		sts.append(self._mk_label('__main_loop'))
+		append(sts, S_Comment('==== main() infinite loop ===='))
+		append(sts, self._mk_label('__main_loop'))
 		if main_userfn is not None:
+			append(sts, S_Comment('-- User main() code --'))
 			sts += main_userfn_processed
-		sts.append(self._mk_goto('__main_loop'))
+		append(sts, self._mk_goto('__main_loop'))
+
 
 		# other user functions
 		for fn in functions_processed:
-			sts += fn  # func already contains header, return handler etc
+
+			append(sts, fn)  # func already contains header, return handler etc
 
 
+		# compose main function with all the code
 		main = S_Function()
 		main.name = 'main'
 		main.body_st = S_Block()
@@ -332,17 +499,78 @@ class M_Grand(Mutator):
 
 
 	def _process_fn(self, fn, naked=False):
-		""" linearize a func. naked = do not push / pop used tmp vars """
+		""" linearize a function. naked = do not push / pop used tmp vars """
 
 		self._decorate_fn(fn)
+		self.tmp_pool.release_all()
 
-		# TODO process the func & contents
+		if naked:
+			return self._process_block(fn, fn.body_st.children)
 
-		# return linearized code
+		body = []
 
-		raise NotImplementedError('TODO')
+		self.arg_pool.rewind()
 
-		return []
+		# assign arguments to tmps
+		append(body, S_Comment('-- Store args in tmp vars --'))
+		for n in fn.args:
+			arg = self.arg_pool.acquire()
+			tmp = self.tmp_pool.acquire()
+			fn.meta.changed_tmps.append(tmp)
+			fn.meta.local_tmp_dict[n] = tmp
+			fn.meta.arg_tmps.append(tmp)
+
+			append(body, synth("""
+				%s = %s;
+			""" % (tmp, arg)))
+
+		append(body, S_Comment('-- Function body --'))
+
+		append(body, self._process_block(fn, fn.body_st.children))
+
+		out = []
+
+		# begin label
+		append(out, S_Comment('==== FUNC %s(%s) ====' % (fn.name, ','.join(fn.args))))
+
+		label = self._mk_label(self.fn_pool.get_begin(fn.name))
+		append(out, label)
+
+		# push all changed tmp vars
+		append(out, S_Comment('-- Push used tmp vars --'))
+		for n in fn.meta.changed_tmps:
+			append(out, self._mk_push(n))
+
+		append(out, body)
+
+		# end label
+		label = self._mk_label(self.fn_pool.get_end(fn.name))
+		append(out, label)
+
+		append(out, S_Comment('-- Pop used tmp vars --'))
+		for n in reversed(fn.meta.changed_tmps):
+			append(out, self._mk_pop(n))
+
+		append(out, S_Comment('-- Jump to caller --'))
+		append(out, self._mk_pop('__addr'))  # pop a return address
+		append(out, self._mk_goto('__trampoline'))
+
+		return out
+
+
+	def _process_block(self, fn, sts):
+		""" Process a statement block
+
+		Args:
+			fn: The parent S_Function
+			sts: list of statements in the block
+
+		Returns block linearized.
+
+		"""
+
+		#raise NotImplementedError('TODO')
+		return [S_Comment('TODO: func body %s' % fn.name)] + sts
 
 
 	def _add_global_var(self, name, value=None):
@@ -359,6 +587,8 @@ class M_Grand(Mutator):
 	def _decorate_fn(self, fn):
 		""" Add meta fields to a function statement """
 
+		fn.bind_parent(None)
+
 		fn.meta = Obj()
 
 		# list of tmp vars modified within the scope of this function
@@ -372,6 +602,8 @@ class M_Grand(Mutator):
 		# mapping arguments to tmp vars (order is kept)
 		# vars are also added to local_tmp_dict
 		fn.meta.arg_tmps = []
+
+		return fn
 
 
 	def _mk_label(self, name):
@@ -389,6 +621,13 @@ class M_Grand(Mutator):
 	def _mk_assign(self, name, value):
 		s = S_Assign()
 		s.var = E_Variable(name)
+
+		if type(value) == int:
+			value = E_Literal(T_Number(str(value)))
+
+		if type(value) == str:
+			value = E_Variable(value)
+
 		s.value = value
 		return s
 
@@ -397,3 +636,27 @@ class M_Grand(Mutator):
 		s = S_Var()
 		s.var = E_Variable(name)
 		return s
+
+
+	def _mk_push(self, name):
+
+		return synth("""
+			__sp -= 1;
+			ram[__sp] = %s;
+		""" % name)
+
+
+	def _mk_pop(self, name):
+
+		return synth("""
+			%s = ram[__sp];
+			__sp += 1;
+		""" % name)
+
+
+	def _mk_error(self, message):
+
+		return synth("""
+			echo("%s");
+			goto __reset;
+		""" % message)

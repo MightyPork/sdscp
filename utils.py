@@ -1,6 +1,15 @@
 #!/bin/env python3
 
 
+def append(arr, added):
+	""" Append to array, both array or item """
+
+	if type(added) == list:
+		arr.extend(added)
+	else:
+		arr.append(added)
+
+
 class CompatibilityError(SyntaxError):
 	""" Error caused by incompatibility of the source code
 	with SDS-C target syntax. The code may be valid, but not
