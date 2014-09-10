@@ -149,8 +149,10 @@ class TmpVarPool:
 	def acquire(self):
 		""" Acquire a free temporary variable """
 
+
 		for (name, used) in self.locks.items():
 			if not used:
+				self.used_cnt += 1
 				self.locks[name] = True
 				return name
 
@@ -165,7 +167,11 @@ class TmpVarPool:
 	def release(self, name):
 		""" Release a temporary variable """
 
+		if not name in self.locks.keys():
+			raise Exception('Cannot release %s, not defined.' % name)
+
 		self.locks[name] = False
+		self.used_cnt -= 1
 
 
 	def release_all(self):
@@ -268,7 +274,7 @@ class FnRegistry:
 
 
 	def register(self, name):
-		""" Register a function. Returns index """
+		""" Register a function. Returns index. """
 
 		i = self.counter
 
@@ -282,12 +288,11 @@ class FnRegistry:
 		self.labels.register(end)
 
 		self.counter += 1
-
-		return name
+		return i
 
 
 	def register_call(self):
-		""" Register a call. Get index. """
+		""" Register a call. Returns index. """
 
 		i = self.counter
 		label = self.get_call_label(i)
@@ -298,7 +303,7 @@ class FnRegistry:
 
 		self.counter += 1;
 
-		return name
+		return i
 
 
 	def get_begin(self, index):
@@ -355,9 +360,56 @@ class FnRegistry:
 		return self.index2label
 
 
+	def get_addr(self, name):
+		""" Get address for name """
 
-class M_Grand(Mutator):
+		if not name in self.name2index.keys():
+			raise Exception('Function not found, cannot call: %s' % name)
+
+		return self.name2index[name]
+
+
+
+class M_Grande(Mutator):
 	""" The master mutator for SDSCP extra features """
+
+	def __init__(self):
+
+		# list of builtin functions
+		self.builtin_fn = [
+			'echo',
+			'echoinline',
+			'echoclear',
+			'smtp_send',
+			'ping',
+			'dns_resolv',
+			'wait',
+			'http_get',
+			'lcd_echo',
+			'lcd_clear',
+			'lcd_newline',
+			'lcd_setpixel',
+			'serial_set',
+			'serial_write',
+			'serial_text_out',
+			'read_dataflash',
+			'write_dataflash',
+			'read_dataflash_page_to_ram',
+			'write_ram_block_to_dataflash_page',
+			'atoi',
+			'sprintf',
+			'snmp_send_trap',
+			'send_udp',
+			'onewire_rescan',
+		]
+
+		self.builtin_var = [
+			'sys',
+			'ram',
+			'text',
+		]
+
+
 
 	def _transform(self, code):
 
@@ -437,7 +489,7 @@ class M_Grand(Mutator):
 
 		# Compose output code
 		output_code = []
-		append(output_code, S_Comment('==== Globals declaration ===='))
+		append(output_code, S_Comment('Globals declaration'))
 		append(output_code, self.globals_declare)
 
 		# main func body statements
@@ -448,7 +500,7 @@ class M_Grand(Mutator):
 
 
 		# trampoline
-		append(sts, S_Comment('==== Redirection vector ===='))
+		append(sts, S_Comment('Redirection vector'))
 		append(sts, self._mk_label('__trampoline'))
 
 		for (i, n) in self.fn_pool.get_trampoline_map().items():
@@ -460,30 +512,26 @@ class M_Grand(Mutator):
 		append(sts, self._mk_error('Bad address!'))
 
 		# reset label
-		append(sts, S_Comment('==== init() ===='))
+		append(sts, S_Comment('### FUNC: init() ###'))
 		append(sts, self._mk_label('__reset'))
 
 		# assign global vars default values
-		append(sts, S_Comment('-- Assign global variables --'))
 		append(sts, self.globals_assign)
 
 		# user init function
 		if init_userfn is not None:
-			append(sts, S_Comment('-- User init() code --'))
 			append(sts, init_userfn_processed)
 
 		# infinite main loop
-		append(sts, S_Comment('==== main() infinite loop ===='))
+		append(sts, S_Comment('### FUNC: main() ###'))
 		append(sts, self._mk_label('__main_loop'))
 		if main_userfn is not None:
-			append(sts, S_Comment('-- User main() code --'))
 			sts += main_userfn_processed
 		append(sts, self._mk_goto('__main_loop'))
 
 
 		# other user functions
 		for fn in functions_processed:
-
 			append(sts, fn)  # func already contains header, return handler etc
 
 
@@ -512,7 +560,7 @@ class M_Grand(Mutator):
 		self.arg_pool.rewind()
 
 		# assign arguments to tmps
-		append(body, S_Comment('-- Store args in tmp vars --'))
+		append(body, S_Comment('Store args to tmp vars'))
 		for n in fn.args:
 			arg = self.arg_pool.acquire()
 			tmp = self.tmp_pool.acquire()
@@ -524,20 +572,22 @@ class M_Grand(Mutator):
 				%s = %s;
 			""" % (tmp, arg)))
 
-		append(body, S_Comment('-- Function body --'))
-
+		append(body, S_Comment('Function body'))
 		append(body, self._process_block(fn, fn.body_st.children))
 
 		out = []
 
 		# begin label
-		append(out, S_Comment('==== FUNC %s(%s) ====' % (fn.name, ','.join(fn.args))))
+		append(out, S_Comment('### FUNC %s(%s) ###' % (fn.name, ','.join(fn.args))))
 
 		label = self._mk_label(self.fn_pool.get_begin(fn.name))
 		append(out, label)
 
 		# push all changed tmp vars
-		append(out, S_Comment('-- Push used tmp vars --'))
+		append(out, S_Comment('Push used tmp vars'))
+
+		fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))
+
 		for n in fn.meta.changed_tmps:
 			append(out, self._mk_push(n))
 
@@ -547,11 +597,11 @@ class M_Grand(Mutator):
 		label = self._mk_label(self.fn_pool.get_end(fn.name))
 		append(out, label)
 
-		append(out, S_Comment('-- Pop used tmp vars --'))
+		append(out, S_Comment('Pop used tmp vars'))
 		for n in reversed(fn.meta.changed_tmps):
 			append(out, self._mk_pop(n))
 
-		append(out, S_Comment('-- Jump to caller --'))
+		append(out, S_Comment('Return to caller'))
 		append(out, self._mk_pop('__addr'))  # pop a return address
 		append(out, self._mk_goto('__trampoline'))
 
@@ -569,8 +619,160 @@ class M_Grand(Mutator):
 
 		"""
 
-		#raise NotImplementedError('TODO')
-		return [S_Comment('TODO: func body %s' % fn.name)] + sts
+		out = []
+
+		for s in sts:
+			tmps = []
+
+			# local var
+			if isinstance(s, S_Var):
+				repl = self.tmp_pool.acquire()
+				fn.meta.local_tmp_dict[s.var.name] = repl
+
+				value = s.value
+
+				if value is None:
+					value = 0
+				else:
+					(init, tmps, value) = self._process_expr(fn, s.value)
+					append(out, init)
+
+				append(out, self._mk_assign(repl, value))
+
+			elif isinstance(s, S_Assign):
+
+				(init, _tmps, value) = self._process_expr(fn, s.value)
+				append(out, init)
+				append(tmps, _tmps)
+
+				index = s.var.index
+
+				if index is not None:
+					# assign to array
+					ind = self.tmp_pool.acquire()
+					tmps.append(ind)
+
+					(init, _tmps, ind_val) = self._process_expr(fn, index)
+					append(out, init)
+					append(tmps, _tmps)
+					append(out, self._mk_assign(ind, ind_val))
+
+					index = E_Variable(ind)
+
+				append(out, self._mk_assign(name=s.var.name, value=value, op=s.op, index=index))
+
+			elif isinstance(s, S_Call):  # func call with no return value assignment
+
+				if s.name in self.builtin_fn:
+					# a builtin function,
+					# take care of complex arguments (SDS-C bug workaround)
+
+					args = []
+					for a in s.args:
+						(init, _tmps, a_val) = self._process_expr(fn, a)
+						append(out, init)
+						append(tmps, _tmps)
+
+						if isinstance(a_val, E_Group):
+							# must use helper tmp
+							tmp = self.tmp_pool.acquire()
+							append(tmps, tmp)
+							append(out, self._mk_assign(tmp, a_val))
+
+							a_val = E_Variable(tmp)
+
+						args.append(a_val)
+
+					c = S_Call()
+					c.name = s.name
+					c.args = args
+
+					append(out, c)
+
+				else:
+					# call to user func
+
+					self.arg_pool.rewind()
+
+					for a in s.args:
+
+						arg_name = self.arg_pool.acquire()
+
+						(init, _tmps, a_val) = self._process_expr(fn, a)
+						append(out, init)
+						append(tmps, _tmps)
+
+						append(out, self._mk_assign(arg_name, a_val))
+
+					# get return label index
+					return_idx = self.fn_pool.register_call()
+
+					# callee address
+					addr = self.fn_pool.get_addr(s.name)
+					append(out, self._mk_assign('__addr', addr))
+					append(out, self._mk_push(return_idx))
+					append(out, self._mk_goto('__trampoline'))
+
+					# return label
+					lbl = self.fn_pool.get_call_label(return_idx)
+					append(out, self._mk_label(lbl))
+
+			else:
+				out.append(s)
+
+			for t in tmps:
+				fn.meta.changed_tmps.append(t)
+				self.tmp_pool.release(t)
+
+		# TODO: Handle other statements
+
+
+		return out
+
+
+	def _process_expr(self, fn, e):
+		init = []
+		tmps = []
+
+		if isinstance(e, E_Group):
+			new_children = []
+
+			for c in e.children:
+				(_init, _tmps, _e) = self._process_expr(fn, c)
+
+				append(init, _init)
+				append(tmps, _tmps)
+				append(new_children, _e)
+
+			return (init, tmps, E_Group(new_children))
+
+		if isinstance(e, E_Variable):
+
+			if fn is None:
+				name = e.name
+			else:
+				name = fn.meta.local_tmp_dict.get(e.name, e.name)
+
+			if (e.index is None) or isinstance(e.index, E_Literal):
+				return (init, tmps, E_Variable(name))
+
+			else:
+				tmp = self.tmp_pool.acquire()
+
+				(_init, _tmps, _e) = self._process_expr(fn, e.index)
+
+				append(init, _init)
+				append(tmps, _tmps)
+				append(tmps, tmp)
+
+				s = self._mk_assign(tmp, _e)
+				init.append(s)
+
+				return (init, tmps, E_Variable(name, E_Variable(tmp)))
+
+		# TODO: handle call & return value, handle function arguments etc.
+
+		return (init, tmps, e)
 
 
 	def _add_global_var(self, name, value=None):
@@ -580,8 +782,14 @@ class M_Grand(Mutator):
 		self.globals_declare.append(v)
 
 		if value is not None:
-			a = self._mk_assign(name, value)
-			self.globals_assign.append(a)
+
+			(init, tmps, value) = self._process_expr(None, value)
+			append(self.globals_assign, init)
+
+			append(self.globals_assign, self._mk_assign(name, value))
+
+			for t in tmps:
+				self.tmp_pool.release(t)
 
 
 	def _decorate_fn(self, fn):
@@ -618,9 +826,9 @@ class M_Grand(Mutator):
 		return s
 
 
-	def _mk_assign(self, name, value):
+	def _mk_assign(self, name, value, op='=', index=None):
 		s = S_Assign()
-		s.var = E_Variable(name)
+		s.var = E_Variable(name, index)
 
 		if type(value) == int:
 			value = E_Literal(T_Number(str(value)))
@@ -629,6 +837,12 @@ class M_Grand(Mutator):
 			value = E_Variable(value)
 
 		s.value = value
+
+		if type(op) == str:
+			op = T_AssignOperator(op)
+
+		s.op = op
+
 		return s
 
 

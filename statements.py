@@ -687,7 +687,6 @@ class S_Assign(Statement):
 
 	def _bind_children(self):
 		self.var.bind_parent(self)
-		self.op.bind_parent(self)
 		self.value.bind_parent(self)
 
 

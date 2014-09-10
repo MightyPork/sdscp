@@ -628,7 +628,7 @@ class SdsRenderer2(BasicSdsRenderer):
 
 		self.mutators = []
 		self.mutators.append(M_AddBraces())
-		self.mutators.append(M_Grand())
+		self.mutators.append(M_Grande())
 
 
 	def _prepare(self, code):

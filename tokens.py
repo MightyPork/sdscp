@@ -1107,37 +1107,46 @@ class Tokenizer:
 		if kwd == 'if':
 			self._add( T_IF() )
 			self._collect_paren(rd, ParenType.EXPR)
+			return
 
 		elif kwd == 'else':
 			self._add( T_ELSE() )
+			return
 
 		elif kwd == 'elseif':
 			self._add( T_ELSE() )
 			self._add( T_IF() )
 			self._collect_paren(rd, ParenType.EXPR)
+			return
 
 		# the various loops
 		elif kwd == 'while':
 			self._add( T_WHILE() )
 			self._collect_paren(rd, ParenType.EXPR)
+			return
 
 		elif kwd == 'for':
 			self._add( T_FOR() )
 			self._collect_paren(rd, ParenType.FOR)
+			return
 
 		elif kwd == 'do':
 			self._add( T_DO() )
+			return
 
 		elif kwd == 'continue':
 			self._add( T_CONTINUE() )
+			return
 
 		elif kwd == 'break':
 			self._add( T_BREAK() )
+			return
 
 		# the switch statemnt
 		elif kwd == 'switch':
 			self._add( T_SWITCH() )
 			self._collect_paren(rd, ParenType.EXPR)
+			return
 
 		elif kwd == 'case':
 			self._add( T_CASE() )
@@ -1147,11 +1156,13 @@ class Tokenizer:
 			self._add(t)
 
 			self._collect_colon(rd)
+			return
 
 		elif kwd == 'default':
 			self._add( T_DEFAULT() )
 
 			self._collect_colon(rd)
+			return
 
 		elif kwd == 'var':
 
@@ -1190,6 +1201,7 @@ class Tokenizer:
 
 				else:
 					rd.error('Expected , or ; here.')
+			return
 
 		elif kwd == 'goto':
 			self._add( T_GOTO() )
@@ -1199,11 +1211,13 @@ class Tokenizer:
 			self._add(t)
 
 			self._collect_semicolon(rd)
+			return
 
 		elif kwd == 'label':
 			# the label keyword (optional for labels)
 
 			self._collect_label(rd)
+			return
 
 		elif kwd == 'return':
 			self._add( T_RETURN() )
@@ -1216,6 +1230,7 @@ class Tokenizer:
 
 			# the semicolon
 			self._collect_semicolon(rd)
+			return
 
 		elif rd.has_paren():
 			# function call or declaration
@@ -1234,6 +1249,7 @@ class Tokenizer:
 				self._add(t)
 
 				self._collect_semicolon(rd)
+				return
 
 			elif rd.has_code_block():
 				# a declaration
@@ -1248,6 +1264,7 @@ class Tokenizer:
 
 				cbl = rd.consume_block()
 				self._add( T_CodeBlock(cbl) )
+				return
 
 		elif (
 			rd.has_bracket() or
@@ -1267,6 +1284,7 @@ class Tokenizer:
 
 			if rd.starts(';'):
 				self._collect_semicolon(rd)
+				return
 
 			elif rd.starts(','):
 				rd.consume()  # the comma
@@ -1297,6 +1315,8 @@ class Tokenizer:
 					else:
 						rd.error('Expected , or ; here.')
 
+				return
+
 		else:
 			# just a name
 			rd.sweep()
@@ -1312,6 +1332,9 @@ class Tokenizer:
 
 			# unknown meaning
 			rd.error("Unexpected syntax: Don't know what %s means here." % s)
+
+		# unknown meaning
+		rd.error("Invalid syntax found - missing semicolon maybe?")
 
 
 	def show(self):

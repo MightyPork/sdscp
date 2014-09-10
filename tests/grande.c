@@ -19,3 +19,8 @@ func_with_args(moo, yo, dawg) {
 other_func(booo) {
 	echo(booo);
 }
+
+
+noargs() {
+	do_stuff();
+}

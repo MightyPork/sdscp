@@ -4,6 +4,9 @@
 def append(arr, added):
 	""" Append to array, both array or item """
 
+	if (added is None) or (arr is None):
+		return
+
 	if type(added) == list:
 		arr.extend(added)
 	else:
