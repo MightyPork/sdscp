@@ -714,8 +714,8 @@ class S_If(Statement):
 
 		# declare instance attributes
 		self.cond = None
-		self.then_st = None
-		self.else_st = None
+		self.then_st = S_Empty()
+		self.else_st = S_Empty()
 
 		# if created without a TW
 		if tw is None:

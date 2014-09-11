@@ -231,7 +231,7 @@ class LabelPool:
 		self.used = []
 
 
-	def make(self, prefix='label'):
+	def acquire(self, prefix='label'):
 		""" Make a unique label with given prefix """
 		if prefix in self.counters:
 			self.counters[prefix] += 1
@@ -268,7 +268,7 @@ class FnRegistry:
 
 		self.index2label = {}
 
-		self.labels = label_pool
+		self.label_pool = label_pool
 
 		self.call_counter = 0
 
@@ -284,8 +284,8 @@ class FnRegistry:
 		self.name2index[name] = i
 		self.index2label[i] = begin
 
-		self.labels.register(begin)
-		self.labels.register(end)
+		self.label_pool.register(begin)
+		self.label_pool.register(end)
 
 		self.counter += 1
 		return i
@@ -299,7 +299,7 @@ class FnRegistry:
 
 		self.index2label[i] = label
 
-		self.labels.register(label)
+		self.label_pool.register(label)
 
 		self.counter += 1;
 
@@ -446,8 +446,8 @@ at https://github.com/MightyPork/sdscp
 
 		self.tmp_pool = TmpVarPool()
 		self.arg_pool = ArgPool()
-		self.labels = LabelPool()
-		self.fn_pool = FnRegistry(self.labels)
+		self.label_pool = LabelPool()
+		self.fn_pool = FnRegistry(self.label_pool)
 
 		init_userfn = None
 		main_userfn = None
@@ -703,82 +703,152 @@ at https://github.com/MightyPork/sdscp
 
 		"""
 
+		if isinstance(sts, S_Block):
+			sts = sts.children
+
+		if isinstance(sts, Statement):
+			sts = [sts]
+
+		# init transformer dict on demand
+		if not hasattr(self, '_statement_transformers'):
+
+			self._statement_transformers = {
+				S_Empty:	None,
+				S_Var:		self._transform_var,
+				S_Assign:	self._transform_assign,
+				S_Call:		self._transform_call,
+				S_Return:	self._transform_return,
+				S_If:		self._transform_if
+			}
+
 		out = []
 
 		for s in sts:
-			tmps = []
+			try:
+				transformer = self._statement_transformers[type(s)]
 
-			# local var
-			if isinstance(s, S_Var):
-				repl = self.tmp_pool.acquire()
-				fn.meta.local_tmp_dict[s.var.name] = repl
-
-				value = s.value
-
-				if value is None:
-					value = 0
-				else:
-					(init, tmps, value) = self._process_expr(fn, s.value)
-					append(out, init)
-
-				append(out, self._mk_assign(repl, value))
-				self._fn_release_tmps(fn, tmps)
-
-			elif isinstance(s, S_Assign):
-
-				(_init, _tmps, value) = self._process_expr(fn, s.value)
-				append(out, _init)
-				append(tmps, _tmps)
-
-				if not isinstance(s.var, E_Variable):
-					raise Exception('Cannot assign to %s (type %s)' % (args[0], type(args[0])))
-
-				(_init, _tmps, var) = self._process_expr(fn, s.var)
-				append(out, _init)
-				append(tmps, _tmps)
-
-				append(out, self._mk_assign(name=var, value=value, op=s.op))
-
-				self._fn_release_tmps(fn, tmps)
-
-			elif isinstance(s, S_Call):  # func call with no return value assignment
-
-				if s.name in self.builtin_fn:
-					# a builtin function,
-					# take care of complex arguments (SDS-C bug workaround)
-
-					(_init, _tmps, args) = self._prepare_builtin_func_args(fn, s.args)
+				if transformer is not None:
+					(_init, _tmps) = transformer(fn, s)
 					append(out, _init)
-					append(tmps, _tmps)
+					self._fn_release_tmps(fn, _tmps)
 
-					c = S_Call()
-					c.name = s.name
-					c.args = args
-
-					append(out, c)
-
-					self._fn_release_tmps(fn, tmps)
-
-				else:
-					# call to user func
-					append(out, self._call_user_func(fn, s.name, s.args))
-
-			elif isinstance(s, S_Return):
-				(_init, _tmps, rval) = self._process_expr(fn, s.value)
-				append(out, _init)
-				append(tmps, _tmps)
-				append(out, self._mk_assign('__retval', rval))
-				append(out, self._mk_goto(self.fn_pool.get_end(fn.name)))
-
-			# TODO: Handle other statements
-
-			else:
+			except KeyError:
 				print('WARN: Unhandled statement %s (type %s)' % (s, type(s)))
-				out.append(s)
-
-
+				append(out, s)
 
 		return out
+
+
+	def _transform_var(self, fn, s):
+		out = []
+		tmps = []
+
+		repl = self.tmp_pool.acquire()
+		fn.meta.local_tmp_dict[s.var.name] = repl
+
+		value = s.value
+
+		if value is None:
+			value = 0
+		else:
+			(init, tmps, value) = self._process_expr(fn, s.value)
+			append(out, init)
+
+		append(out, self._mk_assign(repl, value))
+
+		return (out, tmps)
+
+
+	def _transform_assign(self, fn, s):
+		out = []
+		tmps = []
+
+		(_init, _tmps, value) = self._process_expr(fn, s.value)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		if not isinstance(s.var, E_Variable):
+			raise Exception('Cannot assign to %s (type %s)' % (args[0], type(args[0])))
+
+		(_init, _tmps, var) = self._process_expr(fn, s.var)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		append(out, self._mk_assign(name=var, value=value, op=s.op))
+
+		return (out, tmps)
+
+
+	def _transform_call(self, fn, s):
+		out = []
+		tmps = []
+
+		if s.name in self.builtin_fn:
+			# a builtin function,
+			# take care of complex arguments (SDS-C bug workaround)
+
+			(_init, _tmps, args) = self._prepare_builtin_func_args(fn, s.args)
+			append(out, _init)
+			append(tmps, _tmps)
+
+			c = S_Call()
+			c.name = s.name
+			c.args = args
+
+			append(out, c)
+
+		else:
+			# call to user func
+			append(out, self._call_user_func(fn, s.name, s.args))
+
+		return (out, tmps)
+
+
+	def _transform_return(self, fn, s):
+		out = []
+		tmps = []
+
+		(_init, _tmps, rval) = self._process_expr(fn, s.value)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		append(out, self._mk_assign('__retval', rval))
+		append(out, self._mk_goto(self.fn_pool.get_end(fn.name)))
+
+		return (out, tmps)
+
+
+	def _transform_if(self, fn, s):
+		out = []
+		tmps = []
+
+		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		label_then = self.label_pool.acquire('if_then')
+		label_else = self.label_pool.acquire('if_else')
+		label_end = self.label_pool.acquire('if_end')
+
+		ss = S_If()
+		ss.cond = cond
+		ss.then_st = self._mk_goto(label_then)
+
+		if not isinstance(s.else_st, S_Empty):
+			ss.else_st = self._mk_goto(label_else)
+
+		append(out, ss)
+		append(out, self._mk_label(label_then))
+		append(out, self._process_block(fn, s.then_st))
+
+		if not isinstance(s.else_st, S_Empty):
+			append(out, self._mk_goto(label_end))
+			append(out, self._mk_label(label_else))
+			append(out, self._process_block(fn, s.else_st))
+
+		append(out, self._mk_label(label_end))
+
+		return (out, tmps)
 
 
 	def _fn_release_tmps(self, fn, tmps):
@@ -823,14 +893,21 @@ at https://github.com/MightyPork/sdscp
 			if e.index is None:
 				expr = E_Variable(name)
 
-			elif isinstance(e.index, E_Literal):
+			elif isinstance(e.index, E_Literal):  #
 				expr = E_Variable(name, e.index)
+
+			elif isinstance(e.index, E_Variable) and (e.index.index is None):  # simple var
+
+				(_init, _tmps, _e) = self._process_expr(fn, e.index)
+				append(init, _init)
+				append(tmps, _tmps)
+
+				expr = E_Variable(name, _e)
 
 			else:
 				tmp = self.tmp_pool.acquire()
 
 				(_init, _tmps, _e) = self._process_expr(fn, e.index)
-
 				append(init, _init)
 				append(tmps, _tmps)
 				append(tmps, tmp)
@@ -857,7 +934,7 @@ at https://github.com/MightyPork/sdscp
 
 				expr = E_Variable(tmp)
 
-		elif isinstance(e, E_Literal):
+		elif isinstance(e, E_Literal) or isinstance(e, E_Operator):
 			expr = e
 
 		else:
@@ -1087,12 +1164,6 @@ at https://github.com/MightyPork/sdscp
 		return out
 
 
-		# return synth("""
-		# 	__sp -= 1;
-		# 	ram[__sp] = %s;
-		# """ % name)
-
-
 	def _mk_pop(self, name):
 
 		out = []
@@ -1105,11 +1176,6 @@ at https://github.com/MightyPork/sdscp
 		append(out, self._mk_assign(name, E_Variable('ram', E_Variable('__sp'))))
 		append(out, self._mk_assign('__sp', 1, op='+='))
 		return out
-
-		# return synth("""
-		# 	%s = ram[__sp];
-		# 	__sp += 1;
-		# """ % name)
 
 
 	def _mk_error(self, message):
