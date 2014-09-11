@@ -282,11 +282,15 @@ class BasicRenderer(Renderer):
 			src += ' '
 		else:
 			# small THEN
-			src += '\n'
+			indent = not isinstance(s.else_st, S_Empty)
+
+			if indent:
+				src += '\n'
+
 			src += self._render_any(
 				s.then_st,
 				level=1,  # indent the statement
-				indent_first=True,
+				indent_first=indent,
 				append_newline=False)
 
 
@@ -454,7 +458,7 @@ class BasicRenderer(Renderer):
 		if isinstance(e, E_Call):
 			return self._render_expr_call(e)
 
-		raise Exception('Cannot render expr token %s' % str(e))
+		raise Exception('Cannot render expr token %s (type %s)' % (e, type(e)))
 
 
 	def _render_expr_literal(self, e):  # E_Literal

@@ -409,7 +409,8 @@ class M_Grande(Mutator):
 			'text',
 		]
 
-
+		self.stack_start = 200
+		self.stack_end = 511
 
 	def _transform(self, code):
 
@@ -429,7 +430,7 @@ class M_Grande(Mutator):
 
 		# register helper vars
 		self._add_global_var('__retval')  # return value
-		self._add_global_var('__sp', 512)  # stack pointer at RAMEND (grows towards lower addrs)
+		self._add_global_var('__sp', self.stack_end + 1)  # stack pointer at RAMEND (grows towards lower addrs)
 		self._add_global_var('__addr')  # jump address pointer
 
 		# iterate through top level statements
@@ -496,7 +497,8 @@ class M_Grande(Mutator):
 		sts = []
 
 		# goto reset (skip trampolines)
-		append(sts, self._mk_goto('__reset'))
+		append(sts, S_Comment('Jump to init vector'))
+		append(sts, self._mk_goto('__init'))
 
 
 		# trampoline
@@ -509,11 +511,38 @@ class M_Grande(Mutator):
 			""" % (i, n)))
 
 		append(sts, S_Comment('Fall-through for invalid address'))
-		append(sts, self._mk_error('Bad address!'))
+		append(sts, self._mk_goto('__err_bad_addr'))
+
+
+		append(sts, S_Comment('### Error handlers ###'))
+		# stack overflow
+		append(sts, self._mk_label('__err_so'))
+		append(sts, self._mk_error('[ERROR] Stack overflow!'))
+		# stack underflow
+		append(sts, self._mk_label('__err_su'))
+		append(sts, self._mk_error('[ERROR] Stack underflow!'))
+		# bad address
+		append(sts, self._mk_label('__err_bad_addr'))
+		append(sts, self._mk_error('[ERROR] Bad address!'))
+
+		# shutdown trap
+		append(sts, S_Comment('### Shutdown trap ###'))
+		append(sts, synth("""
+			label __halt:
+			echo("[INFO] Program halted.");
+			label __halt_loop:
+			wait(1000);
+			goto __halt_loop;
+		"""))
 
 		# reset label
 		append(sts, S_Comment('### FUNC: init() ###'))
+
+		append(sts, self._mk_goto('__init'))
 		append(sts, self._mk_label('__reset'))
+		append(sts, self._mk_echo('[INFO] Program reset.'))
+		append(sts, self._mk_label('__init'))
+		append(sts, self._mk_echo('[INFO] Initialization...'))
 
 		# assign global vars default values
 		append(sts, self.globals_assign)
@@ -524,6 +553,7 @@ class M_Grande(Mutator):
 
 		# infinite main loop
 		append(sts, S_Comment('### FUNC: main() ###'))
+		append(sts, self._mk_echo('[INFO] Main loop started.'))
 		append(sts, self._mk_label('__main_loop'))
 		if main_userfn is not None:
 			sts += main_userfn_processed
@@ -650,21 +680,29 @@ class M_Grande(Mutator):
 				append(out, _init)
 				append(tmps, _tmps)
 
-				index = s.var.index
+				if not isinstance(s.var, E_Variable):
+					raise Exception('Cannot assign to %s (type %s)' % (args[0], type(args[0])))
 
-				if index is not None:
-					# assign to array
-					ind = self.tmp_pool.acquire()
-					tmps.append(ind)
+				(_init, _tmps, var) = self._process_expr(fn, s.var)
+				append(out, _init)
+				append(tmps, _tmps)
 
-					(_init, _tmps, ind_val) = self._process_expr(fn, index)
-					append(out, _init)
-					append(tmps, _tmps)
-					append(out, self._mk_assign(ind, ind_val))
 
-					index = E_Variable(ind)
+				# index = s.var.index
 
-				append(out, self._mk_assign(name=s.var.name, value=value, op=s.op, index=index))
+				# if index is not None:
+				# 	# assign to array
+				# 	ind = self.tmp_pool.acquire()
+				# 	tmps.append(ind)
+
+				# 	(_init, _tmps, ind_val) = self._process_expr(fn, index)
+				# 	append(out, _init)
+				# 	append(tmps, _tmps)
+				# 	append(out, self._mk_assign(ind, ind_val))
+
+				# 	index = E_Variable(ind)
+
+				append(out, self._mk_assign(name=var, value=value, op=s.op))
 
 				self._fn_release_tmps(fn, tmps)
 
@@ -742,6 +780,7 @@ class M_Grande(Mutator):
 
 		elif isinstance(e, E_Variable):
 
+			# translate name to tmp name
 			if fn is None:
 				name = e.name
 			else:
@@ -812,36 +851,64 @@ class M_Grande(Mutator):
 		out = []
 		tmps = []
 
-		self.arg_pool.rewind()
+		# magic functions
+		if name == 'reset':
+			return self._mk_goto('__reset')
 
-		arg_assignments = []
+		elif name == 'end':
+			return self._mk_goto('__halt')
 
-		for a in args:
+		elif name == 'push':
 
-			arg_name = self.arg_pool.acquire()
-
-			(_init, _tmps, a_val) = self._process_expr(fn, a)
+			(_init, _tmps, a_val) = self._process_expr(fn, args[0])
 			append(out, _init)
 			append(tmps, _tmps)
 
-			append(arg_assignments, self._mk_assign(arg_name, a_val))
+			append(out, self._mk_push(a_val))
 
-		append(out, arg_assignments)
+		elif name == 'pop':
 
-		# get return label index
-		return_idx = self.fn_pool.register_call()
+			if not isinstance(args[0], E_Variable):
+				raise Exception('Cannot pop to %s (type %s)' % (args[0], type(args[0])))
 
-		# callee address
-		addr = self.fn_pool.get_addr(name)
-		append(out, self._mk_assign('__addr', addr))
-		append(out, self._mk_push(return_idx))
-		append(out, self._mk_goto('__trampoline'))
+			(_init, _tmps, a) = self._process_expr(fn, args[0])
+			append(out, _init)
+			append(tmps, _tmps)
 
-		# return label
-		lbl = self.fn_pool.get_call_label(return_idx)
-		append(out, self._mk_label(lbl))
+			append(out, self._mk_pop(a))
 
-		self._fn_release_tmps(fn, tmps)
+		else:
+			# regular user function call
+			self.arg_pool.rewind()
+
+			arg_assignments = []
+
+			for a in args:
+
+				arg_name = self.arg_pool.acquire()
+
+				(_init, _tmps, a_val) = self._process_expr(fn, a)
+				append(out, _init)
+				append(tmps, _tmps)
+
+				append(arg_assignments, self._mk_assign(arg_name, a_val))
+
+			append(out, arg_assignments)
+
+			# get return label index
+			return_idx = self.fn_pool.register_call()
+
+			# callee address
+			addr = self.fn_pool.get_addr(name)
+			append(out, self._mk_assign('__addr', addr))
+			append(out, self._mk_push(return_idx))
+			append(out, self._mk_goto('__trampoline'))
+
+			# return label
+			lbl = self.fn_pool.get_call_label(return_idx)
+			append(out, self._mk_label(lbl))
+
+			self._fn_release_tmps(fn, tmps)
 
 		return out
 
@@ -941,7 +1008,14 @@ class M_Grande(Mutator):
 
 	def _mk_assign(self, name, value, op='=', index=None):
 		s = S_Assign()
-		s.var = E_Variable(name, index)
+
+		if type(index) == str:
+			index = E_Variable(index)
+
+		if isinstance(name, E_Variable):
+			s.var = name
+		else:
+			s.var = E_Variable(name, index)
 
 		if type(value) == int:
 			value = E_Literal(T_Number(str(value)))
@@ -965,20 +1039,41 @@ class M_Grande(Mutator):
 		return s
 
 
-	def _mk_push(self, name):
+	def _mk_push(self, what):
 
-		return synth("""
-			__sp -= 1;
-			ram[__sp] = %s;
-		""" % name)
+		out = []
+		append(out, self._mk_assign('__sp', 1, op='-='))
+
+		append(out, synth("""
+			if(__sp < %d) goto __err_so;
+		""" % self.stack_start))
+
+		append(out, self._mk_assign('ram', what, index='__sp'))
+		return out
+
+
+		# return synth("""
+		# 	__sp -= 1;
+		# 	ram[__sp] = %s;
+		# """ % name)
 
 
 	def _mk_pop(self, name):
 
-		return synth("""
-			%s = ram[__sp];
-			__sp += 1;
-		""" % name)
+		out = []
+
+		append(out, synth("""
+			if(__sp > %d) goto __err_su;
+		""" % self.stack_end))
+
+		append(out, self._mk_assign(name, E_Variable('ram', E_Variable('__sp'))))
+		append(out, self._mk_assign('__sp', 1, op='+='))
+		return out
+
+		# return synth("""
+		# 	%s = ram[__sp];
+		# 	__sp += 1;
+		# """ % name)
 
 
 	def _mk_error(self, message):
@@ -986,4 +1081,11 @@ class M_Grande(Mutator):
 		return synth("""
 			echo("%s");
 			goto __reset;
+		""" % message)
+
+
+	def _mk_echo(self, message):
+
+		return synth("""
+			echo("%s");
 		""" % message)
