@@ -236,7 +236,7 @@ class LabelPool:
 		if prefix in self.counters:
 			self.counters[prefix] += 1
 		else:
-			self.counters[prefix] = 0
+			self.counters[prefix] = 1
 
 		name = '__%s_%d' % (prefix, self.counters[prefix])
 		self.register(name)
@@ -263,14 +263,14 @@ class FnRegistry:
 	""" Registry of function labels and translations """
 
 	def __init__(self, label_pool):
-		self.counter = 0
+		self.counter = 1
 		self.name2index = {}
 
 		self.index2label = {}
 
 		self.label_pool = label_pool
 
-		self.call_counter = 0
+		self.call_counter = 1
 
 
 	def register(self, name):
@@ -551,11 +551,11 @@ at https://github.com/MightyPork/sdscp
 
 		# infinite main loop
 		append(sts, S_Comment('### FUNC: main() ###'))
-		append(sts, self._mk_echo('[INFO] Main loop started.'))
-		append(sts, self._mk_label('__main_loop'))
+		append(sts, self._mk_echo('[INFO] main() started.'))
 		if main_userfn is not None:
 			sts += main_userfn_processed
-		append(sts, self._mk_goto('__main_loop'))
+
+		append(sts, self._mk_goto('__halt'))
 
 
 		# other user functions
@@ -718,7 +718,11 @@ at https://github.com/MightyPork/sdscp
 				S_Assign:	self._transform_assign,
 				S_Call:		self._transform_call,
 				S_Return:	self._transform_return,
-				S_If:		self._transform_if
+				S_If:		self._transform_if,
+				S_While:	self._transform_while,
+				S_DoWhile:	self._transform_dowhile,
+				S_For:		self._transform_for
+				# TODO for, switch, break, continue, label, goto
 			}
 
 		out = []
@@ -822,31 +826,173 @@ at https://github.com/MightyPork/sdscp
 		out = []
 		tmps = []
 
+		append(out, S_Comment('IF begin'))
+
 		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
 		append(out, _init)
 		append(tmps, _tmps)
 
-		label_then = self.label_pool.acquire('if_then')
-		label_else = self.label_pool.acquire('if_else')
-		label_end = self.label_pool.acquire('if_end')
+		l_then = self.label_pool.acquire('if_then')
+		l_else = self.label_pool.acquire('if_else')
+		l_endif = self.label_pool.acquire('if_end')
 
 		ss = S_If()
 		ss.cond = cond
-		ss.then_st = self._mk_goto(label_then)
+		ss.then_st = self._mk_goto(l_then)
 
 		if not isinstance(s.else_st, S_Empty):
-			ss.else_st = self._mk_goto(label_else)
+			ss.else_st = self._mk_goto(l_else)
 
 		append(out, ss)
-		append(out, self._mk_label(label_then))
+		append(out, self._mk_label(l_then))
 		append(out, self._process_block(fn, s.then_st))
 
 		if not isinstance(s.else_st, S_Empty):
-			append(out, self._mk_goto(label_end))
-			append(out, self._mk_label(label_else))
+			append(out, self._mk_goto(l_endif))
+			append(out, self._mk_label(l_else))
 			append(out, self._process_block(fn, s.else_st))
 
-		append(out, self._mk_label(label_end))
+		append(out, self._mk_label(l_endif))
+
+		append(out, S_Comment('IF end'))
+
+		return (out, tmps)
+
+
+	def _transform_while(self, fn, s):
+		out = []
+		tmps = []
+
+		append(out, S_Comment('WHILE begin'))
+
+		l_continue = self.label_pool.acquire('while_continue')
+		l_body = self.label_pool.acquire('while_body')
+		l_break = self.label_pool.acquire('while_break')
+
+		# add meta to the loop
+		s.meta = Obj()
+		s.meta.l_continue = l_continue
+		s.meta.l_body = l_body
+		s.meta.l_break = l_break
+
+		# continue label
+		append(out, self._mk_label(l_continue))
+
+		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		# condition
+		ss = S_If()
+		ss.cond = cond
+		ss.then_st = self._mk_goto(l_body)
+		ss.else_st = self._mk_goto(l_break)
+		append(out, ss)
+
+		# body
+		append(out, self._mk_label(l_body))
+
+		append(out, self._process_block(fn, s.body_st))
+
+		# end of body
+		append(out, self._mk_goto(l_continue))
+		append(out, self._mk_label(l_break))
+
+		append(out, S_Comment('WHILE end'))
+
+		return (out, tmps)
+
+
+	def _transform_dowhile(self, fn, s):
+		out = []
+		tmps = []
+
+		append(out, S_Comment('DO_WHILE begin'))
+
+		l_continue = self.label_pool.acquire('dowhile_continue')
+		l_body = self.label_pool.acquire('dowhile_body')
+		l_break = self.label_pool.acquire('dowhile_break')
+
+		# add meta to the loop
+		s.meta = Obj()
+		s.meta.l_continue = l_continue
+		s.meta.l_body = l_body
+		s.meta.l_break = l_break
+
+		# body
+		append(out, self._mk_label(l_body))
+
+		append(out, self._process_block(fn, s.body_st))
+
+		# continue label
+		append(out, self._mk_label(l_continue))
+
+		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		# condition
+		ss = S_If()
+		ss.cond = cond
+		ss.then_st = self._mk_goto(l_body)
+		ss.else_st = self._mk_goto(l_break)
+		append(out, ss)
+
+		# end of body
+		append(out, self._mk_label(l_break))
+
+		append(out, S_Comment('DO_WHILE end'))
+
+		return (out, tmps)
+
+
+	def _transform_for(self, fn, s):
+		out = []
+		tmps = []
+
+		append(out, S_Comment('FOR begin'))
+
+		l_continue = self.label_pool.acquire('for_continue')
+		l_cond = self.label_pool.acquire('for_condition')
+		l_body = self.label_pool.acquire('for_body')
+		l_break = self.label_pool.acquire('for_break')
+
+		# add meta to the loop
+		s.meta = Obj()
+		s.meta.l_continue = l_continue
+		s.meta.l_body = l_body
+		s.meta.l_break = l_break
+		s.meta.l_cond = l_cond
+
+		# the init
+		append(out, self._process_block(fn, s.init))
+
+		# condition check
+		append(out, self._mk_label(l_cond))
+
+		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		ss = S_If()
+		ss.cond = cond
+		ss.then_st = self._mk_goto(l_body)
+		ss.else_st = self._mk_goto(l_break)
+		append(out, ss)
+
+		# body
+		append(out, self._mk_label(l_body))
+
+		append(out, self._process_block(fn, s.body_st))
+
+		# continue (iter)
+		append(out, self._mk_label(l_continue))
+		append(out, self._process_block(fn, s.iter))
+		append(out, self._mk_goto(l_cond))
+
+		# break
+		append(out, self._mk_label(l_break))
+		append(out, S_Comment('FOR end'))
 
 		return (out, tmps)
 
