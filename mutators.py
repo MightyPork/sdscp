@@ -568,9 +568,13 @@ class M_Grande(Mutator):
 			fn.meta.local_tmp_dict[n] = tmp
 			fn.meta.arg_tmps.append(tmp)
 
-			append(body, synth("""
-				%s = %s;
-			""" % (tmp, arg)))
+			append(body, self._mk_assign(tmp, arg))
+
+			# append(body, synth("""
+			# 	%s = %s;
+			# """ % (tmp, arg)))
+
+		append(body, self._mk_assign('__retval', 0))
 
 		append(body, S_Comment('Function body'))
 		append(body, self._process_block(fn, fn.body_st.children))
@@ -638,11 +642,12 @@ class M_Grande(Mutator):
 					append(out, init)
 
 				append(out, self._mk_assign(repl, value))
+				self._fn_release_tmps(fn, tmps)
 
 			elif isinstance(s, S_Assign):
 
-				(init, _tmps, value) = self._process_expr(fn, s.value)
-				append(out, init)
+				(_init, _tmps, value) = self._process_expr(fn, s.value)
+				append(out, _init)
 				append(tmps, _tmps)
 
 				index = s.var.index
@@ -652,8 +657,8 @@ class M_Grande(Mutator):
 					ind = self.tmp_pool.acquire()
 					tmps.append(ind)
 
-					(init, _tmps, ind_val) = self._process_expr(fn, index)
-					append(out, init)
+					(_init, _tmps, ind_val) = self._process_expr(fn, index)
+					append(out, _init)
 					append(tmps, _tmps)
 					append(out, self._mk_assign(ind, ind_val))
 
@@ -661,27 +666,18 @@ class M_Grande(Mutator):
 
 				append(out, self._mk_assign(name=s.var.name, value=value, op=s.op, index=index))
 
+				self._fn_release_tmps(fn, tmps)
+
 			elif isinstance(s, S_Call):  # func call with no return value assignment
 
 				if s.name in self.builtin_fn:
 					# a builtin function,
 					# take care of complex arguments (SDS-C bug workaround)
 
-					args = []
-					for a in s.args:
-						(init, _tmps, a_val) = self._process_expr(fn, a)
-						append(out, init)
-						append(tmps, _tmps)
 
-						if isinstance(a_val, E_Group):
-							# must use helper tmp
-							tmp = self.tmp_pool.acquire()
-							append(tmps, tmp)
-							append(out, self._mk_assign(tmp, a_val))
-
-							a_val = E_Variable(tmp)
-
-						args.append(a_val)
+					(_init, _tmps, args) = self._prepare_builtin_func_args(fn, s.args)
+					append(out, _init)
+					append(tmps, _tmps)
 
 					c = S_Call()
 					c.name = s.name
@@ -689,44 +685,23 @@ class M_Grande(Mutator):
 
 					append(out, c)
 
+					self._fn_release_tmps(fn, tmps)
+
 				else:
 					# call to user func
 
-					self.arg_pool.rewind()
+					append(out, self._call_user_func(fn, s.name, s.args))
 
-					arg_assignments = []
-
-					for a in s.args:
-
-						arg_name = self.arg_pool.acquire()
-
-						(init, _tmps, a_val) = self._process_expr(fn, a)
-						append(out, init)
-						append(tmps, _tmps)
-
-						append(arg_assignments, self._mk_assign(arg_name, a_val))
-
-					append(out, arg_assignments)
-
-					# get return label index
-					return_idx = self.fn_pool.register_call()
-
-					# callee address
-					addr = self.fn_pool.get_addr(s.name)
-					append(out, self._mk_assign('__addr', addr))
-					append(out, self._mk_push(return_idx))
-					append(out, self._mk_goto('__trampoline'))
-
-					# return label
-					lbl = self.fn_pool.get_call_label(return_idx)
-					append(out, self._mk_label(lbl))
+			elif isinstance(s, S_Return):
+				(_init, _tmps, rval) = self._process_expr(fn, s.value)
+				append(out, _init)
+				append(tmps, _tmps)
+				append(out, self._mk_assign('__retval', rval))
+				append(out, self._mk_goto(self.fn_pool.get_end(fn.name)))
 
 			else:
+				print('WARN: Unhandled statement %s (type %s)' % (s, type(s)))
 				out.append(s)
-
-			for t in tmps:
-				fn.meta.changed_tmps.append(t)
-				self.tmp_pool.release(t)
 
 		# TODO: Handle other statements
 
@@ -734,9 +709,24 @@ class M_Grande(Mutator):
 		return out
 
 
+	def _fn_release_tmps(self, fn, tmps):
+		""" Release tmps used in a function & mark them as dirty in the function """
+
+		for t in tmps:
+			fn.meta.changed_tmps.append(t)
+			self.tmp_pool.release(t)
+
+
 	def _process_expr(self, fn, e):
+
+		if type(e) == int:
+			e = E_Literal(T_Number(str(e)))
+		elif type(e) == str:
+			e = E_Variable(e)
+
 		init = []
 		tmps = []
+		expr = e
 
 		if isinstance(e, E_Group):
 			new_children = []
@@ -748,9 +738,9 @@ class M_Grande(Mutator):
 				append(tmps, _tmps)
 				append(new_children, _e)
 
-			return (init, tmps, E_Group(new_children))
+			expr = E_Group(new_children)
 
-		if isinstance(e, E_Variable):
+		elif isinstance(e, E_Variable):
 
 			if fn is None:
 				name = e.name
@@ -758,10 +748,10 @@ class M_Grande(Mutator):
 				name = fn.meta.local_tmp_dict.get(e.name, e.name)
 
 			if e.index is None:
-				return (init, tmps, E_Variable(name))
+				expr = E_Variable(name)
 
 			elif isinstance(e.index, E_Literal):
-				return (init, tmps, E_Variable(name, e.index))
+				expr = E_Variable(name, e.index)
 
 			else:
 				tmp = self.tmp_pool.acquire()
@@ -775,11 +765,122 @@ class M_Grande(Mutator):
 				s = self._mk_assign(tmp, _e)
 				init.append(s)
 
-				return (init, tmps, E_Variable(name, E_Variable(tmp)))
+				expr = E_Variable(name, E_Variable(tmp))
 
-		# TODO: handle call & return value, handle function arguments etc.
+		elif isinstance(e, E_Call):
+			if e.name in self.builtin_fn:
+				# a builtin func
+				(_init, _tmps, args) = self._prepare_builtin_func_args(fn, e.args)
+				append(init, _init)
+				append(tmps, _tmps)
 
-		return (init, tmps, e)
+				expr = E_Call(e.name, args)
+			else:
+				# user func
+				append(init, self._call_user_func(fn, e.name, e.args))
+
+				tmp = self.tmp_pool.acquire()
+				append(init, self._mk_assign(tmp, '__retval'))
+
+				expr = E_Variable(tmp)
+
+		elif isinstance(e, E_Literal):
+			expr = e
+
+		else:
+			print('WARN: Unhandled expression %s (type %s)' % (e, type(e)))
+
+		# TODO: handle other stuff?
+
+		return (init, tmps, expr)
+
+
+	def _call_user_func(self, fn, name, args):
+		""" Generate statements for calling a user function.
+		__retval may contain the return value, if any.
+
+		Args:
+			fn (S_Function): Function wrapping the call
+			name (str): Name of the called function
+			args (Expression[]): array of original arguments
+
+		Returns:
+			list of statements
+
+		"""
+
+		out = []
+		tmps = []
+
+		self.arg_pool.rewind()
+
+		arg_assignments = []
+
+		for a in args:
+
+			arg_name = self.arg_pool.acquire()
+
+			(_init, _tmps, a_val) = self._process_expr(fn, a)
+			append(out, _init)
+			append(tmps, _tmps)
+
+			append(arg_assignments, self._mk_assign(arg_name, a_val))
+
+		append(out, arg_assignments)
+
+		# get return label index
+		return_idx = self.fn_pool.register_call()
+
+		# callee address
+		addr = self.fn_pool.get_addr(name)
+		append(out, self._mk_assign('__addr', addr))
+		append(out, self._mk_push(return_idx))
+		append(out, self._mk_goto('__trampoline'))
+
+		# return label
+		lbl = self.fn_pool.get_call_label(return_idx)
+		append(out, self._mk_label(lbl))
+
+		self._fn_release_tmps(fn, tmps)
+
+		return out
+
+
+	def _prepare_builtin_func_args(self, fn, orig_args):
+		"""
+		Prepare arguments for a builtin function call
+
+		Args:
+			fn (S_Function): wrapping function - decorated
+			orig_args (Expression[]): original arguments
+
+		Returns:
+			(_init, _tmps, args)
+			_init ... statements used to init the arguments (tmp code)
+			_tmps ... list of used tmp variables
+			args ... output arguments
+
+		"""
+
+		args = []
+		out = []
+		tmps = []
+		for a in orig_args:
+			(_init, _tmps, a_val) = self._process_expr(fn, a)
+			append(out, _init)
+			append(tmps, _tmps)
+
+			if isinstance(a_val, E_Group):
+				# must use helper tmp
+				tmp = self.tmp_pool.acquire()
+				append(tmps, tmp)
+				append(out, self._mk_assign(tmp, a_val))
+
+				a_val = E_Variable(tmp)
+
+			args.append(a_val)
+
+		return (out, tmps, args)
 
 
 	def _add_global_var(self, name, value=None):
@@ -800,7 +901,12 @@ class M_Grande(Mutator):
 
 
 	def _decorate_fn(self, fn):
-		""" Add meta fields to a function statement """
+		""" Add meta fields to a function statement
+
+		Args:
+			fn (S_Function): the function
+
+		"""
 
 		fn.bind_parent(None)
 
