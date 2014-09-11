@@ -1,5 +1,6 @@
-#ifndef SYS_C_INCLUDED
-#define SYS_C_INCLUDED
+#pragma once
+
+#pragma renderer sds2
 
 // Verze 2, pro SDSCP 1.0+
 
@@ -198,6 +199,3 @@ wait_for_http_get()
 // jak dlouho od posledniho impulzu (ms)
 #define SYS_S0_WIDTH_ACTUAL[n]  sys[624 + (n)]
 #define S0_WIDTH_ACTUAL[n] SYS_S0_WIDTH_ACTUAL[n]
-
-// end of include guard
-#endif

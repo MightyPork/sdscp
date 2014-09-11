@@ -153,6 +153,12 @@ try:
 				print('  ' + str(m))
 		print()
 
+		banner('PRAGMAS', '-')
+		print('List of all #pragma config key-value pairs\n')
+		for (k, v) in dproc.get_pragmas().items():
+			print('%s = %s' % (k, v))
+
+		print()
 
 
 	if SHOW_RESOLVED:
@@ -162,6 +168,8 @@ try:
 
 
 	# -------------------- Apply macros --------------------
+
+	pragmas = dproc.get_pragmas()
 
 	# perform macro replacements
 	dproc.apply_macros()
@@ -209,7 +217,18 @@ try:
 	if DEST != None or SHOW_OUTPUT:
 
 		# perform tweaks to match some of SDS-C's broken syntax
-		rndr = SdsRenderer2(sts)
+
+		rtype = pragmas.get('renderer', 'sds')
+
+		if rtype == 'sds':
+			rndr = SdsRenderer(sts)
+		elif rtype == 'sds2':
+			rndr = SdsRenderer2(sts)
+		elif rtype == 'basic':
+			rndr = BasicRenderer(sts)
+
+		rndr.set_pragmas(pragmas)
+
 		for_sds = rndr.render()
 
 		if SHOW_OUTPUT:

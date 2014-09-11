@@ -206,6 +206,36 @@ class MacroReader(CodeReader):
 		return buffer
 
 
+	def consume_pragma_directive(self):
+		""" consume a #pragma directive
+
+		Returns:
+			The #pragma directive.
+
+		"""
+
+		buffer = self._consume_directive_name('pragma')
+
+		buffer += ' '
+		self.consume_inline_whitespace()
+
+		buffer += self.consume_identifier()
+
+		buffer += ' '
+		self.consume_inline_whitespace()
+
+		if self.has_identifier():
+			buffer += self.consume_identifier()
+		elif self.has_number():
+			buffer += self.consume_number()
+		elif self.has_string():
+			buffer += self.consume_string()
+
+		self.sweep()
+
+		return buffer.strip()
+
+
 	def consume_ifdef_directive(self):
 		""" consume #ifdef
 
@@ -325,6 +355,15 @@ class MacroReader(CodeReader):
 			return False
 
 		return self.starts('#include')
+
+
+	def has_pragma_directive(self):
+		""" Check if next token is #pragma """
+
+		if self.has_end():
+			return False
+
+		return self.starts('#pragma')
 
 
 	def has_define_directive(self):
@@ -887,6 +926,62 @@ class D_Ifndef(Token):
 
 
 
+class D_Pragma(Token):
+	""" #pragma directive
+
+	Args:
+		value (str): The directive code
+
+	Attributes:
+		name (str): Name of the option
+		value (mixed): Value for the option
+
+	"""
+
+	def __init__(self, value):
+		super().__init__(value)
+
+		rd = CodeReader(value)
+		rd.consume_exact('#pragma')
+		rd.consume_inline_whitespace()
+		self.name = rd.consume_identifier()
+		rd.consume_inline_whitespace()
+
+		if rd.has_identifier():
+			self.value = rd.consume_identifier()  # identifier without quotes
+
+			if self.value.lower() == 'true':
+				self.value = True
+			elif self.value.lower() == 'false':
+				self.value = False
+
+		elif rd.has_number():
+
+			n = rd.consume_number()
+
+			try:
+				self.value = int(n, 10)
+			except ValueError:
+				try:
+					self.value = int(n, 16)
+				except ValueError:
+					try:
+						self.value = int(n, 2)
+					except ValueError:
+						rd.error('Could not parse number: %s' % n)
+
+		elif rd.has_string():
+			self.value = rd.consume_string()[1:-1]  # crop quotes
+
+		else:
+			self.value = True  # boolean directive (flag)
+
+
+	def __str__(self):
+		return '%s: %s = %s' % (type(self).__name__, self.name, self.value)
+
+
+
 def _load_file(filename):
 	""" Load a file to string
 
@@ -921,6 +1016,9 @@ class DirectiveProcessor:
 			It is a dict {"name" -> D_Define[]}, where the list
 			contains variants of the macro (overloading)
 
+		pragmas (dict):
+			Dict of pragma keys and values
+
 		keep_comments:
 			Config option, whether to keep comments in the source code.
 
@@ -933,6 +1031,9 @@ class DirectiveProcessor:
 		self.defines = OrderedDict()
 		self.keep_comments = True
 
+		self.pragmas = {}
+
+		self.files_once = []  # list of files included with pragma once
 
 
 	def add_defines(self, new_defines):
@@ -1072,6 +1173,28 @@ class DirectiveProcessor:
 
 				self.defines[d.name].append(d)
 
+			# #define - add a new macro
+			elif rd.has_pragma_directive():
+
+				s = rd.consume_pragma_directive()
+				d = D_Pragma(s)
+
+				if d.name == 'once':
+					self.files_once.append(self.main_file)
+				else:
+					if d.name in self.pragmas.keys():
+						if not self.pragmas[d.name] == d.value:
+							raise Exception(
+								'Cannot overwrite pragma "%s" (old "%s", new "%s")'
+								% (
+									d.name,
+									self.pragmas[d.name],
+									d.value
+								))
+
+					self.pragmas[d.name] = d.value
+
+
 			# #include - include external file
 			elif rd.has_include_directive():
 
@@ -1085,20 +1208,30 @@ class DirectiveProcessor:
 					else:
 						d.file = ff
 
+				if d.file in self.files_once:
+					print('skipping %s (#pragma once)' % d.file)
+					continue  # end this cycle
+
 				print('including %s' % d.file)
 
 				# create a nested macro processor
 				mp = DirectiveProcessor(d.file)
 
-				# inject current defines
-				mp.add_defines(self.defines)
+				mp.files_once = self.files_once
+				mp.pragmas = self.pragmas
+				mp.defines = self.defines  # reference
+
+				# # inject current defines
+				# mp.add_defines(self.defines)
 
 				# process the external file
 				mp.process()
+
 				out += mp.get_output()
 
-				# add back defines collected from the external file
-				self.add_defines( mp.get_defines() )
+				# # add back defines collected from the external file
+				# self.add_defines( mp.get_defines() )
+
 
 			# #ifdef
 			elif rd.has_ifdef_directive() or rd.has_ifndef_directive():
@@ -1335,3 +1468,9 @@ class DirectiveProcessor:
 			return self.apply_macros()
 		else:
 			return out
+
+
+	def get_pragmas(self):
+		""" Get dict of collected pragmas """
+
+		return self.pragmas

@@ -1,3 +1,5 @@
+#pragma renderer sds2
+
 #include "sys2.c"
 
 #define HEATING RELAY[1]

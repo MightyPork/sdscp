@@ -21,6 +21,10 @@ class Renderer:
 			The "program" argument is stored here
 		_prepared (Statement[]):
 			The source prepared for rendering
+		indent (str):
+			The used indent
+		pragmas (dict):
+			Pragmas to follow
 
 	"""
 
@@ -28,6 +32,27 @@ class Renderer:
 		self._source = program
 		self._prepared = None
 		self.indent = '    '
+		self.pragmas = {}
+
+
+	def set_pragmas(self, pragmas):
+		self.pragmas = pragmas
+
+		indent = self.pragmas.get('indent', '    ')
+
+		if indent == 'tabs' or indent == '\t':
+			self.indent = '\t'
+		elif indent == 'spaces':
+			self.indent = '    '
+		else:
+			self.indent = indent
+
+		self._on_pragmas_set()
+
+
+	def _on_pragmas_set(self):
+		""" Called after self.pragmas got assigned """
+		pass
 
 
 	def render(self):
@@ -608,9 +633,10 @@ class SdsRenderer(BasicSdsRenderer):
 	def __init__(self, program):
 		super().__init__(program)
 
-		self.mutators = []
-		self.mutators.append(M_AddBraces())
-		self.mutators.append(M_CollectVars())
+		self.mutators = [
+			M_AddBraces(),
+			M_CollectVars()
+		]
 
 
 	def _prepare(self, code):
@@ -636,11 +662,14 @@ class SdsRenderer2(BasicSdsRenderer):
 
 		self.mutators = []
 
-		gr = M_Grande()
-		#gr.do_check_stack_bounds = False
+		self.gr = M_Grande()
 
-		self.mutators.append(gr)
+		self.mutators.append(self.gr)
 		self.mutators.append(M_AddBraces())
+
+
+	def _on_pragmas_set(self):
+		self.gr.do_check_stack_bounds = self.pragmas.get('check_stack_bounds', True)
 
 
 	def _prepare(self, code):
