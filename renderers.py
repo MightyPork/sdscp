@@ -229,7 +229,7 @@ class BasicRenderer(Renderer):
 		if s.text.count('\n') == 0:
 			return '// %s' % s.text
 		else:
-			return '/* %s */' % s.text
+			return '/*\n%s\n*/' % s.text.rstrip('\n').lstrip('\n')
 
 
 	def _render_function(self, s):  # S_Function
@@ -632,7 +632,11 @@ class SdsRenderer2(BasicSdsRenderer):
 
 		self.mutators = []
 		self.mutators.append(M_AddBraces())
-		self.mutators.append(M_Grande())
+
+		gr = M_Grande()
+		#gr.do_check_stack_bounds = False
+
+		self.mutators.append(gr)
 
 
 	def _prepare(self, code):
