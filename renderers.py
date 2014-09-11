@@ -271,6 +271,10 @@ class BasicRenderer(Renderer):
 	def _render_if(self, s):  # S_If
 		src = 'if (%s) ' % self._render_expr(s.cond)
 
+		# normalize empty code block to empty statement
+		if type(s.else_st) is S_Block and len(s.else_st.children) == 0:
+			s.else_st = S_Empty()
+
 		small_then = True
 
 		if isinstance(s.then_st, S_Block):
@@ -631,12 +635,12 @@ class SdsRenderer2(BasicSdsRenderer):
 		super().__init__(program)
 
 		self.mutators = []
-		self.mutators.append(M_AddBraces())
 
 		gr = M_Grande()
 		#gr.do_check_stack_bounds = False
 
 		self.mutators.append(gr)
+		self.mutators.append(M_AddBraces())
 
 
 	def _prepare(self, code):

@@ -5,6 +5,7 @@ from tokens import Tokenizer
 from statements import *
 from expressions import *
 from utils import *
+import math
 
 def synth(source):
 	""" Parse source & convert to statements """
@@ -65,16 +66,21 @@ class M_AddBraces(Mutator):
 
 		if isinstance(s, S_If):
 
+			has_else = (not isinstance(s.else_st, S_Empty))
+
 			# wrap THEN
 			if isinstance(s.then_st, S_Block):
 				s.then_st = self._add_braces(s.then_st)
 			else:  # not a block
-				ss = S_Block(None)
-				ss.children = [self._add_braces(s.then_st)]
-				s.then_st = ss
+				if type(s.then_st) is S_Goto and not has_else:
+					pass
+				else:
+					ss = S_Block(None)
+					ss.children = [self._add_braces(s.then_st)]
+					s.then_st = ss
 
 			# wrap ELSE
-			if (not isinstance(s.else_st, S_Empty)):
+			if has_else:
 				if isinstance(s.else_st, S_Block):
 					s.else_st = self._add_braces(s.else_st)
 				else:
@@ -265,12 +271,15 @@ class FnRegistry:
 	def __init__(self, label_pool):
 		self.counter = 1
 		self.name2index = {}
+		self.index2name = {}
 
 		self.index2label = {}
 
 		self.label_pool = label_pool
 
 		self.call_counter = 1
+
+		self.function_labels = {}
 
 
 	def register(self, name):
@@ -282,10 +291,13 @@ class FnRegistry:
 		end = self.get_end(i)
 
 		self.name2index[name] = i
+		self.index2name[i] = name
 		self.index2label[i] = begin
 
 		self.label_pool.register(begin)
 		self.label_pool.register(end)
+
+		self.function_labels[i] = [begin, end]
 
 		self.counter += 1
 		return i
@@ -369,6 +381,15 @@ class FnRegistry:
 		return self.name2index[name]
 
 
+	def get_name(self, addr):
+		""" Get name from address """
+
+		if not addr in self.index2name.keys():
+			return None
+
+		return self.index2name[addr]
+
+
 
 class M_Grande(Mutator):
 	""" The master mutator for SDSCP extra features
@@ -442,12 +463,14 @@ at https://github.com/MightyPork/sdscp
 		self.globals_assign = []
 
 		functions = []
-		func_names = []
+		self.user_fn = []
 
 		self.tmp_pool = TmpVarPool()
 		self.arg_pool = ArgPool()
 		self.label_pool = LabelPool()
 		self.fn_pool = FnRegistry(self.label_pool)
+
+		self.functions_called = []
 
 		init_userfn = None
 		main_userfn = None
@@ -464,10 +487,10 @@ at https://github.com/MightyPork/sdscp
 
 			elif isinstance(s, S_Function):
 
-				if s.name in func_names:
+				if s.name in self.user_fn:
 					raise Exception('Duplicate function: %s()' % s.name)
 
-				func_names.append(s.name)
+				self.user_fn.append(s.name)
 
 				if s.name == 'main':
 					main_userfn = s
@@ -476,7 +499,7 @@ at https://github.com/MightyPork/sdscp
 					init_userfn = s
 
 				else:
-					func_names.append(s.name)
+					self.user_fn.append(s.name)
 					functions.append(s)
 					self.fn_pool.register(s.name)
 
@@ -494,9 +517,9 @@ at https://github.com/MightyPork/sdscp
 
 
 		# process user functions except main() & init()
-		functions_processed = []
+		functions_processed = {}
 		for fn in functions:
-			functions_processed.append(self._process_fn(fn))
+			functions_processed[fn.name] = self._process_fn(fn)
 
 
 		# Add used tmps to globals declare
@@ -534,7 +557,7 @@ at https://github.com/MightyPork/sdscp
 
 
 		# reset label
-		append(sts, S_Comment('### FUNC: init() ###'))
+		append(sts, self._banner('FUNC: init()'))
 
 		append(sts, self._mk_goto('__init'))
 		append(sts, self._mk_label('__reset'))
@@ -550,7 +573,7 @@ at https://github.com/MightyPork/sdscp
 			append(sts, init_userfn_processed)
 
 		# infinite main loop
-		append(sts, S_Comment('### FUNC: main() ###'))
+		append(sts, self._banner('FUNC: main()'))
 		append(sts, self._mk_echo('[INFO] main() started.'))
 		if main_userfn is not None:
 			sts += main_userfn_processed
@@ -558,9 +581,15 @@ at https://github.com/MightyPork/sdscp
 		append(sts, self._mk_goto('__halt'))
 
 
-		# other user functions
-		for fn in functions_processed:
-			append(sts, fn)  # func already contains header, return handler etc
+		# other user functions (already processed)
+		for (name, fn_sts) in functions_processed.items():
+			if not name in self.functions_called:
+				print('INFO: Unused function %s(), removing from code.' % name)
+			else:
+				append(sts, fn_sts)
+
+			# note: This optimization fails if dead function is called from
+			# another dead function or from itself.
 
 
 		# compose main function with all the code
@@ -578,10 +607,17 @@ at https://github.com/MightyPork/sdscp
 		""" Build redirection vector """
 
 		sts = []
-		append(sts, S_Comment('Redirection vector'))
+		append(sts, self._banner('Redirection vector'))
 		append(sts, self._mk_label('__trampoline'))
 
 		for (i, n) in self.fn_pool.get_trampoline_map().items():
+
+			name = self.fn_pool.get_name(i)
+
+			if (name is not None) and (not name in self.functions_called):
+				print('INFO: Removing unused func from trampoline: %s' % name)
+				continue
+
 			append(sts, synth("""
 				if (__addr == %d) goto %s;
 			""" % (i, n)))
@@ -596,7 +632,7 @@ at https://github.com/MightyPork/sdscp
 		""" Build error handlers """
 
 		sts = []
-		append(sts, S_Comment('### Error handlers ###'))
+		append(sts, self._banner('Error handlers'))
 		# stack overflow
 		append(sts, self._mk_label('__err_so'))
 		append(sts, self._mk_error('[ERROR] Stack overflow!'))
@@ -614,7 +650,7 @@ at https://github.com/MightyPork/sdscp
 		""" Build a shutdown trap """
 
 		sts = []
-		append(sts, S_Comment('### Shutdown trap ###'))
+		append(sts, self._banner('Shutdown trap'))
 		append(sts, synth("""
 			label __halt:
 			echo("[INFO] Program halted.");
@@ -639,20 +675,21 @@ at https://github.com/MightyPork/sdscp
 
 		self.arg_pool.rewind()
 
-		# assign arguments to tmps
-		append(body, S_Comment('Store args to tmp vars'))
-		for n in fn.args:
-			arg = self.arg_pool.acquire()
-			tmp = self.tmp_pool.acquire()
-			fn.meta.changed_tmps.append(tmp)
-			fn.meta.local_tmp_dict[n] = tmp
-			fn.meta.arg_tmps.append(tmp)
+		if len(fn.args) > 0:
+			# assign arguments to tmps
+			append(body, S_Comment('Store args to tmp vars'))
+			for n in fn.args:
+				arg = self.arg_pool.acquire()
+				tmp = self.tmp_pool.acquire()
+				fn.meta.changed_tmps.append(tmp)
+				fn.meta.local_tmp_dict[n] = tmp
+				fn.meta.arg_tmps.append(tmp)
 
-			append(body, self._mk_assign(tmp, arg))
+				append(body, self._mk_assign(tmp, arg))
 
-			# append(body, synth("""
-			# 	%s = %s;
-			# """ % (tmp, arg)))
+				# append(body, synth("""
+				# 	%s = %s;
+				# """ % (tmp, arg)))
 
 		append(body, self._mk_assign('__retval', 0))
 
@@ -662,18 +699,19 @@ at https://github.com/MightyPork/sdscp
 		out = []
 
 		# begin label
-		append(out, S_Comment('### FUNC %s(%s) ###' % (fn.name, ','.join(fn.args))))
+		append(out, self._banner('FUNC %s(%s)' % (fn.name, ','.join(fn.args))))
 
 		label = self._mk_label(self.fn_pool.get_begin(fn.name))
 		append(out, label)
 
 		# push all changed tmp vars
-		append(out, S_Comment('Push used tmp vars'))
+		if len(fn.meta.changed_tmps) > 0:
+			append(out, S_Comment('Push used tmp vars'))
 
-		fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))
+			fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))
 
-		for n in fn.meta.changed_tmps:
-			append(out, self._mk_push(n))
+			for n in fn.meta.changed_tmps:
+				append(out, self._mk_push(n))
 
 		append(out, body)
 
@@ -681,9 +719,10 @@ at https://github.com/MightyPork/sdscp
 		label = self._mk_label(self.fn_pool.get_end(fn.name))
 		append(out, label)
 
-		append(out, S_Comment('Pop used tmp vars'))
-		for n in reversed(fn.meta.changed_tmps):
-			append(out, self._mk_pop(n))
+		if len(fn.meta.changed_tmps) > 0:
+			append(out, S_Comment('Pop used tmp vars'))
+			for n in reversed(fn.meta.changed_tmps):
+				append(out, self._mk_pop(n))
 
 		append(out, S_Comment('Return to caller'))
 		append(out, self._mk_pop('__addr'))  # pop a return address
@@ -813,6 +852,7 @@ at https://github.com/MightyPork/sdscp
 		else:
 			# call to user func
 			append(out, self._call_user_func(fn, s.name, s.args))
+			self.functions_called.append(s.name)
 
 		return (out, tmps)
 
@@ -841,30 +881,33 @@ at https://github.com/MightyPork/sdscp
 		append(out, _init)
 		append(tmps, _tmps)
 
-		l_then = self.label_pool.acquire('if_then')
-		l_else = self.label_pool.acquire('if_else')
-		l_endif = self.label_pool.acquire('if_end')
+		# l_then = self.label_pool.acquire('if_then')
+		# l_else = self.label_pool.acquire('if_else')
+		# l_endif = self.label_pool.acquire('if_end')
 
 		ss = S_If()
 		ss.cond = cond
-		ss.then_st = self._mk_goto(l_then)
+		ss.then_st = S_Block()
+		ss.then_st.children = self._process_block(fn, s.then_st)
+		ss.else_st = S_Block()
+		ss.else_st.children = self._process_block(fn, s.else_st)
 
-		if not isinstance(s.else_st, S_Empty):
-			ss.else_st = self._mk_goto(l_else)
-		else:
-			ss.else_st = self._mk_goto(l_endif)
+		# if not isinstance(s.else_st, S_Empty):
+		# 	ss.else_st = self._mk_goto(l_else)
+		# else:
+		# 	ss.else_st = self._mk_goto(l_endif)
 
 
 		append(out, ss)
-		append(out, self._mk_label(l_then))
-		append(out, self._process_block(fn, s.then_st))
+		# append(out, self._mk_label(l_then))
+		# append(out, self._process_block(fn, s.then_st))
 
-		if not isinstance(s.else_st, S_Empty):
-			append(out, self._mk_goto(l_endif))
-			append(out, self._mk_label(l_else))
-			append(out, self._process_block(fn, s.else_st))
+		# if not isinstance(s.else_st, S_Empty):
+		# 	append(out, self._mk_goto(l_endif))
+		# 	append(out, self._mk_label(l_else))
+		# 	append(out, self._process_block(fn, s.else_st))
 
-		append(out, self._mk_label(l_endif))
+		# append(out, self._mk_label(l_endif))
 
 		append(out, S_Comment('IF end'))
 
@@ -1196,6 +1239,8 @@ at https://github.com/MightyPork/sdscp
 
 				expr = E_Variable(tmp)
 
+				self.functions_called.append(s.name)
+
 		elif isinstance(e, E_Literal) or isinstance(e, E_Operator):
 			expr = e
 
@@ -1220,9 +1265,13 @@ at https://github.com/MightyPork/sdscp
 			list of statements
 
 		"""
+		if not name in self.user_fn:
+			raise Exception('Call to undefined function %s()' % name)
 
 		out = []
 		tmps = []
+
+		append(out, S_Comment('CALL: %s()' % name))
 
 		# magic functions
 		if name == 'reset':
@@ -1451,3 +1500,11 @@ at https://github.com/MightyPork/sdscp
 	def _mk_echo(self, message):
 
 		return synth('echo("%s");' % message)
+
+
+	def _banner(self, text, fill='-', length=60):
+		""" Show a banner line """
+		blob = (fill*length + ' ' + text + ' ' + fill*length)
+		overlap = len(blob)-80
+		return S_Comment(blob[ math.floor(overlap/2) : math.floor(-overlap/2)])
+
