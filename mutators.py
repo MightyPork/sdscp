@@ -714,15 +714,19 @@ at https://github.com/MightyPork/sdscp
 
 			self._statement_transformers = {
 				S_Empty:	None,
+				S_Goto:		self._transform_noop,
+				S_Label:	self._transform_noop,
+				S_Return:	self._transform_return,
 				S_Var:		self._transform_var,
 				S_Assign:	self._transform_assign,
 				S_Call:		self._transform_call,
-				S_Return:	self._transform_return,
 				S_If:		self._transform_if,
 				S_While:	self._transform_while,
 				S_DoWhile:	self._transform_dowhile,
-				S_For:		self._transform_for
-				# TODO for, switch, break, continue, label, goto
+				S_For:		self._transform_for,
+				S_Break:	self._transform_break,
+				S_Continue:	self._transform_continue,
+				# TODO switch
 			}
 
 		out = []
@@ -741,6 +745,11 @@ at https://github.com/MightyPork/sdscp
 				append(out, s)
 
 		return out
+
+
+	def _transform_noop(self, fn, s):
+		""" No change """
+		return (s, [])
 
 
 	def _transform_var(self, fn, s):
@@ -842,6 +851,9 @@ at https://github.com/MightyPork/sdscp
 
 		if not isinstance(s.else_st, S_Empty):
 			ss.else_st = self._mk_goto(l_else)
+		else:
+			ss.else_st = self._mk_goto(l_endif)
+
 
 		append(out, ss)
 		append(out, self._mk_label(l_then))
@@ -995,6 +1007,44 @@ at https://github.com/MightyPork/sdscp
 		append(out, S_Comment('FOR end'))
 
 		return (out, tmps)
+
+
+	def _transform_break(self, fn, s):
+		out = []
+
+		p = s
+		while True:
+			p = p.get_parent()
+
+			if p is None:
+				raise Exception('Break outside loop or switch!')
+
+			if type(p) in [S_For, S_While, S_DoWhile, S_Switch]:
+
+				# a loop or switch
+				append(out, self._mk_goto(p.meta.l_break))
+				break
+
+		return (out, [])
+
+
+	def _transform_continue(self, fn, s):
+		out = []
+
+		p = s
+		while True:
+			p = p.get_parent()
+
+			if p is None:
+				raise Exception('Continue outside loop!')
+
+			if type(p) in [S_For, S_While, S_DoWhile]:
+
+				# a loop or switch
+				append(out, self._mk_goto(p.meta.l_continue))
+				break
+
+		return (out, [])
 
 
 	def _fn_release_tmps(self, fn, tmps):

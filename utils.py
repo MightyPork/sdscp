@@ -56,7 +56,7 @@ class SyntaxNode:
 		pass  # stub
 
 
-	def get_parent(cls=None):
+	def get_parent(self, cls=None):
 		""" Get parent of given type (skips all parents of different types)
 
 		Args:
@@ -67,11 +67,14 @@ class SyntaxNode:
 
 		"""
 
-		if self.parent is None:
-			raise Exception('No parent of type %s found!' % str(cls))
-
-		if isinstance(self.parent, cls):
+		if cls is None:
 			return self.parent
+		else:
+			if self.parent is None:
+				return None
 
-		return self.parent.get_parent(cls)
+			if isinstance(self.parent, cls):
+				return self.parent
+
+			return self.parent.get_parent(cls)
 
