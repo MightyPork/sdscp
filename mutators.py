@@ -726,7 +726,7 @@ at https://github.com/MightyPork/sdscp
 				S_For:		self._transform_for,
 				S_Break:	self._transform_break,
 				S_Continue:	self._transform_continue,
-				# TODO switch
+				S_Switch:	self._transform_switch  # also handles case and default.
 			}
 
 		out = []
@@ -1045,6 +1045,72 @@ at https://github.com/MightyPork/sdscp
 				break
 
 		return (out, [])
+
+
+	def _transform_switch(self, fn, s):
+		out = []
+		tmps = []
+
+		append(out, S_Comment('SWITCH begin'))
+
+		l_break = self.label_pool.acquire('switch_break')
+
+		# add meta to the switch
+		s.meta = Obj()
+		s.meta.l_break = l_break
+
+		compared = self.tmp_pool.acquire()
+		tmps.append(compared)
+
+		append(out, self._mk_assign(compared, s.value))
+
+		case_active = False
+		l_next_case = self.label_pool.acquire('case')
+
+		for ss in s.body_st.children:
+			if type(ss) is S_Case:
+
+
+				l_skip_case = self.label_pool.acquire('case_skip')
+
+				# already in case, skip the test
+				if case_active:
+					append(out, self._mk_goto(l_skip_case))
+
+				# add case label
+				append(out, self._mk_label(l_next_case))
+
+				# prepare label for next case
+				l_next_case = self.label_pool.acquire('case')
+
+				# prepare the if
+				st = S_If()
+				st.cond = E_Group([E_Variable(compared), E_Operator('=='), ss.value])
+				st.then_st = self._mk_goto(l_skip_case)
+				st.else_st = self._mk_goto(l_next_case)
+				append(out, st)
+
+				# skip case label
+				append(out, self._mk_label(l_skip_case))
+
+				case_active = True
+
+			elif type(ss) is S_Default:
+				append(out, self._mk_label(l_next_case))
+				l_next_case = self.label_pool.acquire('case')
+
+				case_active = True
+
+			else:
+				append(out, self._process_block(fn, ss))
+
+		# label for last case false jump
+		append(out, self._mk_label(l_next_case))
+		append(out, self._mk_label(l_break))
+
+		append(out, S_Comment('SWITCH end'))
+
+		return (out, tmps)
 
 
 	def _fn_release_tmps(self, fn, tmps):
