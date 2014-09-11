@@ -1239,7 +1239,7 @@ at https://github.com/MightyPork/sdscp
 
 				expr = E_Variable(tmp)
 
-				self.functions_called.append(s.name)
+				self.functions_called.append(e.name)
 
 		elif isinstance(e, E_Literal) or isinstance(e, E_Operator):
 			expr = e
