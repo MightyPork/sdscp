@@ -694,6 +694,8 @@ class M_Grande(Mutator):
 
 					self.arg_pool.rewind()
 
+					arg_assignments = []
+
 					for a in s.args:
 
 						arg_name = self.arg_pool.acquire()
@@ -702,7 +704,9 @@ class M_Grande(Mutator):
 						append(out, init)
 						append(tmps, _tmps)
 
-						append(out, self._mk_assign(arg_name, a_val))
+						append(arg_assignments, self._mk_assign(arg_name, a_val))
+
+					append(out, arg_assignments)
 
 					# get return label index
 					return_idx = self.fn_pool.register_call()
@@ -753,8 +757,11 @@ class M_Grande(Mutator):
 			else:
 				name = fn.meta.local_tmp_dict.get(e.name, e.name)
 
-			if (e.index is None) or isinstance(e.index, E_Literal):
+			if e.index is None:
 				return (init, tmps, E_Variable(name))
+
+			elif isinstance(e.index, E_Literal):
+				return (init, tmps, E_Variable(name, e.index))
 
 			else:
 				tmp = self.tmp_pool.acquire()
