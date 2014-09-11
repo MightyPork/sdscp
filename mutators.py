@@ -435,7 +435,7 @@ class M_Grande(Mutator):
 			'text',
 		]
 
-		self.stack_start = 200
+		self.stack_start = 300
 		self.stack_end = 511
 
 		self.do_check_stack_bounds = True

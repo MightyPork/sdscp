@@ -670,6 +670,8 @@ class SdsRenderer2(BasicSdsRenderer):
 
 	def _on_pragmas_set(self):
 		self.gr.do_check_stack_bounds = self.pragmas.get('check_stack_bounds', True)
+		self.gr.stack_start = self.pragmas.get('stack_start', 300)
+		self.gr.stack_end = self.pragmas.get('stack_end', 511)
 
 
 	def _prepare(self, code):
