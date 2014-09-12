@@ -12,19 +12,13 @@ It's a python script that works as a processor, digesting your source to a form 
 
 For more detailed info, see the **[SDSCP wiki](https://github.com/MightyPork/sdscp/wiki)**.
 
-### Already implemented
-
 - `#include` directive
 - Function-like macros
 - Array-like macros
 - Double quotes for strings
 - Code branching with `#ifdef`, `#ifndef` etc...
 - Automatic code formatting
-
-
-### Planned
-
-- Fixing SDS-C bugs (expression as array index, etc.)
+- Fixed some SDS-C bugs (expression as array index, etc.)
 - Extra control structures
   - `FOR`
   - `WHILE`
@@ -32,7 +26,7 @@ For more detailed info, see the **[SDSCP wiki](https://github.com/MightyPork/sds
   - `SWITCH`
   - `IF_ELSEIF_ELSE`
 - Stack in `ram[]` - Used for argument passing and return values
-- Local variables (keeping variable value after a function call)
+- Local variables
 - Expression as array index
 - Reimplemented functions (with arguments and return values)
 
