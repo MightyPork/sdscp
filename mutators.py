@@ -633,12 +633,15 @@ at https://github.com/MightyPork/sdscp
 
 		sts = []
 		append(sts, self._banner('Error handlers'))
-		# stack overflow
-		append(sts, self._mk_label('__err_so'))
-		append(sts, self._mk_error('[ERROR] Stack overflow!'))
-		# stack underflow
-		append(sts, self._mk_label('__err_su'))
-		append(sts, self._mk_error('[ERROR] Stack underflow!'))
+
+		if self.do_check_stack_bounds:
+			# stack overflow
+			append(sts, self._mk_label('__err_so'))
+			append(sts, self._mk_error('[ERROR] Stack overflow!'))
+			# stack underflow
+			append(sts, self._mk_label('__err_su'))
+			append(sts, self._mk_error('[ERROR] Stack underflow!'))
+
 		# bad address
 		append(sts, self._mk_label('__err_bad_addr'))
 		append(sts, self._mk_error('[ERROR] Bad address!'))
@@ -686,10 +689,6 @@ at https://github.com/MightyPork/sdscp
 				fn.meta.arg_tmps.append(tmp)
 
 				append(body, self._mk_assign(tmp, arg))
-
-				# append(body, synth("""
-				# 	%s = %s;
-				# """ % (tmp, arg)))
 
 		append(body, self._mk_assign('__retval', 0))
 
@@ -886,10 +885,6 @@ at https://github.com/MightyPork/sdscp
 		append(out, _init)
 		append(tmps, _tmps)
 
-		# l_then = self.label_pool.acquire('if_then')
-		# l_else = self.label_pool.acquire('if_else')
-		# l_endif = self.label_pool.acquire('if_end')
-
 		ss = S_If()
 		ss.cond = cond
 		ss.then_st = S_Block()
@@ -897,22 +892,7 @@ at https://github.com/MightyPork/sdscp
 		ss.else_st = S_Block()
 		ss.else_st.children = self._process_block(fn, s.else_st)
 
-		# if not isinstance(s.else_st, S_Empty):
-		# 	ss.else_st = self._mk_goto(l_else)
-		# else:
-		# 	ss.else_st = self._mk_goto(l_endif)
-
-
 		append(out, ss)
-		# append(out, self._mk_label(l_then))
-		# append(out, self._process_block(fn, s.then_st))
-
-		# if not isinstance(s.else_st, S_Empty):
-		# 	append(out, self._mk_goto(l_endif))
-		# 	append(out, self._mk_label(l_else))
-		# 	append(out, self._process_block(fn, s.else_st))
-
-		# append(out, self._mk_label(l_endif))
 
 		append(out, S_Comment('IF end'))
 
