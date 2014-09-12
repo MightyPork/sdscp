@@ -795,16 +795,21 @@ at https://github.com/MightyPork/sdscp
 		out = []
 		tmps = []
 
-		repl = self.tmp_pool.acquire()
-		fn.meta.local_tmp_dict[s.var.name] = repl
+		# reuse if already declared in the function
+		if s.var.name in fn.meta.local_tmp_dict.keys():
+			repl = fn.meta.local_tmp_dict[s.var.name]
+		else:
+			repl = self.tmp_pool.acquire()
+			fn.meta.local_tmp_dict[s.var.name] = repl
 
 		value = s.value
 
 		if value is None:
 			value = 0
 		else:
-			(init, tmps, value) = self._process_expr(fn, s.value)
-			append(out, init)
+			(_init, _tmps, value) = self._process_expr(fn, s.value)
+			append(out, _init)
+			append(tmps, _tmps)
 
 		append(out, self._mk_assign(repl, value))
 

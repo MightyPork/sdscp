@@ -27,6 +27,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
+		'-r', '--renderer',
+		help='Set renderer to use, overrides #pragma renderer. <?>',
+		default=None
+)
+
+parser.add_argument(
 		'-d', '--display',
 		action='store_true',
 		default=False,
@@ -106,6 +112,8 @@ SHOW_STATEMENTS	= args.verbose or args.show_statements
 SHOW_GENERATED	= args.verbose or args.show_generated
 SHOW_OUTPUT		= args.verbose or args.display
 
+REQUESTED_RENDERER = args.renderer
+
 
 # ==================== Utils =======================
 
@@ -170,6 +178,8 @@ try:
 	# -------------------- Apply macros --------------------
 
 	pragmas = dproc.get_pragmas()
+	if REQUESTED_RENDERER is not None:
+		pragmas['renderer'] = REQUESTED_RENDERER
 
 	# perform macro replacements
 	dproc.apply_macros()
