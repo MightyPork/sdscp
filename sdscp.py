@@ -28,7 +28,7 @@ parser.add_argument(
 
 parser.add_argument(
 		'-r', '--renderer',
-		help='Set renderer to use, overrides #pragma renderer. <?>',
+		help='Set renderer to use, overrides #pragma renderer.',
 		default=None
 )
 
