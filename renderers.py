@@ -224,7 +224,9 @@ class BasicRenderer(Renderer):
 		"""
 
 		# remove whitespace at ends
-		src = self._do_render_any(s)
+		src = self._do_render_any(s).strip('\n')
+		if src == '':
+			return src
 
 		if indent_first:
 			# add newline in front of it, to trigger indentation
@@ -301,10 +303,13 @@ class BasicRenderer(Renderer):
 
 	def _render_comment(self, s):  # S_Comment
 
-		if s.text.count('\n') == 0:
-			return '// %s' % s.text
+		if self.pragmas.get('render_comments', True):
+			if s.text.count('\n') == 0:
+				return '// %s' % s.text
+			else:
+				return '/*\n%s\n*/' % s.text.rstrip('\n').lstrip('\n')
 		else:
-			return '/*\n%s\n*/' % s.text.rstrip('\n').lstrip('\n')
+			return ''
 
 
 	def _render_function(self, s):  # S_Function
@@ -345,6 +350,29 @@ class BasicRenderer(Renderer):
 
 	def _render_if(self, s):  # S_If
 		src = 'if (%s) ' % self._render_expr(s.cond)
+
+		if type(s.cond) is E_Literal:
+
+			st = None
+			src = ''
+
+			if int(str(s.cond)) == 0:
+				# always False
+				st = s.else_st
+				src += self._render_comment(S_Comment('(IF always false: else only)')) + '\n'
+			else:
+				# always True
+				st = s.then_st
+				src += self._render_comment(S_Comment('(IF always true: then only)')) + '\n'
+
+			if type(st) is S_Block:
+				for c in st.children:
+					src += self._render_any(c)
+			else:
+				src = self._render_any(st)
+
+			return src.rstrip('\n')
+
 
 		# normalize empty code block to empty statement
 		if type(s.else_st) is S_Block and len(s.else_st.children) == 0:

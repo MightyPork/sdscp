@@ -1,5 +1,8 @@
 #!/bin/env python3
 
+import ast
+import operator as op
+import functools
 
 def append(arr, added):
 	""" Append to array, both array or item """
@@ -78,3 +81,41 @@ class SyntaxNode:
 
 			return self.parent.get_parent(cls)
 
+
+
+# supported operators
+operators = {
+	ast.Add: op.add,
+	ast.Sub: op.sub,
+	ast.Mult: op.mul,
+	ast.Div: op.truediv,
+	ast.Pow: op.pow,
+	ast.USub: op.neg,
+	ast.BitXor: op.xor,
+	ast.BitOr: op.or_,
+	ast.BitAnd: op.and_,
+	ast.Or: op.or_,
+	ast.And: op.and_,
+	ast.LShift: op.lshift,
+	ast.RShift: op.rshift,
+}
+
+def eval_expr(expr):
+	return eval_(ast.parse(expr, mode='eval').body)
+
+def eval_(node):
+	if isinstance(node, ast.Num): # <number>
+		return node.n
+	elif isinstance(node, ast.BinOp): # <left> <operator> <right>
+		return operators[type(node.op)](eval_(node.left), eval_(node.right))
+	elif isinstance(node, ast.UnaryOp): # <operator> <operand> e.g., -1
+		return operators[type(node.op)](eval_(node.operand))
+	else:
+		raise TypeError(node)
+
+def power(a, b):
+	if any(abs(n) > 100 for n in [a, b]):
+		raise ValueError((a,b))
+	return op.pow(a, b)
+
+operators[ast.Pow] = power

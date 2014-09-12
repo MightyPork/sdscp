@@ -1,4 +1,5 @@
 #pragma renderer sds2
+#pragma render_comments false
 
 #include "sys2.c"
 
@@ -8,13 +9,11 @@
 var preset = 140;
 
 main() {
-	while(true) {
-		if(THERMO > preset) {
-			HEATING = 0;
-		} else {
-			HEATING = 1;
-		}
-
-		wait(1000);
+	if(THERMO > preset) {
+		HEATING = 0;
+	} else {
+		HEATING = 1;
 	}
+
+	wait(1000);
 }

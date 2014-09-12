@@ -5,7 +5,10 @@ from tokens import Tokenizer
 from statements import *
 from expressions import *
 from utils import *
+# for evaluation of expr
+import renderers
 import math
+
 
 def synth(source):
 	""" Parse source & convert to statements """
@@ -149,7 +152,7 @@ class TmpVarPool:
 
 
 	def _gen_name(self, index):
-		return "__tmp_%d" % (index)
+		return "__r_%d" % (index)
 
 
 	def acquire(self):
@@ -332,7 +335,7 @@ class FnRegistry:
 		if type(index) == str:
 			index = self.name2index[index]
 
-		return "__fn_begin_%d" % index
+		return "__fn_%d" % index
 
 
 	def get_end(self, index):
@@ -349,7 +352,7 @@ class FnRegistry:
 		if type(index) == str:
 			index = self.name2index[index]
 
-		return "__fn_end_%d" % index
+		return "__fn_%d_end" % index
 
 
 	def get_call_label(self, index):
@@ -363,7 +366,7 @@ class FnRegistry:
 
 		"""
 
-		return "__retpos_%s" % index
+		return "__rpos_%s" % index
 
 
 	def get_trampoline_map(self):
@@ -462,7 +465,7 @@ class M_Grande(Mutator):
 		main_userfn = None
 
 		# register helper vars
-		self._add_global_var('__retval')  # return value
+		self._add_global_var('__ret')  # return value
 		self._add_global_var('__sp', self.stack_end + 1)  # stack pointer at RAMEND (grows towards lower addrs)
 		self._add_global_var('__addr')  # jump address pointer
 
@@ -682,7 +685,7 @@ class M_Grande(Mutator):
 
 				append(body, self._mk_assign(tmp, arg))
 
-		append(body, self._mk_assign('__retval', 0))
+		append(body, self._mk_assign('__ret', 0))
 
 		append(body, S_Comment('Function body'))
 		append(body, self._process_block(fn, fn.body_st.children))
@@ -762,17 +765,19 @@ class M_Grande(Mutator):
 		out = []
 
 		for s in sts:
+			transformer = None
+
 			try:
 				transformer = self._statement_transformers[type(s)]
-
-				if transformer is not None:
-					(_init, _tmps) = transformer(fn, s)
-					append(out, _init)
-					self._fn_release_tmps(fn, _tmps)
-
 			except KeyError:
 				print('WARN: Unhandled statement %s (type %s)' % (s, type(s)))
 				append(out, s)
+				continue
+
+			if transformer is not None:
+				(_init, _tmps) = transformer(fn, s)
+				append(out, _init)
+				self._fn_release_tmps(fn, _tmps)
 
 		return out
 
@@ -861,7 +866,7 @@ class M_Grande(Mutator):
 		append(out, _init)
 		append(tmps, _tmps)
 
-		append(out, self._mk_assign('__retval', rval))
+		append(out, self._mk_assign('__ret', rval))
 		append(out, self._mk_goto(self.fn_pool.get_end(fn.name)))
 
 		return (out, tmps)
@@ -897,9 +902,9 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('WHILE begin'))
 
-		l_continue = self.label_pool.acquire('while_continue')
-		l_body = self.label_pool.acquire('while_body')
-		l_break = self.label_pool.acquire('while_break')
+		l_continue = self.label_pool.acquire('wh_continue')
+		l_body = self.label_pool.acquire('wh_body')
+		l_break = self.label_pool.acquire('wh_break')
 
 		# add meta to the loop
 		s.meta = Obj()
@@ -941,9 +946,9 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('DO_WHILE begin'))
 
-		l_continue = self.label_pool.acquire('dowhile_continue')
-		l_body = self.label_pool.acquire('dowhile_body')
-		l_break = self.label_pool.acquire('dowhile_break')
+		l_continue = self.label_pool.acquire('dowh_continue')
+		l_body = self.label_pool.acquire('dowh_body')
+		l_break = self.label_pool.acquire('dowh_break')
 
 		# add meta to the loop
 		s.meta = Obj()
@@ -985,7 +990,7 @@ class M_Grande(Mutator):
 		append(out, S_Comment('FOR begin'))
 
 		l_continue = self.label_pool.acquire('for_continue')
-		l_cond = self.label_pool.acquire('for_condition')
+		l_cond = self.label_pool.acquire('for_test')
 		l_body = self.label_pool.acquire('for_body')
 		l_break = self.label_pool.acquire('for_break')
 
@@ -1157,6 +1162,19 @@ class M_Grande(Mutator):
 		tmps = []
 		expr = e
 
+		# try to evaluate it
+		if not hasattr(self, '_erndr'):
+			self._erndr = renderers.BasicRenderer([])
+
+		if type(e) is E_Group:
+			try:
+				as_str = self._erndr._render_expr(e)
+				val = eval_expr(as_str)
+				e = E_Literal(T_Number(str(val)))
+			except (ValueError, TypeError, SyntaxError, KeyError):
+				pass
+
+
 		if isinstance(e, E_Group):
 			new_children = []
 
@@ -1185,6 +1203,7 @@ class M_Grande(Mutator):
 
 			elif isinstance(e.index, E_Variable) and (e.index.index is None):  # simple var
 
+				# translate var to local tmp
 				(_init, _tmps, _e) = self._process_expr(fn, e.index)
 				append(init, _init)
 				append(tmps, _tmps)
@@ -1192,17 +1211,22 @@ class M_Grande(Mutator):
 				expr = E_Variable(name, _e)
 
 			else:
-				tmp = self.tmp_pool.acquire()
-
 				(_init, _tmps, _e) = self._process_expr(fn, e.index)
 				append(init, _init)
 				append(tmps, _tmps)
-				append(tmps, tmp)
 
-				s = self._mk_assign(tmp, _e)
-				init.append(s)
+				if type(_e) is E_Literal:
+					# was evaluated to value
+					expr = E_Variable(name, _e)
+				else:
+					tmp = self.tmp_pool.acquire()
 
-				expr = E_Variable(name, E_Variable(tmp))
+					append(tmps, tmp)
+
+					s = self._mk_assign(tmp, _e)
+					append(init, s)
+
+					expr = E_Variable(name, E_Variable(tmp))
 
 		elif isinstance(e, E_Call):
 			if e.name in self.builtin_fn:
@@ -1217,7 +1241,7 @@ class M_Grande(Mutator):
 				append(init, self._call_user_func(fn, e.name, e.args))
 
 				tmp = self.tmp_pool.acquire()
-				append(init, self._mk_assign(tmp, '__retval'))
+				append(init, self._mk_assign(tmp, '__ret'))
 
 				expr = E_Variable(tmp)
 
@@ -1236,7 +1260,7 @@ class M_Grande(Mutator):
 
 	def _call_user_func(self, fn, name, args):
 		""" Generate statements for calling a user function.
-		__retval may contain the return value, if any.
+		__ret may contain the return value, if any.
 
 		Args:
 			fn (S_Function): Function wrapping the call
