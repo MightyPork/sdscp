@@ -1,5 +1,5 @@
 #pragma check_stack_bounds false
-#pragma header false
+#pragma header "moo.txt"
 
 main()
 {

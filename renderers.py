@@ -94,17 +94,23 @@ class Renderer:
 				with open(f, "r") as myfile:
 					header_text = myfile.read()
 
-				header_text = header_text % (
-					self.pragmas.get('name', '?'),
-					self.pragmas.get('author', '?'),
-					self.pragmas.get('version', '?'),
-					strftime('%Y-%m-%d, %H:%M:%S', localtime())
-				)
+				header_text = header_text % {
+					'name': self.pragmas.get('name', '?'),
+					'author': self.pragmas.get('author', '?'),
+					'version': self.pragmas.get('version', '?'),
+					'time': strftime('%Y-%m-%d, %H:%M:%S', localtime())
+				}
 
 				banner_text	= banner_text.strip('\n')
 				header_text = header_text.strip('\n')
 
-				bar = '\n\n============================================\n\n'
+				longest = 0
+				for line in banner_text.splitlines() + header_text.splitlines():
+					l = len(line)
+					if l > longest:
+						longest = l
+
+				bar = '\n\n' + ('='*longest) + '\n\n'
 
 				banner = S_Comment((bar + banner_text + bar + header_text + bar).strip('\n'))
 
