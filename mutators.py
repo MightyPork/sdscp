@@ -438,6 +438,8 @@ class M_Grande(Mutator):
 		self.stack_start = 300
 		self.stack_end = 511
 
+		self._halt_used = False
+
 		self.do_check_stack_bounds = True
 
 		self.banner_text = r"""
@@ -552,9 +554,9 @@ at https://github.com/MightyPork/sdscp
 		# ERRORS
 		append(sts, self._build_error_handlers())
 
-		# Shutdown trap
-		append(sts, self._build_shutdown_trap())
-
+		if self._halt_used:
+			# Shutdown trap
+			append(sts, self._build_shutdown_trap())
 
 		# reset label
 		append(sts, self._banner('FUNC: init()'))
@@ -575,10 +577,12 @@ at https://github.com/MightyPork/sdscp
 		# infinite main loop
 		append(sts, self._banner('FUNC: main()'))
 		append(sts, self._mk_echo('[INFO] main() started.'))
+		append(sts, self._mk_label('__main_loop'))
+
 		if main_userfn is not None:
 			sts += main_userfn_processed
 
-		append(sts, self._mk_goto('__halt'))
+		append(sts, self._mk_goto('__main_loop'))
 
 
 		# other user functions (already processed)
@@ -1263,6 +1267,7 @@ at https://github.com/MightyPork/sdscp
 			return self._mk_goto('__reset')
 
 		elif name == 'end':
+			self._halt_used = True
 			return self._mk_goto('__halt')
 
 		elif name == 'push':
