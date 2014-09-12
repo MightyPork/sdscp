@@ -11,6 +11,7 @@ from tokens import Tokenizer
 from readers import CodeReader
 from renderers import *
 import statements
+import getpass
 
 # ==================== Command Line Arguments processing =======================
 
@@ -180,6 +181,17 @@ try:
 	pragmas = dproc.get_pragmas()
 	if REQUESTED_RENDERER is not None:
 		pragmas['renderer'] = REQUESTED_RENDERER
+
+	if 'name' not in pragmas.keys():
+		pragmas['name'] = SRC
+
+	if 'author' not in pragmas.keys():
+		try:
+			pragmas['author'] = getpass.getuser()
+		except Exception:
+			pass
+
+
 
 	# perform macro replacements
 	dproc.apply_macros()

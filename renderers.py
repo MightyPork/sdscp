@@ -1,9 +1,12 @@
 #!/bin/env python3
 
 import re
+import os
 from statements import *
 from expressions import *
 from mutators import *
+from time import localtime, strftime
+from utils import *
 
 
 class Renderer:
@@ -65,6 +68,20 @@ class Renderer:
 
 		if self._prepared is None:
 			self._prepared = self._prepare(self._source)
+
+
+			f = os.path.join(os.path.dirname(__file__), 'header.txt')
+			with open(f, "r") as myfile:
+				banner_text = myfile.read()
+
+			banner = S_Comment(banner_text % (
+				self.pragmas.get('name', '?'),
+				self.pragmas.get('author', '?'),
+				self.pragmas.get('version', '?'),
+				strftime('%Y-%m-%d, %H:%M:%S', localtime())
+			))
+
+			self._prepared = [banner] + self._prepared
 
 		return self._render(self._prepared)
 
