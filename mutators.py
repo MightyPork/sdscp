@@ -1242,8 +1242,6 @@ class M_Grande(Mutator):
 			list of statements
 
 		"""
-		if not name in self.user_fn:
-			raise Exception('Call to undefined function %s()' % name)
 
 		out = []
 		tmps = []
@@ -1278,6 +1276,9 @@ class M_Grande(Mutator):
 			append(out, self._mk_pop(a))
 
 		else:
+			if not name in self.user_fn:
+				raise Exception('Call to undefined function %s()' % name)
+
 			# regular user function call
 			self.arg_pool.rewind()
 

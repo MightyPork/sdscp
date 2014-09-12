@@ -110,7 +110,7 @@ class Renderer:
 					if l > longest:
 						longest = l
 
-				bar = '\n\n' + ('='*longest) + '\n\n'
+				bar = '\n\n' + ('=' * longest) + '\n\n'
 
 				banner = S_Comment((bar + banner_text + bar + header_text + bar).strip('\n'))
 
