@@ -2,7 +2,7 @@
 
 *SDSCP is free software, available under GPL v2*
 
-**[Český návod ZDE!](https://docs.google.com/document/d/1yKPp9HRQfGiGkIW1-4BfH-r1ENqbp_OQmSHbkxUufpk/edit?usp=sharing)**.
+**[Český návod ZDE](https://docs.google.com/document/d/1yKPp9HRQfGiGkIW1-4BfH-r1ENqbp_OQmSHbkxUufpk/edit?usp=sharing)**
 
 This project's goal is to enable better syntax in [SDS-C](http://wiki.merenienergie.cz/index.php/Sdsc_sysf).
 
