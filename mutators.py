@@ -1082,7 +1082,12 @@ class M_Grande(Mutator):
 		compared = self.tmp_pool.acquire()
 		tmps.append(compared)
 
-		append(out, self._mk_assign(compared, s.value))
+		# resolve compared value
+		(_init, _tmps, cond) = self._process_expr(fn, s.value)
+		append(out, _init)
+		append(tmps, _tmps)
+
+		append(out, self._mk_assign(compared, cond))
 
 		case_active = False
 		l_next_case = self.label_pool.acquire('case')

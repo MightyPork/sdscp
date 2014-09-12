@@ -2,8 +2,8 @@
 
 #include "sys2.c"
 
-#define HEATING RELAY[1]
-#define THERMO TEMP[1]
+#define HEATING _RELAY[1]
+#define THERMO _TEMP[1]
 
 var preset = 140;
 
