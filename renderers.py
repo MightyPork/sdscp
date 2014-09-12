@@ -69,19 +69,46 @@ class Renderer:
 		if self._prepared is None:
 			self._prepared = self._prepare(self._source)
 
+			if self.pragmas.get('header', None) is not False:
+				bfile = os.path.join(os.path.dirname(__file__), 'banner.txt')
 
-			f = os.path.join(os.path.dirname(__file__), 'header.txt')
-			with open(f, "r") as myfile:
-				banner_text = myfile.read()
+				if 'header' in self.pragmas:
+					f = self.pragmas.get('header')
+					if f == False:
+						bfile = None
+					else:
+						if os.path.isfile(f):
+							bfile = f
+						else:
+							f = os.path.join(os.path.dirname(self.pragmas.get('main_file')), f)
+							if os.path.isfile(f):
+								bfile = f
 
-			banner = S_Comment(banner_text % (
-				self.pragmas.get('name', '?'),
-				self.pragmas.get('author', '?'),
-				self.pragmas.get('version', '?'),
-				strftime('%Y-%m-%d, %H:%M:%S', localtime())
-			))
+				banner_text = ''
+				if bfile is not None:
+					with open(bfile, "r") as myfile:
+						banner_text = myfile.read()
 
-			self._prepared = [banner] + self._prepared
+
+				f = os.path.join(os.path.dirname(__file__), 'header.txt')
+				with open(f, "r") as myfile:
+					header_text = myfile.read()
+
+				header_text = header_text % (
+					self.pragmas.get('name', '?'),
+					self.pragmas.get('author', '?'),
+					self.pragmas.get('version', '?'),
+					strftime('%Y-%m-%d, %H:%M:%S', localtime())
+				)
+
+				banner_text	= banner_text.strip('\n')
+				header_text = header_text.strip('\n')
+
+				bar = '\n\n============================================\n\n'
+
+				banner = S_Comment((bar + banner_text + bar + header_text + bar).strip('\n'))
+
+				self._prepared = [banner] + self._prepared
 
 		return self._render(self._prepared)
 

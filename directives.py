@@ -990,10 +990,9 @@ def _load_file(filename):
 
 	"""
 
-	f = open(filename, 'r')
-	text = f.read()
-	f.close()
-	return text
+	with open(filename, 'r') as f:
+		text = f.read()
+		return text
 
 
 

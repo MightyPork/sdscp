@@ -1,4 +1,5 @@
 #pragma check_stack_bounds false
+#pragma header false
 
 main()
 {

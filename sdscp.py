@@ -182,6 +182,8 @@ try:
 	if REQUESTED_RENDERER is not None:
 		pragmas['renderer'] = REQUESTED_RENDERER
 
+	pragmas['main_file'] = SRC
+
 	if 'name' not in pragmas.keys():
 		pragmas['name'] = SRC
 
