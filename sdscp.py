@@ -6,9 +6,8 @@ import math
 import re
 import traceback
 
-from directives import DirectiveProcessor
+from directives import DirectiveProcessor, D_Pragma
 from tokens import Tokenizer
-from readers import CodeReader
 from renderers import *
 import statements
 import getpass
@@ -24,13 +23,23 @@ parser.add_argument(
 
 parser.add_argument(
 		'-o', '--output',
-		help='The output file. To just print the output, use -d'
+		help='The output file. To just print the output, use -d',
+		action='store',
 )
 
 parser.add_argument(
 		'-r', '--renderer',
 		help='Set renderer to use, overrides #pragma renderer.',
-		default=None
+		default=None,
+		action='store',
+)
+
+parser.add_argument(
+		'-p', '--pragma',
+		help='Set a pragma value (syntax like #pragma)',
+		action='append',
+		nargs='+',
+		default=[]
 )
 
 parser.add_argument(
@@ -115,6 +124,12 @@ SHOW_OUTPUT		= args.verbose or args.display
 
 REQUESTED_RENDERER = args.renderer
 
+pragmas_args = {}
+
+for p in args.pragma:
+	pr = D_Pragma('#pragma ' + ' '.join(p))
+	pragmas_args[pr.name] = pr.value
+
 
 # ==================== Utils =======================
 
@@ -149,9 +164,30 @@ try:
 
 	# ---------------- Resolve directives ------------------
 
-
+	print('Resolving directives...')
 	# include files, resolve branching, find macros...
 	dproc.process()
+
+
+	# -------------------- Apply macros --------------------
+
+	pragmas = dproc.get_pragmas()
+
+	pragmas.update(pragmas_args)
+
+	if REQUESTED_RENDERER is not None:
+		pragmas['renderer'] = REQUESTED_RENDERER
+
+	pragmas['main_file'] = SRC
+
+	if 'name' not in pragmas.keys():
+		pragmas['name'] = SRC
+
+	if 'author' not in pragmas.keys():
+		try:
+			pragmas['author'] = getpass.getuser()
+		except Exception:
+			pass
 
 
 	if SHOW_MACROS:
@@ -175,26 +211,7 @@ try:
 		print('Code after resolving includes, # branching, and extracting macros:\n')
 		print(prep4disp( dproc.get_output() ) + '\n')
 
-
-	# -------------------- Apply macros --------------------
-
-	pragmas = dproc.get_pragmas()
-	if REQUESTED_RENDERER is not None:
-		pragmas['renderer'] = REQUESTED_RENDERER
-
-	pragmas['main_file'] = SRC
-
-	if 'name' not in pragmas.keys():
-		pragmas['name'] = SRC
-
-	if 'author' not in pragmas.keys():
-		try:
-			pragmas['author'] = getpass.getuser()
-		except Exception:
-			pass
-
-
-
+	print('Applying macros...')
 	# perform macro replacements
 	dproc.apply_macros()
 	# get output code
@@ -208,8 +225,8 @@ try:
 		print(prep4disp(processed) + '\n')
 
 
+	print('Tokenizing code...')
 	tk = Tokenizer(processed)
-
 	tokens = tk.tokenize()
 	sts = statements.parse(tokens)
 
@@ -253,6 +270,7 @@ try:
 
 		rndr.set_pragmas(pragmas)
 
+		print('Rendering to SDS-C using "%s"...' % rtype)
 		for_sds = rndr.render()
 
 		if SHOW_OUTPUT:

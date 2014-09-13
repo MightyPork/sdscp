@@ -1,3 +1,5 @@
+#pragma renderer sds2
+
 #pragma check_stack_bounds false
 #pragma header "moo.txt"
 

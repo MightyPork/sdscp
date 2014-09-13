@@ -69,6 +69,7 @@ class Renderer:
 		if self._prepared is None:
 			self._prepared = self._prepare(self._source)
 
+			# resolve header comment
 			if self.pragmas.get('header', None) is not False:
 				bfile = os.path.join(os.path.dirname(__file__), 'banner.txt')
 
@@ -113,6 +114,7 @@ class Renderer:
 				bar = '\n\n' + ('=' * longest) + '\n\n'
 
 				banner = S_Comment((bar + banner_text + bar + header_text + bar).strip('\n'))
+				banner._header_comment = True
 
 				self._prepared = [banner] + self._prepared
 
@@ -247,6 +249,9 @@ class BasicRenderer(Renderer):
 		if isinstance(s, S_Function):
 			src = '\n' + src
 
+		if hasattr(s, '_header_comment'):
+			src += '\n'
+
 		return src
 
 
@@ -303,7 +308,7 @@ class BasicRenderer(Renderer):
 
 	def _render_comment(self, s):  # S_Comment
 
-		if self.pragmas.get('render_comments', True):
+		if self.pragmas.get('render_comments', True) or hasattr(s, '_header_comment'):
 			if s.text.count('\n') == 0:
 				return '// %s' % s.text
 			else:
@@ -351,6 +356,7 @@ class BasicRenderer(Renderer):
 	def _render_if(self, s):  # S_If
 		src = 'if (%s) ' % self._render_expr(s.cond)
 
+		# Optimization for dead branch
 		if type(s.cond) is E_Literal:
 
 			st = None
@@ -373,10 +379,33 @@ class BasicRenderer(Renderer):
 
 			return src.rstrip('\n')
 
-
 		# normalize empty code block to empty statement
 		if type(s.else_st) is S_Block and len(s.else_st.children) == 0:
 			s.else_st = S_Empty()
+
+		if type(s.then_st) is S_Block and len(s.then_st.children) == 0:
+			s.then_st = S_Empty()
+
+		is_two_goto = True
+		is_two_goto &= (
+			(type(s.then_st) is S_Goto) or
+			(type(s.then_st) is S_Block and len(s.then_st.children) == 1 and type(s.then_st.children[0]) is S_Goto))
+		is_two_goto &= (
+			(type(s.else_st) is S_Goto) or
+			(type(s.else_st) is S_Block and len(s.else_st.children) == 1 and type(s.else_st.children[0]) is S_Goto))
+
+		if is_two_goto:
+			g1 = s.then_st
+			if type(g1) is S_Block:
+				g1 = g1.children[0]
+
+			g2 = s.else_st
+			if type(g2) is S_Block:
+				g2 = g2.children[0]
+
+			src += 'goto %s else goto %s;' % (g1.name, g2.name)
+
+			return src
 
 		small_then = True
 
@@ -671,8 +700,8 @@ class BasicSdsRenderer(BasicRenderer):
 			if isinstance(e.index, E_Group):
 				if len(e.index.children) > 1:
 					raise CompatibilityError(
-						'Can\'t use expression as array index in SDS-C, at %s' %
-						str(e))
+						'Can\'t use expression as array index in SDS-C, at %s'
+						% e)
 
 			src += '[%s]' % self._render_expr(e.index)
 
@@ -683,8 +712,8 @@ class BasicSdsRenderer(BasicRenderer):
 
 		if self._render_expr(s.value) != '0':
 			raise CompatibilityError(
-				'SDS-C does not support return values, at %s' %
-				str(s))
+				'SDS-C does not support return values, at %s'
+				% s)
 
 		return 'return;'
 
@@ -692,10 +721,17 @@ class BasicSdsRenderer(BasicRenderer):
 	def _render_expr_call(self, e):  # E_Call
 		if e.name in self._userfuncs:
 			raise CompatibilityError(
-				'Can\'t use user-func in expression in SDS-C, at %s' %
-				str(e))
+				'Can\'t use user-func in expression in SDS-C, at %s'
+				% e)
 
 		return super()._render_expr_call(e)
+
+	def _render_expr_operator(self, e):  # E_Operator
+
+		if e.value in ['++', '--']:
+			raise CompatibilityError('Can\'t use ++ and -- SDS-C expressions!')
+
+		return e.value
 
 
 
@@ -744,12 +780,20 @@ class SdsRenderer2(BasicSdsRenderer):
 
 		self.mutators.append(self.gr)
 		self.mutators.append(M_AddBraces())
+		self.mutators.append(M_RemoveStupid())
 
 
 	def _on_pragmas_set(self):
 		self.gr.do_check_stack_bounds = self.pragmas.get('check_stack_bounds', True)
 		self.gr.stack_start = self.pragmas.get('stack_start', 300)
 		self.gr.stack_end = self.pragmas.get('stack_end', 511)
+
+
+	# def _render_label(self, s):  # S_Label - ignore unused
+	# 	if not s.name in self.gr.labels_used:
+	# 		return ''
+	# 	else:
+	# 		return super()._render_label(s)
 
 
 	def _prepare(self, code):

@@ -1,3 +1,5 @@
+#pragma renderer sds2
+
 var k = 100;
 
 main()

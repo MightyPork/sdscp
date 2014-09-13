@@ -60,7 +60,7 @@ class M_AddBraces(Mutator):
 	def _transform(self, code):
 		processed = []
 		for s in code:
-			processed.append(self._add_braces(s))
+			append(processed, self._add_braces(s))
 
 		return processed
 
@@ -115,6 +115,148 @@ class M_AddBraces(Mutator):
 		return s
 
 
+class M_RemoveStupid(Mutator):
+	""" Removes obvious dead code, unused labels etc. """
+
+	def _transform(self, code):
+
+		print('Trimming dead code...')
+		p = 1
+		while True:
+			print('Pass %d' % p)
+			p += 1
+
+			self.removed = False
+			self.used_labels = set()
+			self.existing_labels = set()
+
+			self.do_rm_labels = False
+			code = self._rm_dead(code)
+
+			self.do_rm_labels = True
+			code = self._rm_dead(code)
+
+			#print(self.used_labels)
+
+			if not self.removed:
+				break
+
+		return code
+
+
+	def _rm_dead(self, code):
+		out = []
+
+		was_alone = isinstance(code, Statement)
+
+		if was_alone:
+			code = [code]
+
+		length = len(code)
+
+		i = 0
+		while i < length:
+
+			s = code[i]
+
+			if type(s) is S_Label:
+				self.existing_labels.add(s.name)
+
+				if self.do_rm_labels:
+					if s.name not in self.used_labels:
+						i += 1 # skip
+						self.removed = True
+						print('INFO: Removing unused label %s' % s.name)
+						continue
+
+			if type(s) is S_Goto:
+				self.used_labels.add(s.name)
+
+				if self.do_rm_labels:
+					if s.name not in self.existing_labels:
+						raise Exception('GOTO to undefined label %s!' % s.name)
+
+				# Discard all until next label.
+				# If the label is the target for this goto, discard the goto too.
+
+				cmt = None
+
+				j = i
+				while j < length:
+					j += 1
+
+					if j == length:
+						out.append(s)
+						break
+
+					ss = code[j]
+
+					# UGLY HACK to avoid removing of FUNC banner comments.
+					if type(ss) is S_Comment and 'FUNC' in ss.text:
+						out.append(s)
+						out.append(ss)
+						i=j
+						break
+
+					if type(ss) is S_Label:
+
+						if self.do_rm_labels and ss.name not in self.used_labels:
+							self.removed = True
+							print('INFO: Removing unused label %s' % ss.name)
+							continue
+
+						if ss.name == s.name:
+							self.removed = True
+						else:
+							append(out, s)
+							if j > i + 1:
+								self.removed = True
+
+						out.append(ss)
+						self.existing_labels.add(ss.name)
+
+						i = j
+
+						break
+
+			elif type(s) is S_If:
+				# go into if's branches
+				s.then_st = self._rm_dead(s.then_st)
+				s.else_st = self._rm_dead(s.else_st)
+				out.append(s)
+
+			elif isinstance(s, S_Block):
+				# handle block contents
+				s.children = self._rm_dead(s.children)
+				out.append(s)
+
+			elif (isinstance(s, S_For) or
+				isinstance(s, S_While) or
+				isinstance(s, S_Switch) or
+				isinstance(s, S_Function) or
+				isinstance(s, S_DoWhile)):
+
+				s.body_st = self._rm_dead(s.body_st)
+				out.append(s)
+
+			else:
+				out.append(s)
+
+			i += 1  # advance counter
+
+		# collapse if was single at start
+		if was_alone:
+			if len(out) == 0:
+				return S_Empty()
+			elif len(out) == 1:
+				return out[0]
+			else:
+				s = S_Block()
+				s.children = out
+				return s
+		else:
+			return out
+
 
 class M_CollectVars(Mutator):
 	""" Collect global vars at the top """
@@ -152,7 +294,7 @@ class TmpVarPool:
 
 
 	def _gen_name(self, index):
-		return "__r_%d" % (index)
+		return "__t%d" % (index)
 
 
 	def acquire(self):
@@ -355,6 +497,27 @@ class FnRegistry:
 		return "__fn_%d_end" % index
 
 
+	def get_ns_label(self, index, label):
+		""" Get namespaced label in function
+
+		Args:
+			index: name or function index
+			label: label name
+
+		Returns:
+			label name with namespace prefix
+
+		"""
+
+		if index == 'main' or index == 'init':
+			return "__fn_%s_label_%s" % (index, label)
+
+		if type(index) == str:
+			index = self.name2index[index]
+
+		return "__fn_%d_label_%s" % (index, label)
+
+
 	def get_call_label(self, index):
 		""" Get return-from-call label
 
@@ -366,7 +529,7 @@ class FnRegistry:
 
 		"""
 
-		return "__rpos_%s" % index
+		return "__call_%s" % index
 
 
 	def get_trampoline_map(self):
@@ -450,16 +613,18 @@ class M_Grande(Mutator):
 
 		self.globals_declare = []
 		self.globals_assign = []
+		self.globals_vars = set()
 
 		functions = []
-		self.user_fn = []
+		self.user_fn = set()
 
 		self.tmp_pool = TmpVarPool()
 		self.arg_pool = ArgPool()
 		self.label_pool = LabelPool()
 		self.fn_pool = FnRegistry(self.label_pool)
 
-		self.functions_called = []
+		self.functions_called = set()
+		self.labels_used = set()
 
 		init_userfn = None
 		main_userfn = None
@@ -479,7 +644,7 @@ class M_Grande(Mutator):
 				if s.name in self.user_fn:
 					raise Exception('Duplicate function: %s()' % s.name)
 
-				self.user_fn.append(s.name)
+				self.user_fn.add(s.name)
 
 				if s.name == 'main':
 					main_userfn = s
@@ -488,7 +653,7 @@ class M_Grande(Mutator):
 					init_userfn = s
 
 				else:
-					self.user_fn.append(s.name)
+					self.user_fn.add(s.name)
 					functions.append(s)
 					self.fn_pool.register(s.name)
 
@@ -747,8 +912,8 @@ class M_Grande(Mutator):
 
 			self._statement_transformers = {
 				S_Empty:	None,
-				S_Goto:		self._transform_noop,
-				S_Label:	self._transform_noop,
+				S_Goto:		self._transform_goto,
+				S_Label:	self._transform_label,
 				S_Return:	self._transform_return,
 				S_Var:		self._transform_var,
 				S_Assign:	self._transform_assign,
@@ -784,6 +949,21 @@ class M_Grande(Mutator):
 
 	def _transform_noop(self, fn, s):
 		""" No change """
+		return (s, [])
+
+
+	def _transform_goto(self, fn, s):
+
+		s.name = self.fn_pool.get_ns_label(fn.name, s.name)
+
+		self.labels_used.add(s.name)
+
+		return (s, [])
+
+	def _transform_label(self, fn, s):
+
+		s.name = self.fn_pool.get_ns_label(fn.name, s.name)
+
 		return (s, [])
 
 
@@ -853,7 +1033,7 @@ class M_Grande(Mutator):
 		else:
 			# call to user func
 			append(out, self._call_user_func(fn, s.name, s.args))
-			self.functions_called.append(s.name)
+			self.functions_called.add(s.name)
 
 		return (out, tmps)
 
@@ -876,8 +1056,6 @@ class M_Grande(Mutator):
 		out = []
 		tmps = []
 
-		append(out, S_Comment('IF begin'))
-
 		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
 		append(out, _init)
 		append(tmps, _tmps)
@@ -891,8 +1069,6 @@ class M_Grande(Mutator):
 
 		append(out, ss)
 
-		append(out, S_Comment('IF end'))
-
 		return (out, tmps)
 
 
@@ -902,7 +1078,7 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('WHILE begin'))
 
-		l_continue = self.label_pool.acquire('wh_continue')
+		l_continue = self.label_pool.acquire('wh_cont')
 		l_body = self.label_pool.acquire('wh_body')
 		l_break = self.label_pool.acquire('wh_break')
 
@@ -946,7 +1122,7 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('DO_WHILE begin'))
 
-		l_continue = self.label_pool.acquire('dowh_continue')
+		l_continue = self.label_pool.acquire('dowh_cont')
 		l_body = self.label_pool.acquire('dowh_body')
 		l_break = self.label_pool.acquire('dowh_break')
 
@@ -989,7 +1165,7 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('FOR begin'))
 
-		l_continue = self.label_pool.acquire('for_continue')
+		l_continue = self.label_pool.acquire('for_cont')
 		l_cond = self.label_pool.acquire('for_test')
 		l_body = self.label_pool.acquire('for_body')
 		l_break = self.label_pool.acquire('for_break')
@@ -1078,7 +1254,7 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('SWITCH begin'))
 
-		l_break = self.label_pool.acquire('switch_break')
+		l_break = self.label_pool.acquire('sw_break')
 
 		# add meta to the switch
 		s.meta = Obj()
@@ -1170,7 +1346,13 @@ class M_Grande(Mutator):
 			try:
 				as_str = self._erndr._render_expr(e)
 				val = eval_expr(as_str)
-				e = E_Literal(T_Number(str(val)))
+
+				e = E_Literal(
+					T_Number(
+						str(
+							round(val)
+						)))
+
 			except (ValueError, TypeError, SyntaxError, KeyError):
 				pass
 
@@ -1191,9 +1373,14 @@ class M_Grande(Mutator):
 
 			# translate name to tmp name
 			if fn is None:
-				name = e.name
+				name = e.name # global
 			else:
 				name = fn.meta.local_tmp_dict.get(e.name, e.name)
+
+				if not name in self.builtin_var:
+					if not name in self.tmp_pool.get_names():
+						if not name in self.globals_vars:
+							raise Exception('Use of undefined variable %s' % name)
 
 			if e.index is None:
 				expr = E_Variable(name)
@@ -1245,7 +1432,7 @@ class M_Grande(Mutator):
 
 				expr = E_Variable(tmp)
 
-				self.functions_called.append(e.name)
+				self.functions_called.add(e.name)
 
 		elif isinstance(e, E_Literal) or isinstance(e, E_Operator):
 			expr = e
@@ -1385,6 +1572,7 @@ class M_Grande(Mutator):
 
 		v = self._mk_var(name)
 		self.globals_declare.append(v)
+		self.globals_vars.add(name)
 
 		if value is not None:
 
@@ -1433,6 +1621,7 @@ class M_Grande(Mutator):
 	def _mk_goto(self, name):
 		s = S_Goto()
 		s.name = name
+		self.labels_used.add(name)
 		return s
 
 

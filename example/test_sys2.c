@@ -1,5 +1,4 @@
 #pragma renderer sds2
-#pragma render_comments false
 
 #include "sys2.c"
 

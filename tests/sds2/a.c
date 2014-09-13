@@ -1,3 +1,4 @@
+#pragma renderer sds2
 
 main() {
 	for(var i=0; i<100; i++)

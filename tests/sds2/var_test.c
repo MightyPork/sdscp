@@ -1,3 +1,5 @@
+#pragma renderer sds2
+
 #define RELAY[n] sys[230 + (n)]
 
 var a = sys[12 + 3];

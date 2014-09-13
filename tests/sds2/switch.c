@@ -1,3 +1,5 @@
+#pragma renderer sds2
+
 main()
 {
 	var a = 75;

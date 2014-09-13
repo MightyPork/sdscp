@@ -950,11 +950,6 @@ class D_Pragma(Token):
 		if rd.has_identifier():
 			self.value = rd.consume_identifier()  # identifier without quotes
 
-			if self.value.lower() == 'true':
-				self.value = True
-			elif self.value.lower() == 'false':
-				self.value = False
-
 		elif rd.has_number():
 
 			n = rd.consume_number()
@@ -975,6 +970,10 @@ class D_Pragma(Token):
 
 		else:
 			self.value = True  # boolean directive (flag)
+
+		v = self.value
+		if type(v) is str:
+			self.value = {'true': True, 'false': False}.get(v.lower(), v)
 
 
 	def __str__(self):
