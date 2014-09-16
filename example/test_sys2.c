@@ -9,10 +9,14 @@ var preset = 140;
 
 main() {
 	if(THERMO > preset) {
-		HEATING = 0;
+		HEATING = foo(0);
 	} else {
-		HEATING = 1;
+		HEATING = foo(1);
 	}
 
 	wait(1000);
+}
+
+foo(a){
+	return a;
 }

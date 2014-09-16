@@ -124,6 +124,12 @@ class MacroReader(CodeReader):
 			buffer += '1'  # add '1' as value
 			return buffer
 
+		# block macro - no need for annoying backslashes inside.
+		if self.has_code_block():
+			buffer += self.consume_block()
+			self.sweep()
+			return buffer
+
 		buffer_before_backslash = buffer
 		last_was_backslash = False
 

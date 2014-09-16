@@ -422,6 +422,8 @@ class FnRegistry:
 
 		self.label_pool = label_pool
 
+		self.callindex2name = {}
+
 		self.call_counter = 1
 
 		self.function_labels = {}
@@ -448,7 +450,7 @@ class FnRegistry:
 		return i
 
 
-	def register_call(self):
+	def register_call(self, called):
 		""" Register a call. Returns index. """
 
 		i = self.counter
@@ -457,6 +459,7 @@ class FnRegistry:
 		self.index2label[i] = label
 
 		self.label_pool.register(label)
+		self.callindex2name[i] = self.get_name(called)
 
 		self.counter += 1;
 
@@ -551,7 +554,10 @@ class FnRegistry:
 		""" Get name from address """
 
 		if not addr in self.index2name.keys():
-			return None
+			if addr in self.callindex2name.keys():
+				return self.callindex2name[addr]
+			else:
+				return None
 
 		return self.index2name[addr]
 
@@ -660,20 +666,62 @@ class M_Grande(Mutator):
 			else:
 				raise Exception('Illegal statement in root scope: %s' % s)
 
+		if main_userfn is None:
+			raise Exception('Missing main!')
 
 		# process init()
+		pr_init = None
 		if init_userfn is not None:
-			init_userfn_processed = self._process_fn(init_userfn, naked=True)
+			pr_init = self._process_fn(init_userfn, naked=True)
 
-		# process main()
-		if main_userfn is not None:
-			main_userfn_processed = self._process_fn(main_userfn, naked=True)
-
+		pr_main = self._process_fn(main_userfn, naked=True)
 
 		# process user functions except main() & init()
-		functions_processed = {}
+		pr_userfuncs = {}
 		for fn in functions:
-			functions_processed[fn.name] = self._process_fn(fn)
+			# now we get
+			pr_userfuncs[fn.name] = self._process_fn(fn)
+
+		# find out what funcs are needed
+		_labels = set()
+		_gotos = set()
+		_calls = set()
+
+		_labels.update(pr_main.labels)
+		_calls.update(pr_main.calls)
+		_gotos.update(pr_main.gotos)
+
+		if pr_init is not None:
+			_labels.update(pr_init.labels)
+			_calls.update(pr_init.calls)
+			_gotos.update(pr_init.gotos)
+
+		_unresolved_calls = set()
+		_unresolved_calls.update(_calls)
+
+		_resolved_calls = set()
+
+		try:
+			while len(_unresolved_calls) > 0:
+				for name in list(_unresolved_calls):
+					if name in _resolved_calls:
+						continue
+
+					fn = pr_userfuncs[name]
+					_resolved_calls.add(name)
+					_unresolved_calls.remove(name)
+
+					_labels.update(fn.labels)
+					_calls.update(fn.calls)
+					_gotos.update(fn.gotos)
+
+					_unresolved_calls.update(_calls.difference(_resolved_calls))
+
+		except KeyError as e:
+			raise Exception('Error while resolving calls', e)
+
+		self.used_labels = _gotos
+		self.functions_called = _calls
 
 
 		# Add used tmps to globals declare
@@ -723,7 +771,7 @@ class M_Grande(Mutator):
 
 		# user init function
 		if init_userfn is not None:
-			append(sts, init_userfn_processed)
+			append(sts, pr_init.code)
 
 		# infinite main loop
 		append(sts, self._banner('FUNC: main()'))
@@ -731,20 +779,14 @@ class M_Grande(Mutator):
 		append(sts, self._mk_label('__main_loop'))
 
 		if main_userfn is not None:
-			sts += main_userfn_processed
+			append(sts, pr_main.code)
 
 		append(sts, self._mk_goto('__main_loop'))
 
 
 		# other user functions (already processed)
-		for (name, fn_sts) in functions_processed.items():
-			if not name in self.functions_called:
-				print('INFO: Unused function %s(), removing from code.' % name)
-			else:
-				append(sts, fn_sts)
-
-			# note: This optimization fails if dead function is called from
-			# another dead function or from itself.
+		for name in _resolved_calls:
+			append(sts, pr_userfuncs[name].code)
 
 
 		# compose main function with all the code
@@ -772,10 +814,10 @@ class M_Grande(Mutator):
 
 		for (i, n) in trmap.items():
 
-			name = self.fn_pool.get_name(i)
+			name = self.fn_pool.get_name(i)  # None = call
 
 			if (name is not None) and (not name in self.functions_called):
-				print('INFO: Removing unused func from trampoline: %s' % name)
+				print('INFO: Removing unused func/call from trampoline: %s' % name)
 				continue
 
 			append(sts, synth("""
@@ -832,7 +874,8 @@ class M_Grande(Mutator):
 		self.tmp_pool.release_all()
 
 		if naked:
-			return self._process_block(fn, fn.body_st.children)
+			out = self._process_block(fn, fn.body_st.children)
+			return self._compose_func_obj(fn, out)
 
 		body = []
 
@@ -887,7 +930,18 @@ class M_Grande(Mutator):
 		append(out, self._mk_pop('__addr'))  # pop a return address
 		append(out, self._mk_goto('__trampoline'))
 
-		return out
+		return self._compose_func_obj(fn, out)
+
+
+	def _compose_func_obj(self, fn, code):
+
+		ret = Obj()
+		ret.code = code
+		ret.labels = fn.meta.labels
+		ret.gotos = fn.meta.gotos
+		ret.calls = fn.meta.calls
+
+		return ret
 
 
 	def _process_block(self, fn, sts):
@@ -913,6 +967,7 @@ class M_Grande(Mutator):
 			self._statement_transformers = {
 				S_Empty:	None,
 				S_Goto:		self._transform_goto,
+				S_Block:	self._transform_alone_block,
 				S_Label:	self._transform_label,
 				S_Return:	self._transform_return,
 				S_Var:		self._transform_var,
@@ -952,17 +1007,24 @@ class M_Grande(Mutator):
 		return (s, [])
 
 
+	def _transform_alone_block(self, fn, s):
+		""" Transform the insides """
+		return (self._process_block(fn, s), [])
+
+
 	def _transform_goto(self, fn, s):
 
 		s.name = self.fn_pool.get_ns_label(fn.name, s.name)
 
 		self.labels_used.add(s.name)
+		fn.meta.gotos.add(s.name)
 
 		return (s, [])
 
 	def _transform_label(self, fn, s):
 
 		s.name = self.fn_pool.get_ns_label(fn.name, s.name)
+		fn.meta.labels.add(s.name)
 
 		return (s, [])
 
@@ -1495,6 +1557,8 @@ class M_Grande(Mutator):
 			if not name in self.user_fn:
 				raise Exception('Call to undefined function %s()' % name)
 
+			fn.meta.calls.add(name)
+
 			# regular user function call
 			self.arg_pool.rewind()
 
@@ -1512,11 +1576,13 @@ class M_Grande(Mutator):
 
 			append(out, arg_assignments)
 
-			# get return label index
-			return_idx = self.fn_pool.register_call()
 
 			# callee address
 			addr = self.fn_pool.get_addr(name)
+
+			# get return label index
+			return_idx = self.fn_pool.register_call(addr)
+
 			append(out, self._mk_assign('__addr', addr))
 			append(out, self._mk_push(return_idx))
 			append(out, self._mk_goto('__trampoline'))
@@ -1596,6 +1662,15 @@ class M_Grande(Mutator):
 		fn.bind_parent(None)
 
 		fn.meta = Obj()
+
+		# list of labels inside the function
+		fn.meta.labels = set()
+
+		# list of gotos inside the function
+		fn.meta.gotos = set()
+
+		# list of called funcs
+		fn.meta.calls = set()
 
 		# list of tmp vars modified within the scope of this function
 		# to be pushed / popped at the beginning / end of the function
