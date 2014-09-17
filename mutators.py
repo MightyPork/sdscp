@@ -1039,6 +1039,7 @@ class M_Grande(Mutator):
 		else:
 			repl = self.tmp_pool.acquire()
 			fn.meta.local_tmp_dict[s.var.name] = repl
+			append(tmps, repl)
 
 		value = s.value
 
