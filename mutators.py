@@ -115,7 +115,7 @@ class M_AddBraces(Mutator):
 		return s
 
 
-class M_RemoveStupid(Mutator):
+class M_RemoveDeadCode(Mutator):
 	""" Removes obvious dead code, unused labels etc. """
 
 	def _transform(self, code):
@@ -348,7 +348,7 @@ class ArgPool:
 
 
 	def _gen_name(self, index):
-		return "__arg_%d" % (index)
+		return "__a%d" % (index)
 
 
 	def rewind(self):
@@ -420,6 +420,9 @@ class FnRegistry:
 
 		self.index2label = {}
 
+		self.index2label_fn = {}
+		self.index2label_call = {}
+
 		self.label_pool = label_pool
 
 		self.callindex2name = {}
@@ -440,6 +443,7 @@ class FnRegistry:
 		self.name2index[name] = i
 		self.index2name[i] = name
 		self.index2label[i] = begin
+		self.index2label_fn[i] = begin
 
 		self.label_pool.register(begin)
 		self.label_pool.register(end)
@@ -457,6 +461,7 @@ class FnRegistry:
 		label = self.get_call_label(i)
 
 		self.index2label[i] = label
+		self.index2label_call[i] = label
 
 		self.label_pool.register(label)
 		self.callindex2name[i] = self.get_name(called)
@@ -480,7 +485,7 @@ class FnRegistry:
 		if type(index) == str:
 			index = self.name2index[index]
 
-		return "__fn_%d" % index
+		return "__fn%d" % index
 
 
 	def get_end(self, index):
@@ -497,7 +502,7 @@ class FnRegistry:
 		if type(index) == str:
 			index = self.name2index[index]
 
-		return "__fn_%d_end" % index
+		return "__fn%d_end" % index
 
 
 	def get_ns_label(self, index, label):
@@ -513,12 +518,12 @@ class FnRegistry:
 		"""
 
 		if index == 'main' or index == 'init':
-			return "__fn_%s_label_%s" % (index, label)
+			return "__fn%sL_%s" % (index, label)
 
 		if type(index) == str:
 			index = self.name2index[index]
 
-		return "__fn_%d_label_%s" % (index, label)
+		return "__fn%sL_%s" % (index, label)
 
 
 	def get_call_label(self, index):
@@ -532,13 +537,25 @@ class FnRegistry:
 
 		"""
 
-		return "__call_%s" % index
+		return "__rp_%s" % index
 
 
 	def get_trampoline_map(self):
 		""" Get index -> label map """
 
 		return self.index2label
+
+
+	def get_trampoline_map_fn(self):
+		""" Get index -> label map for funcs """
+
+		return self.index2label_fn
+
+
+	def get_trampoline_map_call(self):
+		""" Get index -> label map for calls """
+
+		return self.index2label_call
 
 
 	def get_addr(self, name):
@@ -620,6 +637,7 @@ class M_Grande(Mutator):
 		self.globals_declare = []
 		self.globals_assign = []
 		self.globals_vars = set()
+		self.global_rename = {}
 
 		functions = []
 		self.user_fn = set()
@@ -643,7 +661,7 @@ class M_Grande(Mutator):
 		# iterate through top level statements
 		for s in code:
 			if isinstance(s, S_Var):
-				self._add_global_var(s.var.name, s.value)
+				self._add_global_var(s.var.name, s.value, user=True)
 
 			elif isinstance(s, S_Function):
 
@@ -803,21 +821,33 @@ class M_Grande(Mutator):
 	def _build_trampoline(self):
 		""" Build redirection vector """
 
-		trmap = self.fn_pool.get_trampoline_map()
-
-		if len(trmap) == 0:
-			return None
-
 		sts = []
-		append(sts, self._banner('Redirection vector'))
-		append(sts, self._mk_label('__trampoline'))
 
-		for (i, n) in trmap.items():
+		trmap_fn = self.fn_pool.get_trampoline_map_fn()
+		if len(trmap_fn) > 0:
+			append(sts, self._banner('GOSUB vector'))
+			append(sts, self._mk_label('__trampoline_fn'))
 
-			name = self.fn_pool.get_name(i)  # None = call
+			append(sts, self._build_tramp_vector(trmap_fn))
 
-			if (name is not None) and (not name in self.functions_called):
-				print('INFO: Removing unused func/call from trampoline: %s' % name)
+
+		trmap_retpos = self.fn_pool.get_trampoline_map_call()
+		if len(trmap_retpos) > 0:
+			append(sts, self._banner('RETURN vector'))
+			append(sts, self._mk_label('__trampoline_ret'))
+
+			append(sts, self._build_tramp_vector(trmap_retpos))
+
+		return sts
+
+	def _build_tramp_vector(self, jump_map):
+		sts = []
+
+		for (i, n) in jump_map.items():
+
+			name = self.fn_pool.get_name(i)
+			if name not in self.functions_called:
+				print('INFO: Removing reference to %s() from trampoline.' % name)
 				continue
 
 			append(sts, synth("""
@@ -928,7 +958,7 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('Return to caller'))
 		append(out, self._mk_pop('__addr'))  # pop a return address
-		append(out, self._mk_goto('__trampoline'))
+		append(out, self._mk_goto('__trampoline_ret'))
 
 		return self._compose_func_obj(fn, out)
 
@@ -1039,7 +1069,8 @@ class M_Grande(Mutator):
 		else:
 			repl = self.tmp_pool.acquire()
 			fn.meta.local_tmp_dict[s.var.name] = repl
-			append(tmps, repl)
+
+		fn.meta.changed_tmps.append(repl)
 
 		value = s.value
 
@@ -1403,7 +1434,7 @@ class M_Grande(Mutator):
 
 		# try to evaluate it
 		if not hasattr(self, '_erndr'):
-			self._erndr = renderers.BasicRenderer([])
+			self._erndr = renderers.CSyntaxRenderer([])
 
 		if type(e) is E_Group:
 			try:
@@ -1423,6 +1454,8 @@ class M_Grande(Mutator):
 		if isinstance(e, E_Group):
 			new_children = []
 
+			group_with_next = False
+
 			for c in e.children:
 				(_init, _tmps, _e) = self._process_expr(fn, c)
 
@@ -1438,7 +1471,12 @@ class M_Grande(Mutator):
 			if fn is None:
 				name = e.name # global
 			else:
-				name = fn.meta.local_tmp_dict.get(e.name, e.name)
+				if e.name in fn.meta.local_tmp_dict:
+					name = fn.meta.local_tmp_dict[e.name]
+				elif e.name in self.global_rename:
+					name = self.global_rename[e.name]
+				else:
+					name = e.name
 
 				if not name in self.builtin_var:
 					if not name in self.tmp_pool.get_names():
@@ -1503,9 +1541,78 @@ class M_Grande(Mutator):
 		else:
 			print('WARN: Unhandled expression %s (type %s)' % (e, type(e)))
 
-		# TODO: handle other stuff?
+		if type(expr) is E_Group:
+			# group parts by operator precedence (SDS-C bug! awww)
+			expr.children = self._group_expr_operators(expr.children)
 
 		return (init, tmps, expr)
+
+	def _group_expr_operators(self, exprs):
+
+		# print(' , '.join([str(e) for e in exprs]))
+
+		# 1. group highest level, then lower etc.
+		order = ['!', '~', '*', '/', '%', '+', '-', '>>', '<<', '<', '<=', '>', '>=', '==', '!=', '&', '^', '|', '&&', '||']
+
+		for o in order:
+
+			if o in ['!', '~']:
+				arity = 1
+			else:
+				arity = 2
+
+			while True:
+				out = []
+				last2 = None
+				last1 = None
+				collecting = False
+				times = 0
+				for e in exprs:
+					if last1 is None:
+						last1 = e
+						continue
+
+					if last1 is not None and type(e) is E_Operator and e.value == o:
+						# print('Collecting for %s' % e)
+						append(out, last2)
+						if arity == 2:
+							last2 = last1
+						else:
+							append(out, last1)
+
+						last1 = e
+						collecting = True
+						continue
+
+					if collecting:
+						times += 1
+						if arity == 2:
+							out.append(E_Group([last2, last1, e]))
+						else:
+							out.append(E_Group([last1, e]))
+
+						collecting = False
+						last2 = None
+						last1 = None
+					else:
+						if last2 is not None:
+							append(out, last2)
+
+						last2 = last1
+						last1 = e
+
+				if last2 is not None:
+						append(out, last2)
+
+				if last1 is not None:
+						append(out, last1)
+
+				exprs = out
+
+				if times == 0:
+					break
+
+		return exprs # TODO
 
 
 	def _call_user_func(self, fn, name, args):
@@ -1586,7 +1693,7 @@ class M_Grande(Mutator):
 
 			append(out, self._mk_assign('__addr', addr))
 			append(out, self._mk_push(return_idx))
-			append(out, self._mk_goto('__trampoline'))
+			append(out, self._mk_goto('__trampoline_fn'))
 
 			# return label
 			lbl = self.fn_pool.get_call_label(return_idx)
@@ -1634,8 +1741,23 @@ class M_Grande(Mutator):
 		return (out, tmps, args)
 
 
-	def _add_global_var(self, name, value=None):
+	def _add_global_var(self, name, value=None, user=False):
 		""" Add a global variable; split to declaration & assignment """
+
+		if user:
+			if name in self.global_rename.keys():
+				raise Exception('Duplicate global var declaration (%s)' % name)
+
+			# user defined
+			nm = 'u'+name
+			cnt=1
+			while nm in self.global_rename.values():
+				nm = 'u'+name+cnt
+				cnt += 1
+
+			self.global_rename[name] = nm
+			name = nm
+
 
 		v = self._mk_var(name)
 		self.globals_declare.append(v)

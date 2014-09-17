@@ -555,6 +555,21 @@ class T_Expression(CompositeToken):
 				t = T_Number(s)
 				self.tokens.append(t)
 
+			elif (len(self.tokens) > 0 and
+				type(self.tokens[-1:][0]) is T_Operator
+				and rd.matches(r'[-+]\s*[0-9a-z_]+')):
+
+				# Number literal
+				sign = rd.consume()
+				if sign == '+':
+					sign = ''
+
+				rd.sweep()
+
+				if sign == '-':
+					self.tokens.append(T_Number('-1'))
+					self.tokens.append(T_Operator('*'))
+
 			elif rd.has_operator():
 				# Operator
 				s = rd.consume_operator()

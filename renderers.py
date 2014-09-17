@@ -41,7 +41,7 @@ class Renderer:
 	def set_pragmas(self, pragmas):
 		self.pragmas = pragmas
 
-		indent = self.pragmas.get('indent', '    ')
+		indent = self.pragmas.get('indent', 'tabs')
 
 		if indent == 'tabs' or indent == '\t':
 			self.indent = '\t'
@@ -152,7 +152,7 @@ class Renderer:
 
 
 
-class BasicRenderer(Renderer):
+class CSyntaxRenderer(Renderer):
 	""" Renderer that produces C-like syntax.
 
 	Extensible by overriding the individual `_render_?` methods.
@@ -308,7 +308,7 @@ class BasicRenderer(Renderer):
 
 	def _render_comment(self, s):  # S_Comment
 
-		if self.pragmas.get('render_comments', True) or hasattr(s, '_header_comment'):
+		if not self.pragmas.get('no_comments', False) or hasattr(s, '_header_comment'):
 			if s.text.count('\n') == 0:
 				return '// %s' % s.text
 			else:
@@ -606,6 +606,10 @@ class BasicRenderer(Renderer):
 
 
 	def _render_expr_group(self, e):  # E_Group
+
+		if len(e.children) == 1:
+			return self._render_subexpr(e.children[0])
+
 		src = ''
 		for ee in e.children:
 			src += ' ' + self._render_subexpr(ee)
@@ -633,7 +637,7 @@ class BasicRenderer(Renderer):
 
 
 
-class BasicSdsRenderer(BasicRenderer):
+class BaseSdsRenderer(CSyntaxRenderer):
 	""" SDS-C code renderer
 	Takes care of SDS-C pecularities &
 	refuses to render illegar statements / structures.
@@ -735,7 +739,7 @@ class BasicSdsRenderer(BasicRenderer):
 
 
 
-class SdsRenderer(BasicSdsRenderer):
+class SimpleSdsRenderer(BaseSdsRenderer):
 	""" Final SDS renderer
 
 	Attrs:
@@ -762,7 +766,7 @@ class SdsRenderer(BasicSdsRenderer):
 
 
 
-class SdsRenderer2(BasicSdsRenderer):
+class AsmSdsRenderer(BaseSdsRenderer):
 	""" Final SDS renderer
 
 	Attrs:
@@ -780,7 +784,7 @@ class SdsRenderer2(BasicSdsRenderer):
 
 		self.mutators.append(self.gr)
 		self.mutators.append(M_AddBraces())
-		self.mutators.append(M_RemoveStupid())
+		self.mutators.append(M_RemoveDeadCode())
 
 
 	def _on_pragmas_set(self):

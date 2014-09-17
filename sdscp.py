@@ -28,13 +28,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-		'-r', '--renderer',
-		help='Set renderer to use, overrides #pragma renderer.',
-		default=None,
-		action='store',
-)
-
-parser.add_argument(
 		'-p', '--pragma',
 		help='Set a pragma value (syntax like #pragma)',
 		action='append',
@@ -122,8 +115,6 @@ SHOW_STATEMENTS	= args.verbose or args.show_statements
 SHOW_GENERATED	= args.verbose or args.show_generated
 SHOW_OUTPUT		= args.verbose or args.display
 
-REQUESTED_RENDERER = args.renderer
-
 pragmas_args = {}
 
 for p in args.pragma:
@@ -174,9 +165,6 @@ try:
 	pragmas = dproc.get_pragmas()
 
 	pragmas.update(pragmas_args)
-
-	if REQUESTED_RENDERER is not None:
-		pragmas['renderer'] = REQUESTED_RENDERER
 
 	pragmas['main_file'] = SRC
 
@@ -251,7 +239,7 @@ try:
 		banner('GENERATED', '-')
 		print('Code generated from statements:\n')
 
-		rndr = BasicRenderer(sts)
+		rndr = CSyntaxRenderer(sts)
 		print(prep4disp(rndr.render()))
 
 
@@ -259,14 +247,16 @@ try:
 
 		# perform tweaks to match some of SDS-C's broken syntax
 
-		rtype = pragmas.get('renderer', 'sds')
+		rtype = pragmas.get('renderer', 'sds2')
 
-		if rtype == 'sds':
-			rndr = SdsRenderer(sts)
-		elif rtype == 'sds2':
-			rndr = SdsRenderer2(sts)
-		elif rtype == 'basic':
-			rndr = BasicRenderer(sts)
+		if rtype in ['sds', 'simple']:
+			rndr = SimpleSdsRenderer(sts)
+		elif rtype in ['sds2', 'asm']:
+			rndr = AsmSdsRenderer(sts)
+		elif rtype in ['debug']:
+			rndr = CSyntaxRenderer(sts)
+		else:
+			raise Exception('Unknown renderer: "%s"' % rtype)
 
 		rndr.set_pragmas(pragmas)
 
