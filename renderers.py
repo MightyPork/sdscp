@@ -70,24 +70,22 @@ class Renderer:
 			self._prepared = self._prepare(self._source)
 
 			# resolve header comment
-			if self.pragmas.get('header', None) is not False:
-				bfile = os.path.join(os.path.dirname(__file__), 'banner.txt')
+			if 'no_header' not in self.pragmas:
+				logo_file = os.path.join(os.path.dirname(__file__), 'logo.txt')
 
-				if 'header' in self.pragmas:
-					f = self.pragmas.get('header')
-					if f == False:
-						bfile = None
+				if 'logo' in self.pragmas:
+					f = self.pragmas.get('logo')
+
+					if os.path.isfile(f):
+						logo_file = f
 					else:
+						f = os.path.join(os.path.dirname(self.pragmas.get('main_file')), f)
 						if os.path.isfile(f):
-							bfile = f
-						else:
-							f = os.path.join(os.path.dirname(self.pragmas.get('main_file')), f)
-							if os.path.isfile(f):
-								bfile = f
+							logo_file = f
 
 				banner_text = ''
-				if bfile is not None:
-					with open(bfile, "r") as myfile:
+				if logo_file is not None:
+					with open(logo_file, "r") as myfile:
 						banner_text = myfile.read()
 
 

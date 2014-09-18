@@ -537,7 +537,7 @@ class FnRegistry:
 
 		"""
 
-		return "__rp_%s" % index
+		return "__rp%s" % index
 
 
 	def get_trampoline_map(self):

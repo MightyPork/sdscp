@@ -250,8 +250,10 @@ try:
 		rtype = pragmas.get('renderer', 'sds2')
 
 		if rtype in ['sds', 'simple']:
+			rtype = 'simple'
 			rndr = SimpleSdsRenderer(sts)
 		elif rtype in ['sds2', 'asm']:
+			rtype = 'asm'
 			rndr = AsmSdsRenderer(sts)
 		elif rtype in ['debug']:
 			rndr = CSyntaxRenderer(sts)
@@ -260,7 +262,7 @@ try:
 
 		rndr.set_pragmas(pragmas)
 
-		print('Rendering to SDS-C using "%s"...' % rtype)
+		print('Rendering to SDS-C using "%s" renderer...' % rtype)
 		for_sds = rndr.render()
 
 		if SHOW_OUTPUT:
