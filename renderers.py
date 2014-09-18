@@ -82,6 +82,8 @@ class Renderer:
 						f = os.path.join(os.path.dirname(self.pragmas.get('main_file')), f)
 						if os.path.isfile(f):
 							logo_file = f
+						else:
+							print('[WARN] Could not locate logo file: %s' % self.pragmas.get('logo'))
 
 				banner_text = ''
 				if logo_file is not None:
