@@ -420,7 +420,7 @@ class FnRegistry:
 
 		self.index2label = {}
 
-		self.index2label_fn = {}
+		# self.index2label_fn = {}
 		self.index2label_call = {}
 
 		self.label_pool = label_pool
@@ -431,19 +431,22 @@ class FnRegistry:
 
 		self.function_labels = {}
 
+		self.gr = None  # reference to Grande Mutator
+
 
 	def register(self, name):
 		""" Register a function. Returns index. """
 
 		i = self.counter
 
+		self.name2index[name] = i
+		self.index2name[i] = name
+
 		begin = self.get_begin(i)
 		end = self.get_end(i)
 
-		self.name2index[name] = i
-		self.index2name[i] = name
-		self.index2label[i] = begin
-		self.index2label_fn[i] = begin
+		# self.index2label[i] = begin
+		# self.index2label_fn[i] = begin
 
 		self.label_pool.register(begin)
 		self.label_pool.register(end)
@@ -460,7 +463,7 @@ class FnRegistry:
 		i = self.counter
 		label = self.get_call_label(i)
 
-		self.index2label[i] = label
+		# self.index2label[i] = label
 		self.index2label_call[i] = label
 
 		self.label_pool.register(label)
@@ -482,10 +485,21 @@ class FnRegistry:
 
 		"""
 
-		if type(index) == str:
-			index = self.name2index[index]
+		if self.gr is not None and self.gr.do_preserve_names:
+			name = index
 
-		return "__fn%d" % index
+			if type(index) == str:
+				index = self.name2index[index]
+			else:
+				name = self.index2name[index]
+
+			return "__fn%s_%s" % (index, name)
+
+		else:
+			if type(index) == str:
+				index = self.name2index[index]
+
+			return "__fn%s" % index
 
 
 	def get_end(self, index):
@@ -500,6 +514,13 @@ class FnRegistry:
 		"""
 
 		if type(index) == str:
+
+			if index == 'main':
+				return '__main_loop_end';
+
+			if index == 'init':
+				return '__init_end';
+
 			index = self.name2index[index]
 
 		return "__fn%d_end" % index
@@ -540,19 +561,7 @@ class FnRegistry:
 		return "__rp%s" % index
 
 
-	def get_trampoline_map(self):
-		""" Get index -> label map """
-
-		return self.index2label
-
-
-	def get_trampoline_map_fn(self):
-		""" Get index -> label map for funcs """
-
-		return self.index2label_fn
-
-
-	def get_trampoline_map_call(self):
+	def get_retpos_vector_map(self):
 		""" Get index -> label map for calls """
 
 		return self.index2label_call
@@ -630,6 +639,7 @@ class M_Grande(Mutator):
 		self._halt_used = False
 
 		self.do_check_stack_bounds = True
+		self.do_preserve_names = False
 
 
 	def _transform(self, code):
@@ -646,6 +656,7 @@ class M_Grande(Mutator):
 		self.arg_pool = ArgPool()
 		self.label_pool = LabelPool()
 		self.fn_pool = FnRegistry(self.label_pool)
+		self.fn_pool.gr = self
 
 		self.functions_called = set()
 		self.labels_used = set()
@@ -654,7 +665,7 @@ class M_Grande(Mutator):
 		main_userfn = None
 
 		# register helper vars
-		self._add_global_var('__ret')  # return value
+		self._add_global_var('__rval')  # return value
 		self._add_global_var('__sp', self.stack_end + 1)  # stack pointer at RAMEND (grows towards lower addrs)
 		self._add_global_var('__addr')  # jump address pointer
 
@@ -791,6 +802,8 @@ class M_Grande(Mutator):
 		if init_userfn is not None:
 			append(sts, pr_init.code)
 
+		append(sts, self._mk_label('__init_end'))
+
 		# infinite main loop
 		append(sts, self._banner('FUNC: main()'))
 		append(sts, self._mk_echo('[INFO] main() started.'))
@@ -799,6 +812,7 @@ class M_Grande(Mutator):
 		if main_userfn is not None:
 			append(sts, pr_main.code)
 
+		append(sts, self._mk_label('__main_loop_end'))
 		append(sts, self._mk_goto('__main_loop'))
 
 
@@ -823,39 +837,27 @@ class M_Grande(Mutator):
 
 		sts = []
 
-		trmap_fn = self.fn_pool.get_trampoline_map_fn()
-		if len(trmap_fn) > 0:
-			append(sts, self._banner('GOSUB vector'))
-			append(sts, self._mk_label('__trampoline_fn'))
-
-			append(sts, self._build_tramp_vector(trmap_fn))
-
-
-		trmap_retpos = self.fn_pool.get_trampoline_map_call()
-		if len(trmap_retpos) > 0:
+		jump_map = self.fn_pool.get_retpos_vector_map()
+		if len(jump_map) > 0:
 			append(sts, self._banner('RETURN vector'))
-			append(sts, self._mk_label('__trampoline_ret'))
+			append(sts, self._mk_label('__r_vect'))
 
-			append(sts, self._build_tramp_vector(trmap_retpos))
+			append(sts, self._mk_pop('__addr'))  # pop a return address
 
-		return sts
+			# append(sts, synth('echo("RET -> ", __addr);'))  # pop a return address
 
-	def _build_tramp_vector(self, jump_map):
-		sts = []
+			for (i, n) in jump_map.items():
+				name = self.fn_pool.get_name(i)
+				if name not in self.functions_called:
+					print('INFO: Removing reference to %s() from trampoline.' % name)
+					continue
 
-		for (i, n) in jump_map.items():
+				append(sts, synth("""
+					if (__addr == %d) goto %s;
+				""" % (i, n)))
 
-			name = self.fn_pool.get_name(i)
-			if name not in self.functions_called:
-				print('INFO: Removing reference to %s() from trampoline.' % name)
-				continue
-
-			append(sts, synth("""
-				if (__addr == %d) goto %s;
-			""" % (i, n)))
-
-		append(sts, S_Comment('Fall-through for invalid address'))
-		append(sts, self._mk_goto('__err_bad_addr'))
+			append(sts, S_Comment('Fall-through for invalid address'))
+			append(sts, self._mk_goto('__err_bad_addr'))
 
 		return sts
 
@@ -923,7 +925,7 @@ class M_Grande(Mutator):
 
 				append(body, self._mk_assign(tmp, arg))
 
-		append(body, self._mk_assign('__ret', 0))
+		append(body, self._mk_assign('__rval', 0))
 
 		append(body, S_Comment('Function body'))
 		append(body, self._process_block(fn, fn.body_st.children))
@@ -957,8 +959,7 @@ class M_Grande(Mutator):
 				append(out, self._mk_pop(n))
 
 		append(out, S_Comment('Return to caller'))
-		append(out, self._mk_pop('__addr'))  # pop a return address
-		append(out, self._mk_goto('__trampoline_ret'))
+		append(out, self._mk_goto('__r_vect'))
 
 		return self._compose_func_obj(fn, out)
 
@@ -1140,7 +1141,7 @@ class M_Grande(Mutator):
 		append(out, _init)
 		append(tmps, _tmps)
 
-		append(out, self._mk_assign('__ret', rval))
+		append(out, self._mk_assign('__rval', rval))
 		append(out, self._mk_goto(self.fn_pool.get_end(fn.name)))
 
 		return (out, tmps)
@@ -1529,7 +1530,7 @@ class M_Grande(Mutator):
 				append(init, self._call_user_func(fn, e.name, e.args))
 
 				tmp = self.tmp_pool.acquire()
-				append(init, self._mk_assign(tmp, '__ret'))
+				append(init, self._mk_assign(tmp, '__rval'))
 
 				expr = E_Variable(tmp)
 
@@ -1549,12 +1550,13 @@ class M_Grande(Mutator):
 
 	def _group_expr_operators(self, exprs):
 
-		# print(' , '.join([str(e) for e in exprs]))
+		# print(str(E_Group(exprs)))
 
 		# 1. group highest level, then lower etc.
 		order = ['!', '~', '*', '/', '%', '+', '-', '>>', '<<', '<', '<=', '>', '>=', '==', '!=', '&', '^', '|', '&&', '||']
 
 		for o in order:
+			# print('Collecting operator %s' % o)
 
 			if o in ['!', '~']:
 				arity = 1
@@ -1568,20 +1570,26 @@ class M_Grande(Mutator):
 				collecting = False
 				times = 0
 				for e in exprs:
-					if last1 is None:
-						last1 = e
-						continue
-
-					if last1 is not None and type(e) is E_Operator and e.value == o:
+					if type(e) is E_Operator and e.value == o:
 						# print('Collecting for %s' % e)
-						append(out, last2)
+
+						if last2 is not None:
+							append(out, last2)
+
 						if arity == 2:
+							if last1 is None:
+								last1 = e
+								continue
+
 							last2 = last1
 						else:
-							append(out, last1)
+							if last1 is not None:
+								append(out, last1)
 
 						last1 = e
 						collecting = True
+
+						# print("HIT")
 						continue
 
 					if collecting:
@@ -1611,6 +1619,9 @@ class M_Grande(Mutator):
 
 				if times == 0:
 					break
+
+			# print(str(E_Group(exprs)))
+
 
 		return exprs # TODO
 
@@ -1686,14 +1697,15 @@ class M_Grande(Mutator):
 
 
 			# callee address
-			addr = self.fn_pool.get_addr(name)
+			target_fn = self.fn_pool.get_begin(name)
 
 			# get return label index
+			addr = self.fn_pool.get_addr(name)
 			return_idx = self.fn_pool.register_call(addr)
 
-			append(out, self._mk_assign('__addr', addr))
+			# append(out, self._mk_assign('__addr', addr))
 			append(out, self._mk_push(return_idx))
-			append(out, self._mk_goto('__trampoline_fn'))
+			append(out, self._mk_goto(target_fn))
 
 			# return label
 			lbl = self.fn_pool.get_call_label(return_idx)
@@ -1748,15 +1760,26 @@ class M_Grande(Mutator):
 			if name in self.global_rename.keys():
 				raise Exception('Duplicate global var declaration (%s)' % name)
 
-			# user defined
-			nm = 'u'+name
-			cnt=1
-			while nm in self.global_rename.values():
-				nm = 'u'+name+cnt
-				cnt += 1
+			if not self.do_preserve_names:
+				nm = 'u1'
+				cnt=1
+				while nm in self.global_rename.values():
+					cnt += 1
+					nm = 'u%d' % cnt
 
-			self.global_rename[name] = nm
-			name = nm
+				self.global_rename[name] = nm
+				name = nm
+			else:
+				if name[:2] == '__':
+					# user defined
+					nm = 'u'+name
+					cnt=1
+					while nm in self.global_rename.values():
+						nm = 'u'+name+cnt
+						cnt += 1
+
+					self.global_rename[name] = nm
+					name = nm
 
 
 		v = self._mk_var(name)

@@ -133,7 +133,7 @@ class E_Group(Expression):
 
 
 	def __str__(self):
-		return 'EGrp(%s)' % ' '.join( [str(a) for a in self.children] )
+		return '(%s)' % ', '.join( [str(a) for a in self.children] )
 
 
 

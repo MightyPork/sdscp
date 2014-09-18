@@ -38,6 +38,10 @@ class Renderer:
 		self.pragmas = {}
 
 
+	def _get_name(self):
+		return type(self).__name__
+
+
 	def set_pragmas(self, pragmas):
 		self.pragmas = pragmas
 
@@ -70,7 +74,7 @@ class Renderer:
 			self._prepared = self._prepare(self._source)
 
 			# resolve header comment
-			if 'no_header' not in self.pragmas:
+			if self.pragmas.get('header', True):
 				logo_file = os.path.join(os.path.dirname(__file__), 'logo.txt')
 
 				if 'logo' in self.pragmas:
@@ -99,7 +103,8 @@ class Renderer:
 					'name': self.pragmas.get('name', '?'),
 					'author': self.pragmas.get('author', '?'),
 					'version': self.pragmas.get('version', '?'),
-					'time': strftime('%Y-%m-%d, %H:%M:%S', localtime())
+					'time': strftime('%Y-%m-%d, %H:%M:%S', localtime()),
+					'renderer': self._get_name(),
 				}
 
 				banner_text	= banner_text.strip('\n')
@@ -168,6 +173,10 @@ class CSyntaxRenderer(Renderer):
 			current ones.
 
 	"""
+
+	def _get_name(self):
+		return 'csyntax'
+
 
 	def __init__(self, program):
 		super().__init__(program)
@@ -308,7 +317,7 @@ class CSyntaxRenderer(Renderer):
 
 	def _render_comment(self, s):  # S_Comment
 
-		if not self.pragmas.get('no_comments', False) or hasattr(s, '_header_comment'):
+		if self.pragmas.get('comments', True) or hasattr(s, '_header_comment'):
 			if s.text.count('\n') == 0:
 				return '// %s' % s.text
 			else:
@@ -644,6 +653,9 @@ class BaseSdsRenderer(CSyntaxRenderer):
 
 	"""
 
+	def _get_name(self):
+		return 'basic_sds'
+
 	def __init__(self, program):
 		super().__init__(program)
 
@@ -748,6 +760,10 @@ class SimpleSdsRenderer(BaseSdsRenderer):
 
 	"""
 
+	def _get_name(self):
+		return 'simple'
+
+
 	def __init__(self, program):
 		super().__init__(program)
 
@@ -775,6 +791,10 @@ class AsmSdsRenderer(BaseSdsRenderer):
 
 	"""
 
+	def _get_name(self):
+		return 'asm'
+
+
 	def __init__(self, program):
 		super().__init__(program)
 
@@ -788,16 +808,10 @@ class AsmSdsRenderer(BaseSdsRenderer):
 
 
 	def _on_pragmas_set(self):
-		self.gr.do_check_stack_bounds = self.pragmas.get('check_stack_bounds', True)
+		self.gr.do_check_stack_bounds = self.pragmas.get('safe_stack', True)
 		self.gr.stack_start = self.pragmas.get('stack_start', 300)
 		self.gr.stack_end = self.pragmas.get('stack_end', 511)
-
-
-	# def _render_label(self, s):  # S_Label - ignore unused
-	# 	if not s.name in self.gr.labels_used:
-	# 		return ''
-	# 	else:
-	# 		return super()._render_label(s)
+		self.gr.do_preserve_names = self.pragmas.get('keep_names', False)
 
 
 	def _prepare(self, code):
