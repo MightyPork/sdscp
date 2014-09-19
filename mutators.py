@@ -26,6 +26,12 @@ class Mutator:
 
 	"""
 
+
+	def read_pragmas(self, pragmas):
+		""" The mutator here can configure itself based on pragmas """
+		pass
+
+
 	def transform(self, code):
 		""" Apply transformations to the code
 
@@ -118,12 +124,16 @@ class M_AddBraces(Mutator):
 class M_RemoveDeadCode(Mutator):
 	""" Removes obvious dead code, unused labels etc. """
 
+	def read_pragmas(self, pragmas):
+		self.keep_banner_comments = pragmas.get('comments', True)
+
+
 	def _transform(self, code):
 
-		print('Trimming dead code...')
+		print('Removing dead code...')
 		p = 1
 		while True:
-			print('Pass %d' % p)
+			print('Cleaning: Pass %d' % p)
 			p += 1
 
 			self.removed = False
@@ -192,11 +202,12 @@ class M_RemoveDeadCode(Mutator):
 					ss = code[j]
 
 					# UGLY HACK to avoid removing of FUNC banner comments.
-					if type(ss) is S_Comment and 'FUNC' in ss.text:
-						out.append(s)
-						out.append(ss)
-						i=j
-						break
+					if self.keep_banner_comments:
+						if type(ss) is S_Comment and 'FUNC' in ss.text:
+							out.append(s)
+							out.append(ss)
+							i = j
+							break
 
 					if type(ss) is S_Label:
 
@@ -633,13 +644,15 @@ class M_Grande(Mutator):
 			'text',
 		]
 
-		self.stack_start = 300
-		self.stack_end = 511
-
 		self._halt_used = False
 
-		self.do_check_stack_bounds = True
-		self.do_preserve_names = False
+
+	def read_pragmas(self, pragmas):
+		self.do_check_stack_bounds	= pragmas.get('safe_stack', True)
+		self.stack_start			= pragmas.get('stack_start', 300)
+		self.stack_end				= pragmas.get('stack_end', 511)
+		self.do_preserve_names		= pragmas.get('keep_names', False)
+		self.add_debug_trace_logging = pragmas.get('show_trace', False)
 
 
 	def _transform(self, code):
@@ -789,7 +802,6 @@ class M_Grande(Mutator):
 		# reset label
 		append(sts, self._banner('FUNC: init()'))
 
-		append(sts, self._mk_goto('__init'))
 		append(sts, self._mk_label('__reset'))
 		append(sts, self._mk_echo('[INFO] Program reset.'))
 		append(sts, self._mk_label('__init'))
@@ -906,12 +918,21 @@ class M_Grande(Mutator):
 		self.tmp_pool.release_all()
 
 		if naked:
-			out = self._process_block(fn, fn.body_st.children)
+			out = []
+
+			if self.add_debug_trace_logging:
+				append(out, synth("""
+					echo("[TRACE] in %s()");
+				""" % fn.name))
+
+			append(out, self._process_block(fn, fn.body_st.children))
 			return self._compose_func_obj(fn, out)
 
 		body = []
 
 		self.arg_pool.rewind()
+
+		passed_arg_names = []
 
 		if len(fn.args) > 0:
 			# assign arguments to tmps
@@ -923,7 +944,22 @@ class M_Grande(Mutator):
 				fn.meta.local_tmp_dict[n] = tmp
 				fn.meta.arg_tmps.append(tmp)
 
+				append(passed_arg_names, arg)
+
 				append(body, self._mk_assign(tmp, arg))
+
+
+		if self.add_debug_trace_logging:
+			argstr = ''
+
+			for i in range(0, len(passed_arg_names)):
+
+				argstr += ['", ', '"'][i==0] + '%s=", %s, ' % (fn.args[i], passed_arg_names[i])
+
+			append(body, synth('echo("[TRACE] in: %(name)s(", %(params)s ")");' % {
+				'name': fn.name,
+				'params': argstr
+			}))
 
 		append(body, self._mk_assign('__rval', 0))
 
@@ -957,6 +993,12 @@ class M_Grande(Mutator):
 			append(out, S_Comment('Pop used tmp vars'))
 			for n in reversed(fn.meta.changed_tmps):
 				append(out, self._mk_pop(n))
+
+		if self.add_debug_trace_logging:
+			append(out, synth('echo("[TRACE] return from %(name)s, with: ", %(rval)s);' % {
+				'name': fn.name,
+				'rval': '__rval'
+			}))
 
 		append(out, S_Comment('Return to caller'))
 		append(out, self._mk_goto('__r_vect'))

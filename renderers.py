@@ -800,18 +800,15 @@ class AsmSdsRenderer(BaseSdsRenderer):
 
 		self.mutators = []
 
-		self.gr = M_Grande()
-
-		self.mutators.append(self.gr)
+		self.mutators.append(M_Grande())
 		self.mutators.append(M_AddBraces())
 		self.mutators.append(M_RemoveDeadCode())
 
 
 	def _on_pragmas_set(self):
-		self.gr.do_check_stack_bounds = self.pragmas.get('safe_stack', True)
-		self.gr.stack_start = self.pragmas.get('stack_start', 300)
-		self.gr.stack_end = self.pragmas.get('stack_end', 511)
-		self.gr.do_preserve_names = self.pragmas.get('keep_names', False)
+
+		for m in self.mutators:
+			m.read_pragmas(self.pragmas)
 
 
 	def _prepare(self, code):
