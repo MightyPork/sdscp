@@ -1213,7 +1213,7 @@ class DirectiveProcessor:
 						d.file = ff
 
 				if d.file in self.files_once:
-					print('skipping %s (#pragma once)' % d.file)
+					# print('skipping %s (#pragma once)' % d.file)
 					continue  # end this cycle
 
 				print('including %s' % d.file)

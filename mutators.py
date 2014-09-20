@@ -176,7 +176,7 @@ class M_RemoveDeadCode(Mutator):
 					if s.name not in self.used_labels:
 						i += 1 # skip
 						self.removed = True
-						print('INFO: Removing unused label %s' % s.name)
+						# print('INFO: Removing unused label %s' % s.name)
 						continue
 
 			if type(s) is S_Goto:
@@ -213,7 +213,7 @@ class M_RemoveDeadCode(Mutator):
 
 						if self.do_rm_labels and ss.name not in self.used_labels:
 							self.removed = True
-							print('INFO: Removing unused label %s' % ss.name)
+							# print('INFO: Removing unused label %s' % ss.name)
 							continue
 
 						if ss.name == s.name:
@@ -441,6 +441,9 @@ class FnRegistry:
 		# index of call -> function name
 		self.callindex2fnname = {}
 
+		# call index 2 origin func name
+		self.callindex2origin = {}
+
 		self.call_counter = 1
 
 		self.function_labels = {}
@@ -468,7 +471,7 @@ class FnRegistry:
 		return i
 
 
-	def register_call(self, called):
+	def register_call(self, called, from_):
 		""" Register a call. Returns index. """
 
 		i = self.counter
@@ -478,6 +481,7 @@ class FnRegistry:
 
 		self.label_pool.register(label)
 		self.callindex2fnname[i] = self.get_name(called)
+		self.callindex2origin[i] = from_
 
 		self.counter += 1;
 
@@ -665,6 +669,7 @@ class M_Grande(Mutator):
 		self.fn_pool.gr = self
 
 		self.functions_called = set()
+
 		self.labels_used = set()
 
 		init_userfn = None
@@ -722,6 +727,7 @@ class M_Grande(Mutator):
 		_gotos = set()
 		_calls = set()
 
+
 		_labels.update(pr_main.labels)
 		_calls.update(pr_main.calls)
 		_gotos.update(pr_main.gotos)
@@ -733,8 +739,12 @@ class M_Grande(Mutator):
 
 		_unresolved_calls = set()
 		_unresolved_calls.update(_calls)
+		# _unresolved_calls.remove('main')
+		# _unresolved_calls.remove('init')
 
 		_resolved_calls = set()
+		# _resolved_calls.add('main')
+		# _resolved_calls.add('init')
 
 		try:
 			while len(_unresolved_calls) > 0:
@@ -756,6 +766,10 @@ class M_Grande(Mutator):
 			raise Exception('Error while resolving calls', e)
 
 		self.used_labels = _gotos
+		self.defined_labels = _labels
+
+		_calls.add('main')
+		_calls.add('init')
 		self.functions_called = _calls
 
 
@@ -844,6 +858,12 @@ class M_Grande(Mutator):
 		for (i, called_name) in self.fn_pool.callindex2fnname.items():
 			if called_name == name:
 				# print('Func %s called with RP %d' % (name, i))
+
+				origin = self.fn_pool.callindex2origin[i]
+
+				if not origin in self.functions_called:
+					# print('Discarding return to call in unused func %s' % origin)
+					continue
 
 				n = rpvm.get(i)
 
@@ -1726,7 +1746,7 @@ class M_Grande(Mutator):
 
 			# get return label index
 			addr = self.fn_pool.get_fn_addr(name)
-			return_idx = self.fn_pool.register_call(addr)
+			return_idx = self.fn_pool.register_call(addr, fn.name)
 
 			# append(out, self._mk_assign('__addr', addr))
 			append(out, self._mk_push(return_idx))
