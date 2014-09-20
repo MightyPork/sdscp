@@ -426,17 +426,20 @@ class FnRegistry:
 
 	def __init__(self, label_pool):
 		self.counter = 1
-		self.name2index = {}
-		self.index2name = {}
 
-		self.index2label = {}
+		# function name to index
+		self.fnname2fnindex = {}
 
-		# self.index2label_fn = {}
-		self.index2label_call = {}
+		# function index to name
+		self.fnindex2fnname = {}
+
+		# name of retpos for call with given index
+		self.callindex2calllabel = {}
 
 		self.label_pool = label_pool
 
-		self.callindex2name = {}
+		# index of call -> function name
+		self.callindex2fnname = {}
 
 		self.call_counter = 1
 
@@ -450,14 +453,11 @@ class FnRegistry:
 
 		i = self.counter
 
-		self.name2index[name] = i
-		self.index2name[i] = name
+		self.fnname2fnindex[name] = i
+		self.fnindex2fnname[i] = name
 
 		begin = self.get_begin(i)
 		end = self.get_end(i)
-
-		# self.index2label[i] = begin
-		# self.index2label_fn[i] = begin
 
 		self.label_pool.register(begin)
 		self.label_pool.register(end)
@@ -474,11 +474,10 @@ class FnRegistry:
 		i = self.counter
 		label = self.get_call_label(i)
 
-		# self.index2label[i] = label
-		self.index2label_call[i] = label
+		self.callindex2calllabel[i] = label
 
 		self.label_pool.register(label)
-		self.callindex2name[i] = self.get_name(called)
+		self.callindex2fnname[i] = self.get_name(called)
 
 		self.counter += 1;
 
@@ -500,15 +499,15 @@ class FnRegistry:
 			name = index
 
 			if type(index) == str:
-				index = self.name2index[index]
+				index = self.fnname2fnindex[index]
 			else:
-				name = self.index2name[index]
+				name = self.fnindex2fnname[index]
 
 			return "__fn%s_%s" % (index, name)
 
 		else:
 			if type(index) == str:
-				index = self.name2index[index]
+				index = self.fnname2fnindex[index]
 
 			return "__fn%s" % index
 
@@ -532,7 +531,7 @@ class FnRegistry:
 			if index == 'init':
 				return '__init_end';
 
-			index = self.name2index[index]
+			index = self.fnname2fnindex[index]
 
 		return "__fn%d_end" % index
 
@@ -553,7 +552,7 @@ class FnRegistry:
 			return "__fn%sL_%s" % (index, label)
 
 		if type(index) == str:
-			index = self.name2index[index]
+			index = self.fnname2fnindex[index]
 
 		return "__fn%sL_%s" % (index, label)
 
@@ -572,31 +571,25 @@ class FnRegistry:
 		return "__rp%s" % index
 
 
-	def get_retpos_vector_map(self):
-		""" Get index -> label map for calls """
-
-		return self.index2label_call
-
-
-	def get_addr(self, name):
+	def get_fn_addr(self, name):
 		""" Get address for name """
 
-		if not name in self.name2index.keys():
+		if not name in self.fnname2fnindex.keys():
 			raise Exception('Function not found, cannot call: %s' % name)
 
-		return self.name2index[name]
+		return self.fnname2fnindex[name]
 
 
 	def get_name(self, addr):
 		""" Get name from address """
 
-		if not addr in self.index2name.keys():
-			if addr in self.callindex2name.keys():
-				return self.callindex2name[addr]
+		if not addr in self.fnindex2fnname.keys():
+			if addr in self.callindex2fnname.keys():
+				return self.callindex2fnname[addr]
 			else:
 				return None
 
-		return self.index2name[addr]
+		return self.fnindex2fnname[addr]
 
 
 
@@ -786,24 +779,10 @@ class M_Grande(Mutator):
 		append(sts, S_Comment('Disable speed limit'))
 		append(sts, synth('sys[63] = 128;'))
 
-		append(sts, S_Comment('Jump to init vector'))
-		append(sts, self._mk_goto('__init'))
-
-		# trampoline
-		append(sts, self._build_trampoline())
-
-		# ERRORS
-		append(sts, self._build_error_handlers())
-
-		if self._halt_used:
-			# Shutdown trap
-			append(sts, self._build_shutdown_trap())
-
-		# reset label
-		append(sts, self._banner('FUNC: init()'))
 
 		append(sts, self._mk_label('__reset'))
 		append(sts, self._mk_echo('[INFO] Program reset.'))
+		append(sts, self._banner('FUNC: init()'))
 		append(sts, self._mk_label('__init'))
 		append(sts, self._mk_echo('[INFO] Initialization...'))
 
@@ -830,7 +809,17 @@ class M_Grande(Mutator):
 
 		# other user functions (already processed)
 		for name in _resolved_calls:
-			append(sts, pr_userfuncs[name].code)
+			func = pr_userfuncs[name]
+			append(sts, func.code)
+			append(sts, self._build_trampoline_for_func(func.name))
+
+
+		# ERRORS
+		append(sts, self._build_error_handlers())
+
+		if self._halt_used:
+			# Shutdown trap
+			append(sts, self._build_shutdown_trap())
 
 
 		# compose main function with all the code
@@ -844,32 +833,25 @@ class M_Grande(Mutator):
 		return output_code
 
 
-	def _build_trampoline(self):
-		""" Build redirection vector """
+	def _build_trampoline_for_func(self, name):
+		""" Build redirection vector for return from func """
 
 		sts = []
+		append(sts, self._mk_pop('__addr'))  # pop a return address
 
-		jump_map = self.fn_pool.get_retpos_vector_map()
-		if len(jump_map) > 0:
-			append(sts, self._banner('RETURN vector'))
-			append(sts, self._mk_label('__r_vect'))
+		rpvm = self.fn_pool.callindex2calllabel
 
-			append(sts, self._mk_pop('__addr'))  # pop a return address
+		for (i, called_name) in self.fn_pool.callindex2fnname.items():
+			if called_name == name:
+				# print('Func %s called with RP %d' % (name, i))
 
-			# append(sts, synth('echo("RET -> ", __addr);'))  # pop a return address
-
-			for (i, n) in jump_map.items():
-				name = self.fn_pool.get_name(i)
-				if name not in self.functions_called:
-					print('INFO: Removing reference to %s() from trampoline.' % name)
-					continue
+				n = rpvm.get(i)
 
 				append(sts, synth("""
 					if (__addr == %d) goto %s;
 				""" % (i, n)))
 
-			append(sts, S_Comment('Fall-through for invalid address'))
-			append(sts, self._mk_goto('__err_bad_addr'))
+		append(sts, self._mk_goto('__err_bad_addr'))
 
 		return sts
 
@@ -1001,7 +983,7 @@ class M_Grande(Mutator):
 			}))
 
 		append(out, S_Comment('Return to caller'))
-		append(out, self._mk_goto('__r_vect'))
+		# append(out, self._mk_goto('__r_vect'))
 
 		return self._compose_func_obj(fn, out)
 
@@ -1009,6 +991,7 @@ class M_Grande(Mutator):
 	def _compose_func_obj(self, fn, code):
 
 		ret = Obj()
+		ret.name = fn.name
 		ret.code = code
 		ret.labels = fn.meta.labels
 		ret.gotos = fn.meta.gotos
@@ -1742,7 +1725,7 @@ class M_Grande(Mutator):
 			target_fn = self.fn_pool.get_begin(name)
 
 			# get return label index
-			addr = self.fn_pool.get_addr(name)
+			addr = self.fn_pool.get_fn_addr(name)
 			return_idx = self.fn_pool.register_call(addr)
 
 			# append(out, self._mk_assign('__addr', addr))
