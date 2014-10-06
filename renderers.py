@@ -682,14 +682,16 @@ class BaseSdsRenderer(CSyntaxRenderer):
 		if e.is_string():
 			s = e.value[1:-1]
 
-			if s.count("'") > 0:
-				raise CompatibilityError(
-					'Can\'t use single quote in SDS-C string, at %s'
-					% str(e))
-
+			s = s.replace("'", "\\'")
 			s = s.replace('\\"', '"')
 
 			return "'%s'" % s
+
+		elif e.is_char():
+			print('Converting char to ascii value @ %s' % e.value)
+
+			e.token = T_Number(str(ord(e.value[1:-1])))
+			e.value = e.token.value
 
 		return super()._render_expr_literal(e)
 
