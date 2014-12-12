@@ -83,6 +83,10 @@ class SyntaxNode:
 
 
 
+### EXPRESSION EVALUATOR ###
+# This part uses python expression parser to simplify expressions.
+# It's no way 100% reliable but seems to work quite good.
+
 # supported operators
 operators = {
 	ast.Add: op.add,
@@ -96,8 +100,17 @@ operators = {
 	ast.BitAnd: op.and_,
 	ast.Or: op.or_,
 	ast.And: op.and_,
+	ast.Not: op.not_,
 	ast.LShift: op.lshift,
 	ast.RShift: op.rshift,
+
+	ast.NotEq: op.ne,
+	ast.Eq: op.eq,
+	ast.Compare: op.eq, #?
+	ast.Gt: op.gt,
+	ast.Lt: op.lt,
+	ast.GtE: op.ge,
+	ast.LtE: op.le,
 }
 
 def eval_expr(expr):
@@ -108,8 +121,18 @@ def eval_(node):
 		return node.n
 	elif isinstance(node, ast.BinOp): # <left> <operator> <right>
 		return operators[type(node.op)](eval_(node.left), eval_(node.right))
+
 	elif isinstance(node, ast.UnaryOp): # <operator> <operand> e.g., -1
 		return operators[type(node.op)](eval_(node.operand))
+
+	elif isinstance(node, ast.Compare): # blah <= boo
+
+		if len(node.ops) != 1:
+			raise SyntaxError("Could not parse, compound compare operator.")
+		if len(node.comparators) != 1:
+			raise SyntaxError("Could not parse, compound compare comparators.")
+
+		return operators[type(node.ops[0])](eval_(node.left), eval_(node.comparators[0]))
 	else:
 		raise TypeError(node)
 

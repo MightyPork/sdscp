@@ -363,7 +363,24 @@ class CSyntaxRenderer(Renderer):
 
 
 	def _render_if(self, s):  # S_If
+
 		src = 'if (%s) ' % self._render_expr(s.cond)
+
+		# Try to evaluate condition
+		if not hasattr(self, '_erndr'):
+			self._erndr = CSyntaxRenderer([])
+
+		condorigstr = self._erndr._render_expr(s.cond)
+
+		if type(s.cond) is E_Group:
+			try:
+				as_str = self._erndr._render_expr(s.cond)
+				val = eval_expr(as_str)
+
+				s.cond = E_Literal( T_Number( str( round(val) ) ) )
+
+			except (ValueError, TypeError, SyntaxError, KeyError):
+			 	pass
 
 		# Optimization for dead branch
 		if type(s.cond) is E_Literal:
@@ -375,10 +392,12 @@ class CSyntaxRenderer(Renderer):
 				# always False
 				st = s.else_st
 				src += self._render_comment(S_Comment('(IF always false: else only)')) + '\n'
+				print('IF always false at if(%s)' % condorigstr)
 			else:
 				# always True
 				st = s.then_st
 				src += self._render_comment(S_Comment('(IF always true: then only)')) + '\n'
+				print('IF always true at if(%s)' % condorigstr)
 
 			if type(st) is S_Block:
 				for c in st.children:

@@ -146,8 +146,6 @@ class M_RemoveDeadCode(Mutator):
 			self.do_rm_labels = True
 			code = self._rm_dead(code)
 
-			#print(self.used_labels)
-
 			if not self.removed:
 				break
 
@@ -197,9 +195,12 @@ class M_RemoveDeadCode(Mutator):
 
 					if j == length:
 						out.append(s)
+						# print('eof, appending '+str(s))
+						i = j + 1
 						break
 
 					ss = code[j]
+					# print('ss code[j] ' + str(ss))
 
 					# UGLY HACK to avoid removing of FUNC banner comments.
 					if self.keep_banner_comments:
@@ -1487,11 +1488,9 @@ class M_Grande(Mutator):
 				as_str = self._erndr._render_expr(e)
 				val = eval_expr(as_str)
 
-				e = E_Literal(
-					T_Number(
-						str(
-							round(val)
-						)))
+				e = E_Literal(T_Number(str(round(val))))
+
+				print('Expression "%s" simplified to "%s"' % (as_str, val))
 
 			except (ValueError, TypeError, SyntaxError, KeyError):
 				pass
