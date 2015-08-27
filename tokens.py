@@ -1346,7 +1346,7 @@ class Tokenizer:
 				return
 
 			# unknown meaning
-			rd.error("Unexpected syntax: Don't know what %s means here." % s)
+			rd.error("Unexpected syntax: Can't resolve what \"%s\" means here." % s)
 
 		# unknown meaning
 		rd.error("Invalid syntax found - missing semicolon maybe?")

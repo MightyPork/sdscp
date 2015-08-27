@@ -2,6 +2,7 @@
 
 from tokens import *
 from utils import SyntaxNode
+from sdscp_errors import *
 
 def parse(expr_token):
 	""" Converts T_Expression to Expression
@@ -71,7 +72,7 @@ def parse(expr_token):
 			eg._add( parse(paren.expression) )
 
 		else:
-			raise SyntaxError('Unexpected token in expression: %s' % str(tw.peek()))
+			raise SdscpSyntaxError('Unexpected token in expression: %s' % str(tw.peek()))
 
 	# simplify - unwrap single-child parens (even nested)
 	while isinstance(eg, E_Group) and len(eg.children) == 1:

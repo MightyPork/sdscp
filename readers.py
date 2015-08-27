@@ -1,6 +1,7 @@
 #!/bin/env python3
 
 import re
+from sdscp_errors import *
 
 class BaseReader:
 	""" Utility for scanning through a text
@@ -25,6 +26,10 @@ class BaseReader:
 		self.filename = filename
 		self.pos = 0
 		self.length = len(source)
+
+
+	def set_pos(self, p):
+		self.pos = p
 
 
 	def near(self):
@@ -90,7 +95,7 @@ class BaseReader:
 	def error(self, message):
 		""" Report an error
 
-		Raise a SyntaxError with the current position,
+		Raise a SdscpSyntaxError with the current position,
 		what's "near" and the given error message.
 
 		Args:
@@ -102,9 +107,9 @@ class BaseReader:
 		column = self.pos2col(self.pos)
 
 		if self.filename is None:
-			raise SyntaxError(message + '\n' + self.near())
+			raise SdscpSyntaxError(message + '\n' + self.near())
 		else:
-			raise SyntaxError(
+			raise SdscpSyntaxError(
 				message +
 				'\nIn file %s at line %d, col %d,\n%s' % (
 					self.filename, lineno, column, self.near()

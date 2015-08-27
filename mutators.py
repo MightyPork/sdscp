@@ -5,6 +5,8 @@ from tokens import Tokenizer
 from statements import *
 from expressions import *
 from utils import *
+from sdscp_errors import *
+
 # for evaluation of expr
 import renderers
 import math
@@ -182,7 +184,7 @@ class M_RemoveDeadCode(Mutator):
 
 				if self.do_rm_labels:
 					if s.name not in self.existing_labels:
-						raise Exception('GOTO to undefined label %s!' % s.name)
+						raise SdscpSyntaxError('GOTO to undefined label %s!' % s.name)
 
 				# Discard all until next label.
 				# If the label is the target for this goto, discard the goto too.
@@ -289,9 +291,7 @@ class M_CollectVars(Mutator):
 			elif isinstance(s, S_Function):
 				functions.append(s)
 			else:
-				raise CompatibilityError(
-					'Illegal statement in root scope: %s' %
-					str(s))
+				raise CompatibilityError('Illegal statement in root scope: %s' % str(s))
 
 		return variables + functions
 
@@ -580,7 +580,7 @@ class FnRegistry:
 		""" Get address for name """
 
 		if not name in self.fnname2fnindex.keys():
-			raise Exception('Function not found, cannot call: %s' % name)
+			raise SdscpSyntaxError('Function not found, cannot call: %s' % name)
 
 		return self.fnname2fnindex[name]
 
@@ -689,7 +689,7 @@ class M_Grande(Mutator):
 			elif isinstance(s, S_Function):
 
 				if s.name in self.user_fn:
-					raise Exception('Duplicate function: %s()' % s.name)
+					raise SdscpSyntaxError('Duplicate function: %s()' % s.name)
 
 				self.user_fn.add(s.name)
 
@@ -705,10 +705,10 @@ class M_Grande(Mutator):
 					self.fn_pool.register(s.name)
 
 			else:
-				raise Exception('Illegal statement in root scope: %s' % s)
+				raise SdscpSyntaxError('Illegal statement in root scope: %s' % s)
 
 		if main_userfn is None:
-			raise Exception('Missing main!')
+			raise SdscpSyntaxError('Missing main function!')
 
 		# process init()
 		pr_init = None
@@ -1142,7 +1142,7 @@ class M_Grande(Mutator):
 		append(tmps, _tmps)
 
 		if not isinstance(s.var, E_Variable):
-			raise Exception('Cannot assign to %s (type %s)' % (args[0], type(args[0])))
+			raise SdscpSyntaxError('Cannot assign to %s (type %s)' % (args[0], type(args[0])))
 
 		(_init, _tmps, var) = self._process_expr(fn, s.var)
 		append(out, _init)
@@ -1354,12 +1354,13 @@ class M_Grande(Mutator):
 	def _transform_break(self, fn, s):
 		out = []
 
+		parent_func = None
 		p = s
 		while True:
 			p = p.get_parent()
 
 			if p is None:
-				raise Exception('Break outside loop or switch!')
+				raise SdscpSyntaxError('Break outside loop or switch! (In function: %s)' % parent_func.name)
 
 			if type(p) in [S_For, S_While, S_DoWhile, S_Switch]:
 
@@ -1367,24 +1368,33 @@ class M_Grande(Mutator):
 				append(out, self._mk_goto(p.meta.l_break))
 				break
 
+			# for error reporting
+			if type(p) is S_Function:
+				parent_func = p
+
 		return (out, [])
 
 
 	def _transform_continue(self, fn, s):
 		out = []
 
+		parent_func = None
 		p = s
 		while True:
 			p = p.get_parent()
 
 			if p is None:
-				raise Exception('Continue outside loop!')
+				raise SdscpSyntaxError('Continue outside loop! (In function: %s)' % parent_func.name)
 
 			if type(p) in [S_For, S_While, S_DoWhile]:
 
 				# a loop or switch
 				append(out, self._mk_goto(p.meta.l_continue))
 				break
+
+			# for error reporting
+			if type(p) is S_Function:
+				parent_func = p
 
 		return (out, [])
 
@@ -1526,12 +1536,12 @@ class M_Grande(Mutator):
 				if not name in self.builtin_var:
 					if not name in self.tmp_pool.get_names():
 						if not name in self.globals_vars:
-							raise Exception('Use of undefined variable %s' % name)
+							raise SdscpSyntaxError('Use of undefined variable %s' % name)
 
 			if e.index is None:
 				expr = E_Variable(name)
 
-			elif isinstance(e.index, E_Literal):  #
+			elif isinstance(e.index, E_Literal):
 				expr = E_Variable(name, e.index)
 
 			elif isinstance(e.index, E_Variable) and (e.index.index is None):  # simple var
@@ -1706,9 +1716,8 @@ class M_Grande(Mutator):
 			append(out, self._mk_push(a_val))
 
 		elif name == 'pop':
-
 			if not isinstance(args[0], E_Variable):
-				raise Exception('Cannot pop to %s (type %s)' % (args[0], type(args[0])))
+				raise SdscpSyntaxError('Cannot pop to %s (type %s)' % (args[0], type(args[0])))
 
 			(_init, _tmps, a) = self._process_expr(fn, args[0])
 			append(out, _init)
@@ -1718,7 +1727,7 @@ class M_Grande(Mutator):
 
 		else:
 			if not name in self.user_fn:
-				raise Exception('Call to undefined function %s()' % name)
+				raise SdscpSyntaxError('Call to undefined function %s()' % name)
 
 			fn.meta.calls.add(name)
 
@@ -1802,7 +1811,7 @@ class M_Grande(Mutator):
 
 		if user:
 			if name in self.global_rename.keys():
-				raise Exception('Duplicate global var declaration (%s)' % name)
+				raise SdscpSyntaxError('Duplicate global var declaration (%s)' % name)
 
 			if not self.do_preserve_names:
 				nm = 'u1'

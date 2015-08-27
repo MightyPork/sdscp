@@ -3,6 +3,7 @@
 import ast
 import operator as op
 import functools
+from sdscp_errors import *
 
 def append(arr, added):
 	""" Append to array, both array or item """
@@ -14,13 +15,6 @@ def append(arr, added):
 		arr.extend(added)
 	else:
 		arr.append(added)
-
-
-class CompatibilityError(SyntaxError):
-	""" Error caused by incompatibility of the source code
-	with SDS-C target syntax. The code may be valid, but not
-	supported by the compiler.
-	"""
 
 
 class Obj(object):

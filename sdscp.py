@@ -9,12 +9,27 @@ import traceback
 from directives import DirectiveProcessor, D_Pragma
 from tokens import Tokenizer
 from renderers import *
+from sdscp_errors import *
 import statements
 import getpass
 
 # ==================== Command Line Arguments processing =======================
 
-parser = argparse.ArgumentParser(description='SDS-C macro preprocessor')
+parser = argparse.ArgumentParser(
+	description='SDS-C macro preprocessor',
+	formatter_class=argparse.RawDescriptionHelpFormatter,
+	epilog="""
++-------------------------------------------------------+
+| For bug reporting and more info, please visit:        |
+|   https://github.com/MightyPork/sdscp                 |
+|                                                       |
+| Complete documentation in Czech can be viewed here:   |
+|   https://goo.gl/mZ1oOg  (Google Docs)                |
+|                                                       |
+| SDSCP (c) Ondřej Hruška, 2014-2015                    |
++-------------------------------------------------------+
+"""
+	)
 
 parser.add_argument(
 		'source',
@@ -98,6 +113,13 @@ parser.add_argument(
 		help='Show statements (high-level code abstraction).'
 )
 
+parser.add_argument(
+		'-x', '--error-trace',
+		action='store_true',
+		default=False,
+		help='Show stack trace for SDSCP syntax errors (for debugging)'
+)
+
 args = parser.parse_args()
 
 
@@ -114,6 +136,8 @@ SHOW_TOKENS		= args.verbose or args.show_tokens
 SHOW_STATEMENTS	= args.verbose or args.show_statements
 SHOW_GENERATED	= args.verbose or args.show_generated
 SHOW_OUTPUT		= args.verbose or args.display
+
+SHOW_STRACE     = args.error_trace
 
 pragmas_args = {}
 
@@ -141,7 +165,6 @@ def prep4disp(code):
 # ==================== MAIN TASK =======================
 
 try:
-
 	banner('SDS-C Preprocessor', ':')
 
 	print('Reading file:', SRC)
@@ -277,19 +300,44 @@ try:
 		else:
 			print('No output file specified.')
 
-
 	print('\nDone.\n')
 
-except SyntaxError as e:
-	banner('SYNTAX ERROR', '#')
-	type_, value_, traceback_ = sys.exc_info()
-	ex = traceback.format_exception(type_, value_, traceback_)
-	for line in ex:
-		# discard useless junk
-		if 'raise SyntaxError' in line:
-			continue
-		if 'File "<string>", line None' in line:
-			continue
+except Exception as e:
+	errname = type(e).__name__
+	disp_errname = errname
 
-		print(line)
+	is_custom = False
 
+	if errname == 'SdscpSyntaxError':
+		disp_errname = 'SYNTAX ERROR'
+		is_custom = True
+
+	elif errname == 'CompatibilityError':
+		disp_errname = 'COMPATIBILITY ERROR'
+		is_custom = True
+	elif errname == 'IsADirectoryError':
+
+		disp_errname = 'INVALID INPUT FILE'
+		is_custom = True
+
+	elif errname == 'FileNotFoundError':
+		disp_errname = 'FILE NOT FOUND'
+		is_custom = True
+
+	else:
+		disp_errname = 'COMPILATION FAILED'
+
+	banner(disp_errname, '#')
+
+	# Extra debug info requested
+	if SHOW_STRACE or not is_custom:
+		type_, value_, traceback_ = sys.exc_info()
+		ex = traceback.format_exception(type_, value_, traceback_)
+		for line in ex:
+			# discard useless junk
+			if (('raise %s' % errname) in line) or ('File "<string>", line None' in line):
+				continue
+			print(line)
+	else:
+		print(str(e) + '\n')
+		print('To see debug info, please use the -x flag.\n')

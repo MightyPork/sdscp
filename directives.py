@@ -4,6 +4,7 @@ import re
 import os.path
 from collections import OrderedDict
 
+from sdscp_errors import *
 from readers import CodeReader
 from tokens import Token, T_Paren, ParenType
 
@@ -787,7 +788,7 @@ class D_Define(Token):
 		"""
 
 		if not self.can_use_args(args):
-			raise Exception('Macro %s cannot be used with arguments %s!' % (self.name, ','.join(args)) )
+			raise SdscpSyntaxError('Macro %s cannot be used with arguments %s!' % (self.name, ','.join(args)) )
 
 
 		# no-args macro
@@ -1188,7 +1189,7 @@ class DirectiveProcessor:
 				else:
 					if d.name in self.pragmas.keys():
 						if not self.pragmas[d.name] == d.value:
-							raise Exception(
+							raise SdscpSyntaxError(
 								'Cannot overwrite pragma "%s" (old "%s", new "%s")'
 								% (
 									d.name,
@@ -1208,7 +1209,7 @@ class DirectiveProcessor:
 				if not os.path.isfile(d.file):
 					ff = os.path.join(os.path.dirname(self.main_file), d.file)
 					if not os.path.isfile(ff):
-						raise Exception('Could not find file: %s (nor %s)' % (d.file, ff))
+						raise SdscpSyntaxError('Could not find included file: %s (nor %s)' % (d.file, ff))
 					else:
 						d.file = ff
 
