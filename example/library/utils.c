@@ -4,7 +4,7 @@
 #include "sys.c"
 
 // absolute value
-#define _abs(x) ((x) * (1 - (2 * ((x) < 0)))
+#define _abs(x) ((x) * (1 - (2 * ((x) < 0))))
 
 // random in range (from, to) including "from"
 #define _rand(from, to) ((from) + (_RANDOM % ((to) - (from))))
