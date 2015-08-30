@@ -22,6 +22,7 @@
 
 // unix timestamp NTP
 #define _TIMESTAMP sys[4]
+#define _NTP_STATUS sys[37]
 
 #define _TIME_DAY sys[5]
 #define _TIME_MONTH sys[6]
@@ -181,6 +182,7 @@
 #define _TEMP[n] sys[309 + (n)] // one-based
 #define _TEMP_STATUS[n] sys[349 + (n)] // one-based
 #define _TEMP_ROM[n] sys[899 + (n)] // one-based
+#define _TEMP_NAME[n] sys[390 + (n)] // one-based
 #define N_TEMP_ERROR 16777216 // hodnota teploty pokud teploměr chybí
 
 

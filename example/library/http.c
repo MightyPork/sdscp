@@ -45,7 +45,7 @@ _check_http_progress()
 // ip.. ip parts
 // bytes.. # of bytes to store
 // url.. url parts. Must start with slash.
-#define _http_get(ip1, ip2, ip3, ip4, port, bytes, url...) {
+#define _http_get(ip1, ip2, ip3, ip4, hostname, port, bytes, url...) {
 	_wait_for_http();
 	echo("http_get: ",ip1,".",ip2,".",ip3,".",ip4);
 	if(ip1 == 0) {
@@ -59,12 +59,11 @@ _check_http_progress()
 			_HTTP_STORE_MODE = N_HTTP_STORE_TEXT;
 			_HTTP_STORE_LENGTH = bytes;
 		}
+		var __port = port;
+		if(__port == 0) __port = 80;
+		_HTTP_PORT = __port;
 
-		if(port == 0) port = 80;
-
-		_HTTP_PORT = port;
-
-		http_get(ip1, ip2, ip3, ip4, "localhost", ## url);
+		http_get(ip1, ip2, ip3, ip4, hostname, ## url);
 		_http_busy = 1;
 		echo ("[HTTP] Working in background.");
 	}
