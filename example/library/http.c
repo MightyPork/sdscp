@@ -59,10 +59,9 @@ _check_http_progress()
 			_HTTP_STORE_MODE = N_HTTP_STORE_TEXT;
 			_HTTP_STORE_LENGTH = bytes;
 		}
-
-		if(port == 0) port = 80;
-
-		_HTTP_PORT = port;
+		var __port = port;
+		if(__port == 0) __port = 80;
+		_HTTP_PORT = __port;
 
 		http_get(ip1, ip2, ip3, ip4, "localhost", ## url);
 		_http_busy = 1;
