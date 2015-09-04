@@ -1186,6 +1186,11 @@ class M_Grande(Mutator):
 		append(out, _init)
 		append(tmps, _tmps)
 
+		# This really shouldn't be in mutator, but in renderer
+		# it can't provide good debugging info
+		if type(rval) is E_Literal and rval.is_string():
+			raise CompatibilityError('Can\'t return a string literal, at: %s' % str(rval))
+
 		append(out, self._mk_assign('__rval', rval))
 		append(out, self._mk_goto(self.fn_pool.get_end(fn.name)))
 

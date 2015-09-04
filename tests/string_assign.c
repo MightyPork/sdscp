@@ -1,5 +1,5 @@
 // should throw error
 
 main() {
-	var c = 'a';
+	var c = "abc";
 }
