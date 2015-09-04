@@ -715,6 +715,26 @@ class BaseSdsRenderer(CSyntaxRenderer):
 		return super()._render_expr_literal(e)
 
 
+	# Raise error if trying to assign string to variable
+	def _render_assign(self, s):  # S_Assign
+		if self._find_string_literal(s.value):
+			raise CompatibilityError(
+				'SDS-C does not support string variables, at %s' % super()._render_assign(s))
+
+		return super()._render_assign(s)
+
+
+	def _find_string_literal(self, e):
+		if isinstance(e, E_Literal):
+			return e.is_string()
+
+		if isinstance(e, E_Group):
+			for ee in e.children:
+				if self._find_string_literal(ee):
+					return True
+
+		return False
+
 	def _render_function(self, s):  # S_Function
 
 		if len(s.args) > 0:

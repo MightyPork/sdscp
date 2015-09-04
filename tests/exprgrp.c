@@ -3,6 +3,6 @@ main(){
 	var _HTTP_GET_STATUS;
 
 	if(!http_get_busy || _HTTP_GET_STATUS == 0) {
-		echo("fuck");
+		echo("fail");
 	}
 }

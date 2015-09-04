@@ -216,7 +216,6 @@ class M_RemoveDeadCode(Mutator):
 
 						if self.do_rm_labels and ss.name not in self.used_labels:
 							self.removed = True
-							# print('INFO: Removing unused label %s' % ss.name)
 							continue
 
 						if ss.name == s.name:
@@ -1201,14 +1200,24 @@ class M_Grande(Mutator):
 		append(out, _init)
 		append(tmps, _tmps)
 
-		ss = S_If()
-		ss.cond = cond
-		ss.then_st = S_Block()
-		ss.then_st.children = self._process_block(fn, s.then_st)
-		ss.else_st = S_Block()
-		ss.else_st.children = self._process_block(fn, s.else_st)
-
-		append(out, ss)
+		if type(s.cond) is E_Literal:
+			if int(str(s.cond)) == 0:
+				# always False
+				append(out, S_Comment('(IF always false: else only)'))
+				append(out, self._process_block(fn, s.else_st))
+			else:
+				# always True
+				st = s.then_st
+				append(out, S_Comment('(IF always true: then only)'))
+				append(out, self._process_block(fn, s.then_st))
+		else:
+			ss = S_If()
+			ss.cond = cond
+			ss.then_st = S_Block()
+			ss.then_st.children = self._process_block(fn, s.then_st)
+			ss.else_st = S_Block()
+			ss.else_st.children = self._process_block(fn, s.else_st)
+			append(out, ss)
 
 		return (out, tmps)
 
