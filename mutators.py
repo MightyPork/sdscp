@@ -1628,6 +1628,8 @@ class M_Grande(Mutator):
 
 			if o in ['!', '~']:
 				arity = 1
+			elif o in ['+', '-']:        # pridano pro + a -
+				arity = 3
 			else:
 				arity = 2
 
@@ -1639,7 +1641,7 @@ class M_Grande(Mutator):
 				times = 0
 				for e in exprs:
 					if type(e) is E_Operator and e.value == o:
-						# print('Collecting for %s' % e)
+						# print('Collecting for %s' % e)    
 
 						if last2 is not None:
 							append(out, last2)
@@ -1655,8 +1657,13 @@ class M_Grande(Mutator):
 								append(out, last1)
 
 						last1 = e
-						collecting = True
-
+						
+						if arity == 3:          #pridano, preskoc spojovani - collecting
+							last2 = None
+							collecting = False
+						else:
+							collecting = True
+						
 						# print("HIT")
 						continue
 
@@ -1673,7 +1680,7 @@ class M_Grande(Mutator):
 					else:
 						if last2 is not None:
 							append(out, last2)
-
+							
 						last2 = last1
 						last1 = e
 
