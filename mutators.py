@@ -1503,6 +1503,11 @@ class M_Grande(Mutator):
 		tmps = []
 		expr = e
 
+		# group by operators to allow partial simplifications
+		# this also works around a SDS-C bug with bad priorities
+		if type(expr) is E_Group:
+			expr.children = self._group_expr_operators(expr.children)
+
 		# try to evaluate it
 		if not hasattr(self, '_erndr'):
 			self._erndr = renderers.CSyntaxRenderer([])
@@ -1510,6 +1515,7 @@ class M_Grande(Mutator):
 		if type(e) is E_Group:
 			try:
 				as_str = self._erndr._render_expr(e)
+				# print('Trying to simplify: %s' % as_str)
 				val = eval_expr(as_str)
 
 				e = E_Literal(T_Number(str(round(val))))
@@ -1610,10 +1616,6 @@ class M_Grande(Mutator):
 		else:
 			print('WARN: Unhandled expression %s (type %s)' % (e, type(e)))
 
-		if type(expr) is E_Group:
-			# group parts by operator precedence (SDS-C bug! awww)
-			expr.children = self._group_expr_operators(expr.children)
-
 		return (init, tmps, expr)
 
 	def _group_expr_operators(self, exprs):
@@ -1690,6 +1692,8 @@ class M_Grande(Mutator):
 
 			# print(str(E_Group(exprs)))
 
+		if len(exprs) == 1 and type(exprs[0]) is E_Group:
+				exprs = exprs[0].children
 
 		return exprs # TODO
 
