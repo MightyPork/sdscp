@@ -7,27 +7,35 @@
 #pragma keep_names true
 #pragma comments true
 
-var vys, aa, bb, cc;
+var vys, a, b, c;
 
 main() {
-   // vys = aa;
-    vys = -bb;
-    vys = aa - bb;
-    vys = - aa - bb;
-    vys = aa - - cc;
-    vys = aa - cc + bb;
-    vys = aa + bb + cc;
-    vys = aa + bb + cc - aa + bb + cc * aa;
-    vys = aa * bb - bb / cc + aa<<bb && cc - aa;
+   // vys = a;
+    vys = -b;
+    vys = a - b;
+    vys = - a - b;
+    vys = a - - c;
+    vys = a - b + c;
+    vys = a - b - b;
+    vys = a - b - c + b;
+    vys = a + b + c;
+    vys = a + b + c - a + b + c * a;
+    vys = a * b - b / c + a<<b && c - a;
+    vys = -b;
+    vys = a - b;
+    vys = a - - b;
+    vys = + a - b;
+    vys = - a - b;
 
-    if (aa<bb) cc = bb;
-    if ((cc+aa+bb)||(aa-bb+cc)&&!(aa+bb-cc))  aa=cc;
 
-    if (sys[17] - aa >= 10 || sys[17] < bb) {
-        aa = sys[17];
+    if (a<b) c = b;
+    if ((c+a+b)||(a-b+c)&&!(a+b-c))  a=c;
+
+    if (sys[17] - a >= 10 || sys[17] < b) {
+        a = sys[17];
     }
 
-    if(!aa || bb == 0) {
+    if(!a || b == 0) {
 		echo("fail");
 	}
 }

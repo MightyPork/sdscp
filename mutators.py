@@ -1622,16 +1622,27 @@ class M_Grande(Mutator):
 
 		# print(str(E_Group(exprs)))
 
+		order = [
+			[1, '@+', '@-'],
+			[1, '!', '~'],
+			[2, '*', '/', '%'],
+			[2, '>>', '<<'],
+			[2, '+', '-'],
+			[2, '<', '<='],
+			[2, '>', '>='],
+			[2, '==', '!='],
+			[2, '&'],
+			[2, '^'],
+			[2, '|'],
+			[2, '&&'],
+			[2, '||']
+		]
 		# 1. group highest level, then lower etc.
-		order = ['!', '~', '*', '/', '%', '+', '-', '>>', '<<', '<', '<=', '>', '>=', '==', '!=', '&', '^', '|', '&&', '||']
 
 		for o in order:
+			arity = o[0]
+			ops = o[1:]
 			# print('Collecting operator %s' % o)
-
-			if o in ['!', '~']:
-				arity = 1
-			else:
-				arity = 2
 
 			while True:
 				out = []
@@ -1640,7 +1651,7 @@ class M_Grande(Mutator):
 				collecting = False
 				times = 0
 				for e in exprs:
-					if type(e) is E_Operator and e.value == o:
+					if type(e) is E_Operator and e.value in ops:
 						# print('Collecting for %s' % e)
 
 						if last2 is not None:
