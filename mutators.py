@@ -1,4 +1,5 @@
 #!/bin/env python3
+from operator import attrgetter
 
 import statements
 from tokens import Tokenizer
@@ -595,6 +596,8 @@ class FnRegistry:
 
 		return self.fnindex2fnname[addr]
 
+	def get_transformed_name(self, name):
+		return self.get_begin(self.fnname2fnindex[name])
 
 
 class M_Grande(Mutator):
@@ -772,7 +775,6 @@ class M_Grande(Mutator):
 		_calls.add('init')
 		self.functions_called = _calls
 
-
 		# Add used tmps to globals declare
 		for name in self.tmp_pool.get_names():
 			self._add_global_var(name)
@@ -784,7 +786,7 @@ class M_Grande(Mutator):
 		# Compose output code
 		output_code = []
 		append(output_code, S_Comment('Globals declaration'))
-		append(output_code, self.globals_declare)
+		append(output_code, sorted(self.globals_declare, key=attrgetter('var.name')))
 
 		# main func body statements
 		sts = []
@@ -822,7 +824,8 @@ class M_Grande(Mutator):
 
 
 		# other user functions (already processed)
-		for name in _resolved_calls:
+		# sorted by function label
+		for name in sorted(_resolved_calls, key=self.fn_pool.get_transformed_name):
 			func = pr_userfuncs[name]
 			append(sts, func.code)
 			append(sts, self._build_trampoline_for_func(func.name))
