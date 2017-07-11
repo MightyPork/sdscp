@@ -380,7 +380,7 @@ class CSyntaxRenderer(Renderer):
 				s.cond = E_Literal( T_Number( str( round(val) ) ) )
 
 			except (ValueError, TypeError, SyntaxError, KeyError):
-			 	pass
+				pass
 
 		# Optimization for dead branch
 		if type(s.cond) is E_Literal:
@@ -817,7 +817,7 @@ class SimpleSdsRenderer(BaseSdsRenderer):
 	def _prepare(self, code):
 
 		for mut in self.mutators:
-			code = mut.transform(code);
+			code = mut.transform(code)
 
 		return code
 
@@ -855,6 +855,6 @@ class AsmSdsRenderer(BaseSdsRenderer):
 	def _prepare(self, code):
 
 		for mut in self.mutators:
-			code = mut.transform(code);
+			code = mut.transform(code)
 
 		return code

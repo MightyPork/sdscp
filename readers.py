@@ -123,7 +123,7 @@ class BaseReader:
 		Does not change current `pos`.
 
 		Args:
-			chars (str): Number of chars to get (max)
+			chars (int): Number of chars to get (max)
 			offset (int, optional):
 				How many characters to skip before taking the "peek".
 				Counted from the current pos; defualt is 0.
@@ -655,7 +655,7 @@ class CodeReader(BaseReader):
 
 		pos_begin = self.pos
 
-		self.assert_matches(self.RE_CHAR_QUOTE);
+		self.assert_matches(self.RE_CHAR_QUOTE)
 
 		quote = self.consume()
 		buffer = quote

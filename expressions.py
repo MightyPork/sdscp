@@ -259,8 +259,10 @@ class E_Call(Expression):
 
 	"""
 
-	def __init__(self, name, args=[]):
+	def __init__(self, name, args=None):
 		super().__init__()
+		if args is None:
+			args = []
 
 		self.name = name
 		self.args = args

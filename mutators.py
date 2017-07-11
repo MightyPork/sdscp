@@ -483,7 +483,7 @@ class FnRegistry:
 		self.callindex2fnname[i] = self.get_name(called)
 		self.callindex2origin[i] = from_
 
-		self.counter += 1;
+		self.counter += 1
 
 		return i
 
@@ -530,10 +530,10 @@ class FnRegistry:
 		if type(index) == str:
 
 			if index == 'main':
-				return '__main_loop_end';
+				return '__main_loop_end'
 
 			if index == 'init':
-				return '__init_end';
+				return '__init_end'
 
 			index = self.fnname2fnindex[index]
 
@@ -1141,7 +1141,7 @@ class M_Grande(Mutator):
 		append(tmps, _tmps)
 
 		if not isinstance(s.var, E_Variable):
-			raise SdscpSyntaxError('Cannot assign to %s (type %s)' % (args[0], type(args[0])))
+			raise SdscpSyntaxError('Cannot assign to %s (type %s)' % (s.var, type(s.var)))
 
 		(_init, _tmps, var) = self._process_expr(fn, s.var)
 		append(out, _init)

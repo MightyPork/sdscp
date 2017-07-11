@@ -85,8 +85,7 @@ class CompositeToken(Token):
 
 
 	def __init__(self, value):
-
-		self.value = value.strip()
+		super().__init__(value)
 		self.tokens = None  # None = not yet tokenized
 
 
@@ -1359,7 +1358,7 @@ class Tokenizer:
 		"""
 
 		if self.tokens is None:
-			raise Esception('Not parsed yet.')
+			raise Exception('Not parsed yet.')
 
 		show_tokenlist(self.tokens)
 
