@@ -629,7 +629,6 @@ class CSyntaxRenderer(Renderer):
 
 
 	def _render_expr_operator(self, e):  # E_Operator
-		print(e.value)
 		#special treatment for unary
 		if e.value == '@+':
 			return '+'

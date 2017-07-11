@@ -1520,7 +1520,7 @@ class M_Grande(Mutator):
 
 				e = E_Literal(T_Number(str(round(val))))
 
-				print('Expression "%s" simplified to "%s"' % (as_str, val))
+				#print('Expression "%s" simplified to "%s"' % (as_str, val))
 
 			except (ValueError, TypeError, SyntaxError, KeyError):
 				pass
@@ -1626,8 +1626,8 @@ class M_Grande(Mutator):
 			[1, '@+', '@-'],
 			[1, '!', '~'],
 			[2, '*', '/', '%'],
-			[2, '>>', '<<'],
 			[2, '+', '-'],
+			[2, '>>', '<<'],
 			[2, '<', '<='],
 			[2, '>', '>='],
 			[2, '==', '!='],
