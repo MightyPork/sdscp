@@ -1520,7 +1520,7 @@ class M_Grande(Mutator):
 
 				e = E_Literal(T_Number(str(round(val))))
 
-				print('Expression "%s" simplified to "%s"' % (as_str, val))
+				#print('Expression "%s" simplified to "%s"' % (as_str, val))
 
 			except (ValueError, TypeError, SyntaxError, KeyError):
 				pass
@@ -1622,68 +1622,88 @@ class M_Grande(Mutator):
 
 		# print(str(E_Group(exprs)))
 
+		order = [
+			[1, '@+', '@-'],
+			[1, '!', '~'],
+			[2, '*', '/', '%'],
+			[2, '+', '-'],
+			[2, '>>', '<<'],
+			[2, '<', '<='],
+			[2, '>', '>='],
+			[2, '==', '!='],
+			[2, '&'],
+			[2, '^'],
+			[2, '|'],
+			[2, '&&'],
+			[2, '||']
+		]
 		# 1. group highest level, then lower etc.
-		order = ['!', '~', '*', '/', '%', '+', '-', '>>', '<<', '<', '<=', '>', '>=', '==', '!=', '&', '^', '|', '&&', '||']
 
 		for o in order:
+			arity = o[0]
+			ops = o[1:]
 			# print('Collecting operator %s' % o)
-
-			if o in ['!', '~']:
-				arity = 1
-			else:
-				arity = 2
 
 			while True:
 				out = []
-				last2 = None
-				last1 = None
+				prev2 = None
+				prev = None
 				collecting = False
 				times = 0
 				for e in exprs:
-					if type(e) is E_Operator and e.value == o:
+					if type(e) is E_Operator and e.value in ops:
 						# print('Collecting for %s' % e)
 
-						if last2 is not None:
-							append(out, last2)
+						if prev2 is not None:
+							append(out, prev2)
 
 						if arity == 2:
-							if last1 is None:
-								last1 = e
-								continue
+							if prev is None:
+								# This might be operator chaining
+								if len(out) > 0:
+									prev = out[-1]
+									out=out[:-1]
+								else:
+									prev = e
+									continue
+								#continue
 
-							last2 = last1
+							prev2 = prev
 						else:
-							if last1 is not None:
-								append(out, last1)
+							# Arity 1, attaches to the right
+							if prev is not None:
+								append(out, prev)
 
-						last1 = e
+						prev = e
 						collecting = True
 
 						# print("HIT")
 						continue
 
 					if collecting:
+						# Last was an operator, now we got the operand
 						times += 1
 						if arity == 2:
-							out.append(E_Group([last2, last1, e]))
+							out.append(E_Group([prev2, prev, e]))
 						else:
-							out.append(E_Group([last1, e]))
+							out.append(E_Group([prev, e]))
 
 						collecting = False
-						last2 = None
-						last1 = None
+						prev2 = None
+						prev = None
 					else:
-						if last2 is not None:
-							append(out, last2)
+						if prev2 is not None:
+							append(out, prev2)
 
-						last2 = last1
-						last1 = e
+						prev2 = prev
+						prev = e
 
-				if last2 is not None:
-						append(out, last2)
+				# Append left-overs
+				if prev2 is not None:
+						append(out, prev2)
 
-				if last1 is not None:
-						append(out, last1)
+				if prev is not None:
+						append(out, prev)
 
 				exprs = out
 

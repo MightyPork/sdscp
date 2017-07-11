@@ -105,6 +105,7 @@ class Renderer:
 					'version': self.pragmas.get('version', '?'),
 					'time': strftime('%Y-%m-%d, %H:%M:%S', localtime()),
 					'renderer': self._get_name(),
+					'sdscp_version': self.pragmas.get('sdscp_version', '?'),
 				}
 
 				banner_text	= banner_text.strip('\n')
@@ -606,7 +607,6 @@ class CSyntaxRenderer(Renderer):
 
 
 	def _render_subexpr(self, e):  # Expression nested in another
-
 		if isinstance(e, E_Literal):
 			return self._render_expr_literal(e)
 
@@ -630,6 +630,13 @@ class CSyntaxRenderer(Renderer):
 
 
 	def _render_expr_operator(self, e):  # E_Operator
+		#special treatment for unary
+		if e.value == '@+':
+			return '+'
+
+		if e.value == '@-':
+			return '-'
+
 		return e.value
 
 
@@ -788,7 +795,7 @@ class BaseSdsRenderer(CSyntaxRenderer):
 		if e.value in ['++', '--']:
 			raise CompatibilityError('Can\'t use ++ and -- SDS-C expressions!')
 
-		return e.value
+		return super()._render_expr_operator(e)
 
 
 

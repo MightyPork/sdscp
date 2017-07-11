@@ -13,10 +13,12 @@ from sdscp_errors import *
 import statements
 import getpass
 
+VERSION = '1.4.0'
+
 # ==================== Command Line Arguments processing =======================
 
 parser = argparse.ArgumentParser(
-	description='SDS-C macro preprocessor',
+	description='SDS-C macro preprocessor v%s' % VERSION,
 	formatter_class=argparse.RawDescriptionHelpFormatter,
 	epilog="""
 +-------------------------------------------------------+
@@ -34,6 +36,13 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
 		'source',
 		help='The source file to process'
+)
+
+parser.add_argument(
+		'-V', '--version',
+		help='Show the SDSCP version.',
+		action='version',
+		version=VERSION
 )
 
 parser.add_argument(
@@ -190,6 +199,7 @@ try:
 	pragmas.update(pragmas_args)
 
 	pragmas['main_file'] = SRC
+	pragmas['sdscp_version'] = VERSION
 
 	if 'name' not in pragmas.keys():
 		pragmas['name'] = SRC
@@ -270,7 +280,7 @@ try:
 
 		# perform tweaks to match some of SDS-C's broken syntax
 
-		rtype = pragmas.get('renderer', 'sds2')
+		rtype = pragmas.get('renderer', 'asm')
 
 		if rtype in ['sds', 'simple']:
 			rtype = 'simple'
