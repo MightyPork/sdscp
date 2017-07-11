@@ -105,6 +105,7 @@ class Renderer:
 					'version': self.pragmas.get('version', '?'),
 					'time': strftime('%Y-%m-%d, %H:%M:%S', localtime()),
 					'renderer': self._get_name(),
+					'sdscp_version': self.pragmas.get('sdscp_version', '?'),
 				}
 
 				banner_text	= banner_text.strip('\n')
