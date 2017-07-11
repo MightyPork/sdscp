@@ -1660,8 +1660,13 @@ class M_Grande(Mutator):
 						if arity == 2:
 							if prev is None:
 								# This might be operator chaining
-								prev = e
-								continue
+								if len(out) > 0:
+									prev = out[-1]
+									out=out[:-1]
+								else:
+									prev = e
+									continue
+								#continue
 
 							prev2 = prev
 						else:
