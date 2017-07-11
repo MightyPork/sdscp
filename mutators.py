@@ -1646,55 +1646,59 @@ class M_Grande(Mutator):
 
 			while True:
 				out = []
-				last2 = None
-				last1 = None
+				prev2 = None
+				prev = None
 				collecting = False
 				times = 0
 				for e in exprs:
 					if type(e) is E_Operator and e.value in ops:
 						# print('Collecting for %s' % e)
 
-						if last2 is not None:
-							append(out, last2)
+						if prev2 is not None:
+							append(out, prev2)
 
 						if arity == 2:
-							if last1 is None:
-								last1 = e
+							if prev is None:
+								# This might be operator chaining
+								prev = e
 								continue
 
-							last2 = last1
+							prev2 = prev
 						else:
-							if last1 is not None:
-								append(out, last1)
+							# Arity 1, attaches to the right
+							if prev is not None:
+								append(out, prev)
 
-						last1 = e
+						prev = e
 						collecting = True
 
 						# print("HIT")
 						continue
 
 					if collecting:
+						# Last was an operator, now we got the operand
 						times += 1
 						if arity == 2:
-							out.append(E_Group([last2, last1, e]))
+							out.append(E_Group([prev2, prev, e]))
 						else:
-							out.append(E_Group([last1, e]))
+							out.append(E_Group([prev, e]))
 
 						collecting = False
-						last2 = None
-						last1 = None
+						prev2 = None
+						prev = None
 					else:
-						if last2 is not None:
-							append(out, last2)
+						if prev2 is not None:
+							append(out, prev2)
 
-						last2 = last1
-						last1 = e
+						prev2 = prev
+						prev = e
 
-				if last2 is not None:
-						append(out, last2)
+				# Append left-overs
+				if prev2 is not None:
+						append(out, prev2)
 
-				if last1 is not None:
-						append(out, last1)
+				if prev is not None:
+						append(out, prev)
 
 				exprs = out
 
