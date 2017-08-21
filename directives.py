@@ -2,6 +2,7 @@
 
 import re
 import os.path
+import time
 from collections import OrderedDict
 
 from sdscp_errors import *
@@ -1010,6 +1011,7 @@ class DirectiveProcessor:
 
 	Args:
 		main_file (str): The main source file to load
+		injected_pragmas (dict): Injected pragmas via command line (name: value)
 
 	Attributes:
 		main_file (str): The main file path
@@ -1029,7 +1031,7 @@ class DirectiveProcessor:
 
 	"""
 
-	def __init__(self, main_file):
+	def __init__(self, main_file, injected_pragmas = None):
 		self.main_file = main_file
 		self.source = _load_file(main_file)
 		self.output = ''
@@ -1038,8 +1040,26 @@ class DirectiveProcessor:
 
 		self.pragmas = {}
 
+		if injected_pragmas is not None:
+			self.pragmas.update(injected_pragmas)
+			self.add_defines_for_pragmas(injected_pragmas)
+
 		self.files_once = []  # list of files included with pragma once
 
+		self.defines['__TIME__'] = [D_Define('#define __TIME__ "%s"' % time.strftime("%H:%M:%S"))]
+		self.defines['__DATE__'] = [D_Define('#define __DATE__ "%s"' % time.strftime("%b %d %Y"))]
+
+	def add_defines_for_pragmas(self, pragmas):
+		for (name, value) in pragmas.items():
+			# we add the pragma to defines for use inline as __PRAGMANAME__
+			defname = '__%s__' % name.upper()
+			d2 = D_Define(
+				'#define %s %s' % (defname, value) if isinstance(value, int) or isinstance(value, float) else
+				'#define %s "%s"' % (defname, value.replace('"', '\\"'))
+				)
+			if not defname in self.defines:
+				self.defines[defname] = []
+			self.defines[defname].append(d2)
 
 	def add_defines(self, new_defines):
 		""" Add extra defines to the processor
@@ -1198,6 +1218,8 @@ class DirectiveProcessor:
 								))
 
 					self.pragmas[d.name] = d.value
+					
+					self.add_defines_for_pragmas({d.name: d.value})
 
 
 			# #include - include external file
