@@ -587,7 +587,7 @@ class T_Expression(CompositeToken):
 				self.tokens.append(t)
 
 			else:
-				raise Exception('Unexpected expression token near' + rd.peek(10))
+				raise Exception('Unexpected expression token near: «' + rd.peek(10) + '», in «' + self.value + '»')
 
 		for t in self.tokens:
 			if t.is_composite():
