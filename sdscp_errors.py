@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+class SdscpInternalError(Exception):
+	""" Internal error - bug """
+	pass
+
 class SdscpSyntaxError(Exception):
 	""" A syntax error in source code """
 	pass

@@ -433,6 +433,7 @@ class FnRegistry:
 
 		# function index to name
 		self.fnindex2fnname = {}
+		self.fnindex2statement = {}
 
 		# name of retpos for call with given index
 		self.callindex2calllabel = {}
@@ -452,13 +453,19 @@ class FnRegistry:
 		self.gr = None  # reference to Grande Mutator
 
 
-	def register(self, name):
+	def register(self, stmt):
 		""" Register a function. Returns index. """
+
+		if not isinstance(stmt, S_Function):
+			raise SdscpInternalError('fn_pool.register bad argument: ', str(stmt))
+
+		name = stmt.name;
 
 		i = self.counter
 
 		self.fnname2fnindex[name] = i
-		self.fnindex2fnname[i] = name
+		self.fnindex2fnname[i] = name # TODO this is redundant now that we have the statement index?
+		self.fnindex2statement[i] = stmt
 
 		begin = self.get_begin(i)
 		end = self.get_end(i)
@@ -487,6 +494,17 @@ class FnRegistry:
 		self.counter += 1
 
 		return i
+
+
+	def get_fn_args(self, name):
+		""" Get args for name """
+
+		if not name in self.fnname2fnindex.keys():
+			raise SdscpSyntaxError('Function not found, cannot call: %s' % name)
+
+		index = self.fnname2fnindex[name];
+		stmt = self.fnindex2statement[index];
+		return stmt.args;
 
 
 	def get_begin(self, index):
@@ -733,7 +751,7 @@ class M_Grande(Mutator):
 				else:
 					self.user_fn.add(s.name)
 					functions.append(s)
-					self.fn_pool.register(s.name)
+					self.fn_pool.register(s)
 
 			else:
 				raise SdscpSyntaxError('Illegal statement in root scope: %s' % s)
@@ -1130,8 +1148,12 @@ class M_Grande(Mutator):
 		return (s, [])
 
 	def _transform_label(self, fn, s):
+		orig_name = s.name
+		s.name = self.fn_pool.get_ns_label(fn.name, orig_name)
 
-		s.name = self.fn_pool.get_ns_label(fn.name, s.name)
+		if s.name in fn.meta.labels:
+			raise SdscpSyntaxError('Duplicate label %s in %s()' % (orig_name, fn.name))
+
 		fn.meta.labels.add(s.name)
 
 		return (s, [])
@@ -1798,6 +1820,16 @@ class M_Grande(Mutator):
 		else:
 			if not name in self.user_fn:
 				raise SdscpSyntaxError('Call to undefined function %s()' % name)
+
+			declared_args = self.fn_pool.get_fn_args(name);
+
+			if len(args) != len(declared_args):
+				raise SdscpSyntaxError('Invalid call of %s(%s):\n\n\t%s(%s)' % (
+					name,
+					', '.join([str(a) for a in declared_args]),
+					name,
+					', '.join([str(a) for a in args])
+				))
 
 			fn.meta.calls.add(name)
 
