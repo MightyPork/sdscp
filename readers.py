@@ -116,7 +116,6 @@ class BaseReader:
 				)
 			)
 
-
 	def peek(self, chars=1, offset=0):
 		""" Look at the next chars
 

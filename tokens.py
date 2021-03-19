@@ -515,6 +515,8 @@ class T_Expression(CompositeToken):
 
 		while not rd.has_end():
 			rd.sweep()
+			if rd.has_end():
+				break
 
 			if rd.has_identifier():
 				# an identifier
@@ -587,7 +589,12 @@ class T_Expression(CompositeToken):
 				self.tokens.append(t)
 
 			else:
-				raise Exception('Unexpected expression token near: «' + rd.peek(10) + '», in «' + self.value + '»')
+				try:
+					p = rd.peek(10)
+				except:
+					p = "SDSCP ERR reader overrun, pos=" + str(rd.pos)
+
+				raise Exception('Unexpected expression token near: «' + p + '», in «' + self.value + '»')
 
 		for t in self.tokens:
 			if t.is_composite():
