@@ -622,6 +622,13 @@ class D_Define(Token):
 			rd = CodeReader(self.body)
 			buff = ''
 			while not rd.has_end():
+				sweeped = rd.sweep()
+
+				if rd.has_end():
+					break
+				elif len(sweeped) > 0:
+					buff += ' '
+
 				if rd.has_identifier():
 					ident = rd.consume_identifier()
 

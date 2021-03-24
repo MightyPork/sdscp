@@ -1658,9 +1658,12 @@ class M_Grande(Mutator):
 				append(init, self._call_user_func(fn, e.name, e.args))
 
 				tmp = self.tmp_pool.acquire()
+				append(tmps, tmp) # mark as clobbered
 				append(init, self._mk_assign(tmp, '__rval'))
-
 				expr = E_Variable(tmp)
+
+				# It's tempting to just use __rval here. That works OK - except for expressions that contain multiple functions!
+				#expr = E_Variable('__rval')
 
 				self.functions_called.add(e.name)
 
@@ -1866,7 +1869,7 @@ class M_Grande(Mutator):
 			lbl = self.fn_pool.get_call_label(return_idx)
 			append(out, self._mk_label(lbl))
 
-			self._fn_release_tmps(fn, tmps)
+		self._fn_release_tmps(fn, tmps)
 
 		return out
 

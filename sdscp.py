@@ -13,7 +13,7 @@ from sdscp_errors import *
 import statements
 import getpass
 
-VERSION = '1.6.2'
+VERSION = '1.6.3'
 
 # ==================== Command Line Arguments processing =======================
 

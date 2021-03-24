@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.3
+
+- Fix comments in macro definition tokenized as code, resulting in apostrophes and double quotes
+  in comments wrongly treated as char and string boundaries
+
 ## 1.6.2
 
 - Fix crash if an in-line comment is at the end of an expression parenthesis that is wrapped to multiple lines
