@@ -4,6 +4,8 @@
 
 - Fix comments in macro definition tokenized as code, resulting in apostrophes and double quotes
   in comments wrongly treated as char and string boundaries
+- Fix tmp variables clobbered while expanding expressions with function calls not push/popped, leading to UB. 
+- Fix temporaries not released after push() and pop() calls (magic built-in methods).
 
 ## 1.6.2
 
