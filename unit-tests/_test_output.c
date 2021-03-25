@@ -1,1 +1,1 @@
-/home/ondra/local/sdscp/out/test.c
+../out/test.c
