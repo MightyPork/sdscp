@@ -45,6 +45,9 @@ class StTokenWalker(TokenWalker):
 		# empty statemenr
 		if self.has(T_Semicolon):
 			return S_Empty(self)
+		
+		if self.has(T_DocComment):
+			return S_DocComment(self)
 
 		# a function declaration
 		if self.has(T_FUNCTION):
@@ -176,6 +179,19 @@ class S_Comment(Statement):
 	def __str__(self):
 		return '/* %s */' % self.text
 
+
+class S_DocComment(Statement):
+	""" A doc comment """
+
+	def __init__(self, tw):
+		super().__init__()
+
+		# declare instance attributes
+		self.text = tw.consume(T_DocComment).value[3:].strip()
+
+
+	def __str__(self):
+		return '/// ' + self.text
 
 
 class S_Goto(Statement):

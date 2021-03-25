@@ -202,7 +202,8 @@ class CSyntaxRenderer(Renderer):
 			S_Continue:	self._render_continue,
 			S_Var:		self._render_var,
 			S_Assign:	self._render_assign,
-			S_Comment:	self._render_comment
+			S_Comment:	self._render_comment,
+			S_DocComment: self._render_doc_comment
 		}
 
 
@@ -327,6 +328,9 @@ class CSyntaxRenderer(Renderer):
 			return ''
 
 
+	def _render_doc_comment(self, s):  # S_DocComment
+		return '/// %s' % s.text
+
 	def _render_function(self, s):  # S_Function
 
 		src = '%s(%s)\n' % (
@@ -366,47 +370,52 @@ class CSyntaxRenderer(Renderer):
 	def _render_if(self, s):  # S_If
 
 		src = 'if (%s) ' % self._render_expr(s.cond)
+		
+		if self.do_simplify_ifs:
+			# Try to evaluate condition
+			if not hasattr(self, '_erndr'):
+				self._erndr = CSyntaxRenderer([])
 
-		# Try to evaluate condition
-		if not hasattr(self, '_erndr'):
-			self._erndr = CSyntaxRenderer([])
+			condorigstr = self._erndr._render_expr(s.cond)
+			
+			# TODO this transformation should be done in a mutator so that labels and calls used only in the dead branches
+			#  can be removed as dead code.
 
-		condorigstr = self._erndr._render_expr(s.cond)
+			if type(s.cond) is E_Group:
+				try:
+					as_str = self._erndr._render_expr(s.cond, expr_render_mode='eval')
+					val = eval_expr(as_str)
 
-		if type(s.cond) is E_Group:
-			try:
-				as_str = self._erndr._render_expr(s.cond)
-				val = eval_expr(as_str)
+					s.cond = E_Literal( T_Number( str( round(val) ) ) )
 
-				s.cond = E_Literal( T_Number( str( round(val) ) ) )
+				except (ValueError, TypeError, SyntaxError, KeyError) as e:
+					#print("Error evaluating ", as_str, e)
+					pass
 
-			except (ValueError, TypeError, SyntaxError, KeyError):
-				pass
+			# Optimization for dead branch
+			if type(s.cond) is E_Literal:
 
-		# Optimization for dead branch
-		if type(s.cond) is E_Literal:
+				st = None
+				src = ''
 
-			st = None
-			src = ''
+				if int(str(s.cond)) == 0:
+					# always False
+					st = s.else_st
+					src += self._render_comment(S_Comment('(IF always false: else only)')) + '\n'
+					if not config.QUIET: print('IF always false at if(%s)' % condorigstr)
+				else:
+					# always True
+					st = s.then_st
+					src += self._render_comment(S_Comment('(IF always true: then only)')) + '\n'
+					if not config.QUIET: print('IF always true at if(%s)' % condorigstr)
 
-			if int(str(s.cond)) == 0:
-				# always False
-				st = s.else_st
-				src += self._render_comment(S_Comment('(IF always false: else only)')) + '\n'
-				print('IF always false at if(%s)' % condorigstr)
-			else:
-				# always True
-				st = s.then_st
-				src += self._render_comment(S_Comment('(IF always true: then only)')) + '\n'
-				print('IF always true at if(%s)' % condorigstr)
+				if type(st) is S_Block:
+					for c in st.children:
+						src += self._render_any(c)
+				elif type(st) is not S_Empty:
+					src = self._render_any(st)
 
-			if type(st) is S_Block:
-				for c in st.children:
-					src += self._render_any(c)
-			else:
-				src = self._render_any(st)
-
-			return src.rstrip('\n')
+				return src.rstrip('\n')
 
 		# normalize empty code block to empty statement
 		if type(s.else_st) is S_Block and len(s.else_st.children) == 0:
@@ -458,7 +467,6 @@ class CSyntaxRenderer(Renderer):
 				indent_first=indent,
 				append_newline=False)
 
-
 		if not isinstance(s.else_st, S_Empty):
 			# there is some ELSE
 
@@ -480,6 +488,8 @@ class CSyntaxRenderer(Renderer):
 					level=1,  # indent the statement
 					indent_first=True,
 					append_newline=False)
+		else:
+			src = src.strip(); # remove the extra space
 
 		return src
 
@@ -592,7 +602,8 @@ class CSyntaxRenderer(Renderer):
 		return src
 
 
-	def _render_expr(self, e):  # Expression
+	def _render_expr(self, e, expr_render_mode='normal'):  # Expression
+		self.expr_render_mode = expr_render_mode
 
 		if isinstance(e, E_Group):
 			# a paren
@@ -630,6 +641,9 @@ class CSyntaxRenderer(Renderer):
 
 
 	def _render_expr_operator(self, e):  # E_Operator
+		if self.expr_render_mode == 'eval' and e.value == '!':
+			return 'not ' # the space prevents syntax error when acidentally joined to the following token
+		
 		#special treatment for unary
 		if e.value == '@+':
 			return '+'
@@ -714,7 +728,7 @@ class BaseSdsRenderer(CSyntaxRenderer):
 			return "'%s'" % s
 
 		elif e.is_char():
-			print('Converting char to ascii value @ %s' % e.value)
+			if not config.QUIET: print('Converting char to ascii value @ %s' % e.value)
 
 			e.token = T_Number(str(ord(e.value[1:-1])))
 			e.value = e.token.value
@@ -854,6 +868,7 @@ class AsmSdsRenderer(BaseSdsRenderer):
 
 
 	def _on_pragmas_set(self):
+		self.do_simplify_ifs = self.pragmas.get('simplify_ifs', True)
 
 		for m in self.mutators:
 			m.read_pragmas(self.pragmas)

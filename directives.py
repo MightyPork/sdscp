@@ -9,6 +9,7 @@ from sdscp_errors import *
 from readers import CodeReader
 from tokens import Token, T_Paren, ParenType
 
+import config
 
 class MacroReader(CodeReader):
 	""" Code reader with support for directives
@@ -1191,7 +1192,8 @@ class DirectiveProcessor:
 				to_l = rd.pos2line( to_pos )
 				to_c = rd.pos2col( to_pos )
 
-				print('=== JUMP in file "%s":  %d:%d --> %d:%d ===' % (self.main_file, from_l, from_c, to_l, to_c))
+				if not config.QUIET:
+					print('=== JUMP in file "%s":  %d:%d --> %d:%d ===' % (self.main_file, from_l, from_c, to_l, to_c))
 				rd.pos =  skip_dict[rd.pos]
 				continue
 
@@ -1216,9 +1218,8 @@ class DirectiveProcessor:
 				else:
 					if d.name in self.pragmas.keys():
 						if not self.pragmas[d.name] == d.value:
-							raise SdscpSyntaxError(
-								'Cannot overwrite pragma "%s" (old "%s", new "%s")'
-								% (
+							if not config.QUIET:
+								print('!! Pragma %s overwritten from %s to %s!' % (
 									d.name,
 									self.pragmas[d.name],
 									d.value
@@ -1246,7 +1247,8 @@ class DirectiveProcessor:
 					# print('skipping %s (#pragma once)' % d.file)
 					continue  # end this cycle
 
-				print('including %s' % d.file)
+				if not config.QUIET: 
+					print('including %s' % d.file)
 
 				# create a nested macro processor
 				mp = DirectiveProcessor(d.file)

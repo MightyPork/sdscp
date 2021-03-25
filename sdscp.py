@@ -6,12 +6,15 @@ import math
 import re
 import traceback
 
+import getpass
+
 from directives import DirectiveProcessor, D_Pragma
 from tokens import Tokenizer
 from renderers import *
 from sdscp_errors import *
 import statements
-import getpass
+
+import config
 
 VERSION = '1.6.3'
 
@@ -28,7 +31,7 @@ parser = argparse.ArgumentParser(
 | Complete documentation in Czech can be viewed here:   |
 |   https://goo.gl/mZ1oOg  (Google Docs)                |
 |                                                       |
-| SDSCP (c) Ondřej Hruška, 2014-2017                    |
+| SDSCP (c) Ondřej Hruška, 2014-2021                    |
 +-------------------------------------------------------+
 """
 	)
@@ -73,6 +76,13 @@ parser.add_argument(
 		action='store_true',
 		default=False,
 		help='Show all optional debug info.'
+)
+
+parser.add_argument(
+		'-q', '--quiet',
+		action='store_true',
+		default=False,
+		help='Quiet mode, suppress non-error logging'
 )
 
 parser.add_argument(
@@ -148,6 +158,7 @@ SHOW_STATEMENTS	= args.verbose or args.show_statements
 SHOW_GENERATED	= args.verbose or args.show_generated
 SHOW_OUTPUT		= args.verbose or args.display
 
+config.QUIET	= not args.verbose and args.quiet
 SHOW_STRACE     = args.error_trace
 
 pragmas_args = {}
@@ -176,9 +187,8 @@ def prep4disp(code):
 # ==================== MAIN TASK =======================
 
 try:
-	banner('SDS-C Preprocessor', ':')
-
-	print('Reading file:', SRC)
+	if not config.QUIET: banner('SDS-C Preprocessor', ':')
+	if not config.QUIET: print('Reading file:', SRC)
 
 	# read the file
 	dproc = DirectiveProcessor(SRC, pragmas_args)
@@ -189,7 +199,7 @@ try:
 
 	# ---------------- Resolve directives ------------------
 
-	print('Resolving directives...')
+	if not config.QUIET: print('Resolving directives...')
 	# include files, resolve branching, find macros...
 	dproc.process()
 
@@ -232,7 +242,7 @@ try:
 		print('Code after resolving includes, # branching, and extracting macros:\n')
 		print(prep4disp( dproc.get_output() ) + '\n')
 
-	print('Applying macros...')
+	if not config.QUIET: print('Applying macros...')
 	# perform macro replacements
 	dproc.apply_macros()
 	# get output code
@@ -246,7 +256,7 @@ try:
 		print(prep4disp(processed) + '\n')
 
 
-	print('Tokenizing code...')
+	if not config.QUIET: print('Tokenizing code...')
 	tk = Tokenizer(processed)
 	tokens = tk.tokenize()
 	sts = statements.parse(tokens)
@@ -262,7 +272,6 @@ try:
 	if SHOW_STATEMENTS:
 		banner('STATEMENTS', '-')
 		print('Source code abstraction:\n')
-
 
 		for s in sts:
 			print(str(s))
@@ -295,7 +304,7 @@ try:
 
 		rndr.set_pragmas(pragmas)
 
-		print('Rendering to SDS-C using "%s" renderer...' % rtype)
+		if not config.QUIET: print('Rendering to SDS-C using "%s" renderer...' % rtype)
 		for_sds = rndr.render()
 
 		if SHOW_OUTPUT:
@@ -305,14 +314,14 @@ try:
 		if DEST != None:
 			if 'version' in pragmas:
 				DEST = DEST.replace("%V", pragmas.get('version'))
-			print('Writing to file: %s' % DEST)
+			if not config.QUIET: print('Writing to file: %s' % DEST)
 			f = open(DEST, 'w')
 			f.write(for_sds)
 			f.close()
 		else:
 			print('No output file specified.')
 
-	print('\nDone.\n')
+	if not config.QUIET: print('\nDone.\n')
 
 except Exception as e:
 	errname = type(e).__name__
@@ -353,3 +362,5 @@ except Exception as e:
 	else:
 		print(str(e) + '\n')
 		print('To see debug info, please use the -x flag.\n')
+	
+	sys.exit(1)

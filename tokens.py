@@ -440,6 +440,13 @@ class T_Name(Token):
 
 
 
+class T_DocComment(Token):
+	""" Comment that is preserved in the output """
+
+	def equals(self, other):
+		return self.value == other.value
+
+
 class T_Semicolon(Token):
 	""" Semicolon
 
@@ -957,6 +964,11 @@ class Tokenizer:
 
 				s = rd.consume_block()
 				self._add( T_CodeBlock(s) )
+			
+			elif rd.has_inline_doc_comment():
+
+				s = rd.consume_line()
+				self._add( T_DocComment(s) )
 
 			# ;
 			elif rd.starts(';'):

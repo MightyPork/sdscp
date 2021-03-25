@@ -401,6 +401,7 @@ class CodeReader(BaseReader):
 	RE_PAREN_CLOSE = re.compile(r'^[\])}]')
 
 	COMMENT       = '//'
+	DOC_COMMENT       = '///'
 	COMMENT_OPEN  = '/*'
 	COMMENT_CLOSE = '*/'
 
@@ -461,6 +462,9 @@ class CodeReader(BaseReader):
 		pos_begin = self.pos
 
 		while self.pos < self.length:
+			if self.has_inline_doc_comment():
+				# This is a comment, but it must be kept
+				break
 
 			# single-line comment
 			if self.has_inline_comment():
@@ -625,6 +629,10 @@ class CodeReader(BaseReader):
 
 			elif self.has_char():
 				buffer += self.consume_char()
+				continue
+
+			elif self.has_inline_doc_comment():
+				buffer += self.consume_inline_comment()
 				continue
 
 			elif self.has_block_comment():
@@ -925,7 +933,14 @@ class CodeReader(BaseReader):
 		""" Check if next token is a line comment """
 
 		if self.has_end(): return False
-		return self.starts(self.COMMENT)
+		return self.starts(self.COMMENT) and not self.starts(self.DOC_COMMENT)
+
+
+	def has_inline_doc_comment(self):
+		""" Check if next token is a line doc comment """
+
+		if self.has_end(): return False
+		return self.starts(self.DOC_COMMENT)
 
 
 	def has_block_comment(self):

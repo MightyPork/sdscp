@@ -12,6 +12,8 @@ from sdscp_errors import *
 import renderers
 import math
 
+import config
+
 
 def synth(source):
 	""" Parse source & convert to statements """
@@ -133,10 +135,10 @@ class M_RemoveDeadCode(Mutator):
 
 	def _transform(self, code):
 
-		print('Removing dead code...')
+		if not config.QUIET: print('Removing dead code...')
 		p = 1
 		while True:
-			print('Cleaning: Pass %d' % p)
+			if not config.QUIET: print('Cleaning: Pass %d' % p)
 			p += 1
 
 			self.removed = False
@@ -290,6 +292,8 @@ class M_CollectVars(Mutator):
 				variables.append(s)
 			elif isinstance(s, S_Function):
 				functions.append(s)
+			elif isinstance(s, S_DocComment):
+				pass # Simply discard it
 			else:
 				raise CompatibilityError('Illegal statement in root scope: %s' % str(s))
 
@@ -699,7 +703,10 @@ class M_Grande(Mutator):
 		self.stack_start			= pragmas.get('stack_start', 300)
 		self.stack_end				= pragmas.get('stack_end', 511)
 		self.do_preserve_names		= pragmas.get('keep_names', False)
-		self.add_debug_trace_logging = pragmas.get('show_trace', False)
+		self.do_fullspeed			= pragmas.get('fullspeed', True)
+		self.add_debug_trace_logging	= pragmas.get('show_trace', False)
+		self.do_builtin_logging			= pragmas.get('builtin_logging', True)
+		self.do_builtin_error_logging	= pragmas.get('builtin_error_logging', True)
 
 
 	def _transform(self, code):
@@ -734,6 +741,9 @@ class M_Grande(Mutator):
 		for s in code:
 			if isinstance(s, S_Var):
 				self._add_global_var(s.var.name, s.value, user=True)
+
+			elif isinstance(s, S_DocComment):
+				pass # Simply discard it
 
 			elif isinstance(s, S_Function):
 
@@ -839,15 +849,18 @@ class M_Grande(Mutator):
 		sts = []
 
 		# goto reset (skip trampolines)
-		append(sts, S_Comment('Disable speed limit'))
-		append(sts, synth('sys[63] = 128;'))
-
+		
+		if self.do_fullspeed:
+			append(sts, S_Comment('Disable speed limit'))
+			append(sts, synth('sys[63] = 128;'))
 
 		append(sts, self._mk_label('__reset'))
-		append(sts, self._mk_echo('[INFO] Program reset.'))
+		if self.do_builtin_logging:
+			append(sts, self._mk_echo('[INFO] Program reset.'))
 		append(sts, self._banner('FUNC: init()'))
 		append(sts, self._mk_label('__init'))
-		append(sts, self._mk_echo('[INFO] Initialization...'))
+		if self.do_builtin_logging:
+			append(sts, self._mk_echo('[INFO] Initialization...'))
 
 		# assign global vars default values
 		append(sts, self.globals_assign)
@@ -860,7 +873,8 @@ class M_Grande(Mutator):
 
 		# infinite main loop
 		append(sts, self._banner('FUNC: main()'))
-		append(sts, self._mk_echo('[INFO] main() started.'))
+		if self.do_builtin_logging: 
+			append(sts, self._mk_echo('[INFO] main() started.'))
 		append(sts, self._mk_label('__main_loop'))
 
 		if main_userfn is not None:
@@ -935,14 +949,17 @@ class M_Grande(Mutator):
 		if self.do_check_stack_bounds:
 			# stack overflow
 			append(sts, self._mk_label('__err_so'))
-			append(sts, self._mk_error('[ERROR] Stack overflow!'))
+			if self.do_builtin_error_logging:
+				append(sts, self._mk_error('[ERROR] Stack overflow!'))
 			# stack underflow
 			append(sts, self._mk_label('__err_su'))
-			append(sts, self._mk_error('[ERROR] Stack underflow!'))
+			if self.do_builtin_error_logging:
+				append(sts, self._mk_error('[ERROR] Stack underflow!'))
 
 		# bad address
 		append(sts, self._mk_label('__err_bad_addr'))
-		append(sts, self._mk_error('[ERROR] Bad address!'))
+		if self.do_builtin_error_logging:
+			append(sts, self._mk_error('[ERROR] Bad address!'))
 
 		return sts
 
@@ -1092,6 +1109,8 @@ class M_Grande(Mutator):
 
 			self._statement_transformers = {
 				S_Empty:	None,
+				S_Comment:		self._transform_noop,
+				S_DocComment:	self._transform_noop,
 				S_Goto:		self._transform_goto,
 				S_Block:	self._transform_alone_block,
 				S_Label:	self._transform_label,
@@ -1288,13 +1307,13 @@ class M_Grande(Mutator):
 		append(out, S_Comment('WHILE begin'))
 
 		l_continue = self.label_pool.acquire('wh_cont')
-		l_body = self.label_pool.acquire('wh_body')
+		#l_body = self.label_pool.acquire('wh_body')
 		l_break = self.label_pool.acquire('wh_break')
 
 		# add meta to the loop
 		s.meta = Obj()
 		s.meta.l_continue = l_continue
-		s.meta.l_body = l_body
+		#s.meta.l_body = l_body
 		s.meta.l_break = l_break
 
 		# continue label
@@ -1305,14 +1324,16 @@ class M_Grande(Mutator):
 		append(tmps, _tmps)
 
 		# condition
-		ss = S_If()
-		ss.cond = cond
-		ss.then_st = self._mk_goto(l_body)
-		ss.else_st = self._mk_goto(l_break)
+		ss = S_If()		
+		ss.cond = E_Group([E_Operator('!'), cond])
+		ss.then_st = self._mk_goto(l_break)
+		#ss.cond = cond
+		#ss.then_st = self._mk_goto(l_body)
+		#ss.else_st = self._mk_goto(l_break)
 		append(out, ss)
 
 		# body
-		append(out, self._mk_label(l_body))
+		#append(out, self._mk_label(l_body))
 
 		append(out, self._process_block(fn, s.body_st))
 
@@ -1357,7 +1378,7 @@ class M_Grande(Mutator):
 		ss = S_If()
 		ss.cond = cond
 		ss.then_st = self._mk_goto(l_body)
-		ss.else_st = self._mk_goto(l_break)
+		#ss.else_st = self._mk_goto(l_break)
 		append(out, ss)
 
 		# end of body
@@ -1376,13 +1397,13 @@ class M_Grande(Mutator):
 
 		l_continue = self.label_pool.acquire('for_cont')
 		l_cond = self.label_pool.acquire('for_test')
-		l_body = self.label_pool.acquire('for_body')
+		#l_body = self.label_pool.acquire('for_body')
 		l_break = self.label_pool.acquire('for_break')
 
 		# add meta to the loop
 		s.meta = Obj()
 		s.meta.l_continue = l_continue
-		s.meta.l_body = l_body
+		#s.meta.l_body = l_body
 		s.meta.l_break = l_break
 		s.meta.l_cond = l_cond
 
@@ -1397,13 +1418,15 @@ class M_Grande(Mutator):
 		append(tmps, _tmps)
 
 		ss = S_If()
-		ss.cond = cond
-		ss.then_st = self._mk_goto(l_body)
-		ss.else_st = self._mk_goto(l_break)
+		ss.cond = E_Group([E_Operator('!'), cond])
+		ss.then_st = self._mk_goto(l_break)
+		#ss.else_st = self._mk_goto(l_break)
+		#ss.then_st = self._mk_goto(l_body)
+		#ss.else_st = self._mk_goto(l_break)
 		append(out, ss)
 
 		# body
-		append(out, self._mk_label(l_body))
+		#append(out, self._mk_label(l_body))
 
 		append(out, self._process_block(fn, s.body_st))
 
@@ -1495,8 +1518,7 @@ class M_Grande(Mutator):
 		for ss in s.body_st.children:
 			if type(ss) is S_Case:
 
-
-				l_skip_case = self.label_pool.acquire('case_skip')
+				l_skip_case = self.label_pool.acquire('case_matched') # This is used for fall-through
 
 				# already in case, skip the test
 				if case_active:
@@ -1510,9 +1532,8 @@ class M_Grande(Mutator):
 
 				# prepare the if
 				st = S_If()
-				st.cond = E_Group([E_Variable(compared), E_Operator('=='), ss.value])
-				st.then_st = self._mk_goto(l_skip_case)
-				st.else_st = self._mk_goto(l_next_case)
+				st.cond = E_Group([E_Variable(compared), E_Operator('!='), ss.value])
+				st.then_st = self._mk_goto(l_next_case)
 				append(out, st)
 
 				# skip case label
