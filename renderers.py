@@ -51,6 +51,8 @@ class Renderer:
 			self.indent = '\t'
 		elif indent == 'spaces':
 			self.indent = '    '
+		elif type(indent) is int:
+			self.indent = ' ' * int(indent)
 		else:
 			self.indent = indent
 
@@ -596,7 +598,10 @@ class CSyntaxRenderer(Renderer):
 		src = self._render_expr_variable(s.var)
 
 		src += ' %s ' % s.op.value
-		src += self._render_subexpr(s.value)
+
+		self.expr_render_mode = 'normal'
+		src += self._render_subexpr(s.value) # Hack: go directly to sub-expr so there are no parens
+
 		src += ';'
 
 		return src

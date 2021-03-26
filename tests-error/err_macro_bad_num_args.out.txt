@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+"FOO" is a macro, but can't be used with arguments ("no", "variant", "takes", "five", "args")
+
+To see debug info, please use the -x flag.
+

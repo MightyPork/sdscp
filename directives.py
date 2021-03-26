@@ -88,6 +88,32 @@ class MacroReader(CodeReader):
 
 		return white
 
+	def macro_sweep_inline(self):
+		""" Consume in-line comments and whitespace
+
+		Returns:
+			The consumed whitespace and comments
+
+		"""
+
+		pos_begin = self.pos
+
+		while self.pos < self.length:
+			if self.has_inline_doc_comment() or self.has_inline_comment():
+				self.consume_inline_comment()
+				break
+
+			if self.has_block_comment():
+				self.consume_block_comment()
+				break
+
+			if self.matches(r'[ \t]+'):
+				self.consume()
+				continue
+
+			break
+
+		return self.from_pos(pos_begin)
 
 	def consume_define_directive(self):
 		""" Consume a #define macro
@@ -140,7 +166,7 @@ class MacroReader(CodeReader):
 
 			if self.has_inline_comment():
 				# consume comment
-				j = self.sweep()
+				j = self.macro_sweep_inline()
 				white = self._define_get_whitespace(j)
 
 				if last_was_backslash:
@@ -152,8 +178,7 @@ class MacroReader(CodeReader):
 
 			if self.has_block_comment():
 
-				j = self.sweep()
-
+				j = self.macro_sweep_inline()
 				white = self._define_get_whitespace(j)
 
 				if j.count('\n') > 0:
@@ -168,9 +193,13 @@ class MacroReader(CodeReader):
 				continue
 
 			char = self.peek()
+
 			if char == '\\':
 				buffer_before_backslash = buffer
 				last_was_backslash = True
+				self.consume()
+				# Sweep trash after the line wrap
+				self.macro_sweep_inline()
 
 			elif re.match(r'[ \t]', char):  # whitespace except newline
 				pass  # add to macro
@@ -261,6 +290,19 @@ class MacroReader(CodeReader):
 		return buffer
 
 
+	def consume_if0_directive(self):
+		""" consume #if 0
+
+		Returns:
+			The #ifdef directive.
+
+		"""
+
+		buffer = self._consume_directive_name('if 0')
+		self.consume_inline_whitespace()
+		return buffer
+
+
 	def consume_ifndef_directive(self):
 		""" consume a #ifndef
 
@@ -328,6 +370,15 @@ class MacroReader(CodeReader):
 			return False
 
 		return self.starts('#ifdef')
+
+
+	def has_if0_directive(self):
+		""" Stupid hack to support if 0 """
+
+		if self.has_end():
+			return False
+
+		return self.starts('#if 0')
 
 
 	def has_ifndef_directive(self):
@@ -436,6 +487,12 @@ class MacroReader(CodeReader):
 					# skip to end
 					self.pos = self.find_directive_block_end(can_else=True)
 
+				elif self.has_if0_directive():
+					nest += 1
+					self.consume_if0_directive()
+
+					# skip to end
+					self.pos = self.find_directive_block_end(can_else=True)
 
 				elif self.has_ifndef_directive():
 					nest += 1
@@ -903,6 +960,10 @@ class D_Ifdef(Token):
 
 	def __init__(self, value):
 		super().__init__(value)
+		
+		if value == '*** stupid hack if0 ***':
+			self.name = value
+			return
 
 		rd = CodeReader(value)
 		rd.consume_exact('#ifdef')
@@ -1270,13 +1331,18 @@ class DirectiveProcessor:
 
 
 			# #ifdef
-			elif rd.has_ifdef_directive() or rd.has_ifndef_directive():
+			elif rd.has_ifdef_directive() or rd.has_ifndef_directive() or rd.has_if0_directive():
 
 				positive = rd.has_ifdef_directive()
+				if0 = rd.has_if0_directive()
 
 				if positive:
 					s = rd.consume_ifdef_directive()
 					d = D_Ifdef(s)
+				elif if0:
+					rd.consume_if0_directive()
+					d = D_Ifdef('*** stupid hack if0 ***')
+					positive = True
 				else:
 					s = rd.consume_ifndef_directive()
 					d = D_Ifndef(s)
@@ -1451,8 +1517,8 @@ class DirectiveProcessor:
 
 						if replacement is None:
 							out += ident + ident_whitesp + paren
-							print(
-								'[W] Macro "%s" defined, but can\'t use arguments (%s)'
+							raise SdscpSyntaxError(
+								'"%s" is a macro, but can\'t be used with arguments (%s)'
 								% (ident, ', '.join(args) ))
 						else:
 							out += replacement

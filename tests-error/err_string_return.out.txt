@@ -1,0 +1,7 @@
+
+############################## COMPATIBILITY ERROR #############################
+
+SDS-C does not support string variables, at __rval = ('abc' + 1);
+
+To see debug info, please use the -x flag.
+

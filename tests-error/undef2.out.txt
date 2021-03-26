@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+GOTO to undefined label __fnmainL_baa!
+
+To see debug info, please use the -x flag.
+

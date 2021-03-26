@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+Use of undefined variable yolo
+
+To see debug info, please use the -x flag.
+

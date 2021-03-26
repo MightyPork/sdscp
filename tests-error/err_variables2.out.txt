@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+Variable a shadows global, in main
+
+To see debug info, please use the -x flag.
+

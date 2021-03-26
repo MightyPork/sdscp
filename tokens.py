@@ -3,6 +3,7 @@
 import re
 from readers import CodeReader
 from enum import Enum
+from sdscp_errors import SdscpSyntaxError
 
 
 class Token:
@@ -601,7 +602,7 @@ class T_Expression(CompositeToken):
 				except:
 					p = "SDSCP ERR reader overrun, pos=" + str(rd.pos)
 
-				raise Exception('Unexpected expression token near: «' + p + '», in «' + self.value + '»')
+				raise SdscpSyntaxError('Unexpected expression token near: "' + p + '", in "' + self.value + '"')
 
 		for t in self.tokens:
 			if t.is_composite():

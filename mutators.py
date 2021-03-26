@@ -486,7 +486,7 @@ class FnRegistry:
 	def register_call(self, called, from_):
 		""" Register a call. Returns index. """
 
-		i = self.counter
+		i = self.call_counter
 		label = self.get_call_label(i)
 
 		self.callindex2calllabel[i] = label
@@ -495,7 +495,7 @@ class FnRegistry:
 		self.callindex2fnname[i] = self.get_name(called)
 		self.callindex2origin[i] = from_
 
-		self.counter += 1
+		self.call_counter += 1
 
 		return i
 
@@ -738,10 +738,16 @@ class M_Grande(Mutator):
 		self._add_global_var('__addr')  # jump address pointer
 
 		# iterate through top level statements
+		
+		# Variables first
 		for s in code:
 			if isinstance(s, S_Var):
 				self._add_global_var(s.var.name, s.value, user=True)
-
+		# The rest
+		for s in code:
+			if isinstance(s, S_Var):
+				pass # Processed before
+			
 			elif isinstance(s, S_DocComment):
 				pass # Simply discard it
 
@@ -915,27 +921,39 @@ class M_Grande(Mutator):
 		""" Build redirection vector for return from func """
 
 		sts = []
-		append(sts, self._mk_pop('__addr'))  # pop a return address
 
 		rpvm = self.fn_pool.callindex2calllabel
 
+		my_callers = []
 		for (i, called_name) in self.fn_pool.callindex2fnname.items():
 			if called_name == name:
-				# print('Func %s called with RP %d' % (name, i))
+				append(my_callers, i)
+		
+		if len(my_callers) == 1:
+			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldnt even be pushed!
+			append(sts, S_Comment('Only one caller'))
+		else:
+			append(sts, self._mk_pop('__addr'))  # pop a return address
 
-				origin = self.fn_pool.callindex2origin[i]
+		for i in my_callers:
+			origin = self.fn_pool.callindex2origin[i]
 
-				if not origin in self.functions_called:
-					# print('Discarding return to call in unused func %s' % origin)
-					continue
+			if not origin in self.functions_called:
+				# print('Discarding return to call in unused func %s' % origin)
+				continue
 
-				n = rpvm.get(i)
+			rp_label = rpvm.get(i)
 
+			# If there is only one caller, goto directly
+			if len(my_callers) == 1:
+				append(sts, synth("goto %s;" % rp_label))
+			else:
 				append(sts, synth("""
 					if (__addr == %d) goto %s;
-				""" % (i, n)))
+				""" % (i, rp_label)))
 
-		append(sts, self._mk_goto('__err_bad_addr'))
+		if len(my_callers) > 1:
+			append(sts, self._mk_goto('__err_bad_addr'))
 
 		return sts
 
@@ -1048,6 +1066,7 @@ class M_Grande(Mutator):
 			append(out, S_Comment('Push used tmp vars'))
 
 			fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))
+			fn.meta.changed_tmps.sort() # Sort so we always keep the same order, important for unit tests
 
 			for n in fn.meta.changed_tmps:
 				append(out, self._mk_push(n))
@@ -1182,9 +1201,11 @@ class M_Grande(Mutator):
 		out = []
 		tmps = []
 
-		# reuse if already declared in the function
+		# if already declared in the function
 		if s.var.name in fn.meta.local_tmp_dict.keys():
-			repl = fn.meta.local_tmp_dict[s.var.name]
+			raise SdscpSyntaxError('Variable %s already declared in %s' % (s.var.name, fn.name))
+		elif (s.var.name in self.globals_vars) or (s.var.name in self.global_rename.keys()):
+			raise SdscpSyntaxError('Variable %s shadows global, in %s' % (s.var.name, fn.name))
 		else:
 			repl = self.tmp_pool.acquire()
 			fn.meta.local_tmp_dict[s.var.name] = repl
@@ -1397,13 +1418,11 @@ class M_Grande(Mutator):
 
 		l_continue = self.label_pool.acquire('for_cont')
 		l_cond = self.label_pool.acquire('for_test')
-		#l_body = self.label_pool.acquire('for_body')
 		l_break = self.label_pool.acquire('for_break')
 
 		# add meta to the loop
 		s.meta = Obj()
 		s.meta.l_continue = l_continue
-		#s.meta.l_body = l_body
 		s.meta.l_break = l_break
 		s.meta.l_cond = l_cond
 
@@ -1420,13 +1439,7 @@ class M_Grande(Mutator):
 		ss = S_If()
 		ss.cond = E_Group([E_Operator('!'), cond])
 		ss.then_st = self._mk_goto(l_break)
-		#ss.else_st = self._mk_goto(l_break)
-		#ss.then_st = self._mk_goto(l_body)
-		#ss.else_st = self._mk_goto(l_break)
 		append(out, ss)
-
-		# body
-		#append(out, self._mk_label(l_body))
 
 		append(out, self._process_block(fn, s.body_st))
 
@@ -1529,12 +1542,21 @@ class M_Grande(Mutator):
 
 				# prepare label for next case
 				l_next_case = self.label_pool.acquire('case')
+				
+				# The case value can be a variable or even a function call
+				(_init, _tmps, cond) = self._process_expr(fn, ss.value)
+				append(out, _init)
+				append(tmps, _tmps)
 
 				# prepare the if
 				st = S_If()
-				st.cond = E_Group([E_Variable(compared), E_Operator('!='), ss.value])
+				st.cond = E_Group([E_Variable(compared), E_Operator('!='), cond])
 				st.then_st = self._mk_goto(l_next_case)
 				append(out, st)
+				
+				# Release temporaries allocated for the tmp eval
+				for t in _tmps:
+					self.tmp_pool.release(t)
 
 				# skip case label
 				append(out, self._mk_label(l_skip_case))
@@ -1942,7 +1964,7 @@ class M_Grande(Mutator):
 			if not self.do_preserve_names:
 				nm = 'u1'
 				cnt=1
-				while nm in self.global_rename.values():
+				while (nm in self.global_rename.values()) or (nm in self.globals_vars):
 					cnt += 1
 					nm = 'u%d' % cnt
 
@@ -1953,13 +1975,26 @@ class M_Grande(Mutator):
 					# user defined
 					nm = 'u'+name
 					cnt=1
-					while nm in self.global_rename.values():
-						nm = 'u'+name+cnt
+					while (nm in self.global_rename.values()) or (nm in self.globals_vars):
+						nm = 'u'+name+str(cnt)
 						cnt += 1
 
 					self.global_rename[name] = nm
 					name = nm
 
+		if name in self.globals_vars:			
+			if name in self.global_rename.values():
+				# We got this collision through renaming another variable
+				nm = 'u'+name
+				cnt=1
+				while (nm in self.global_rename.values()) or (nm in self.globals_vars):
+					nm = 'u'+name+cnt
+					cnt += 1
+
+				self.global_rename[name] = nm
+				name = nm
+			else:
+				raise SdscpSyntaxError('Duplicate global var declaration (%s)' % name)
 
 		v = self._mk_var(name)
 		self.globals_declare.append(v)

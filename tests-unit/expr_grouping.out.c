@@ -1,0 +1,45 @@
+var __addr;
+var __rval;
+var __sp;
+var a;
+var b;
+var c;
+var vys;
+
+main
+{
+  __sp = 512;
+  label __main_loop:
+  vys = a;
+  vys = (- b);
+  vys = (a - b);
+  vys = ((- a) - b);
+  vys = (a - (- c));
+  vys = ((a - b) + c);
+  vys = ((a - b) - b);
+  vys = (((a - b) - c) + b);
+  vys = (((a - b) - c) - b);
+  vys = ((((a - b) - c) - b) - a);
+  vys = ((((((((a - b) - c) - b) - a) - b) - c) - b) - a);
+  vys = ((a + b) + c);
+  vys = (((((a + b) + c) - a) + b) + (c * a));
+  vys = (((((a * b) - (b / c)) + a) << b) && (c - a));
+  vys = (- b);
+  vys = (a - b);
+  vys = (a - (- b));
+  vys = (a - b);
+  vys = ((- a) - b);
+  if (a < b) {
+    c = b;
+  }
+  if (((c + a) + b) || (((a - b) + c) && (! ((a + b) - c)))) {
+    a = c;
+  }
+  if (((sys[17] - a) >= 10) || (sys[17] < b)) {
+    a = sys[17];
+  }
+  if ((! a) || (b == 0)) {
+    echo('fail');
+  }
+  goto __main_loop;
+}

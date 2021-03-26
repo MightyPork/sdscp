@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+Duplicate global var declaration (a)
+
+To see debug info, please use the -x flag.
+

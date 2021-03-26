@@ -365,6 +365,11 @@ class S_Function(Statement):
 		self.args = []
 		while atw.has_next():
 			n = atw.consume(T_Name).value
+			if n in self.args:				
+				raise SdscpSyntaxError(
+					'Func arg %s already defined in %s!'
+					% (n, self.name)
+				)
 			self.args.append(n)
 
 		# get function body

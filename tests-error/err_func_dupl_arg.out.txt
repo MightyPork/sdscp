@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+Func arg a already defined in func!
+
+To see debug info, please use the -x flag.
+
