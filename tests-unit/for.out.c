@@ -17,6 +17,7 @@ main
   goto __for_test_1;
   label __for_break_1:
   /// Complex test
+  __t0 = 0;
   __t1 = 150;
   /// !
   __t0 = 0;

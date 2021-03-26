@@ -724,6 +724,9 @@ class M_Grande(Mutator):
 		self.label_pool = LabelPool()
 		self.fn_pool = FnRegistry(self.label_pool)
 		self.fn_pool.gr = self
+		
+		self.scope_level = 0
+		self.scope_locals = {}
 
 		self.functions_called = set()
 
@@ -1089,7 +1092,6 @@ class M_Grande(Mutator):
 			}))
 
 		append(out, S_Comment('Return to caller'))
-		# append(out, self._mk_goto('__r_vect'))
 
 		return self._compose_func_obj(fn, out)
 
@@ -1106,7 +1108,7 @@ class M_Grande(Mutator):
 		return ret
 
 
-	def _process_block(self, fn, sts):
+	def _process_block(self, fn, sts, own_scope=True):
 		""" Process a statement block
 
 		Args:
@@ -1116,6 +1118,9 @@ class M_Grande(Mutator):
 		Returns block linearized.
 
 		"""
+
+		if own_scope:
+			self._start_local_scope(fn)
 
 		if isinstance(sts, S_Block):
 			sts = sts.children
@@ -1163,6 +1168,9 @@ class M_Grande(Mutator):
 				append(out, _init)
 				self._fn_release_tmps(fn, _tmps)
 
+		if own_scope:
+			self._end_local_scope(fn)
+
 		return out
 
 
@@ -1196,6 +1204,16 @@ class M_Grande(Mutator):
 
 		return (s, [])
 
+	def _start_local_scope(self, fn):
+		self.scope_level += 1
+		self.scope_locals[self.scope_level] = list()
+
+	def _end_local_scope(self, fn):
+		for entry in self.scope_locals[self.scope_level]:
+			del fn.meta.local_tmp_dict[entry[0]]
+			self.tmp_pool.release(entry[1])
+		del self.scope_locals[self.scope_level];
+		self.scope_level -= 1
 
 	def _transform_var(self, fn, s):
 		out = []
@@ -1209,6 +1227,9 @@ class M_Grande(Mutator):
 		else:
 			repl = self.tmp_pool.acquire()
 			fn.meta.local_tmp_dict[s.var.name] = repl
+
+			if self.scope_level in self.scope_locals:
+				self.scope_locals[self.scope_level].append([s.var.name, repl])
 
 		fn.meta.changed_tmps.append(repl)
 
@@ -1294,7 +1315,7 @@ class M_Grande(Mutator):
 	def _transform_if(self, fn, s):
 		out = []
 		tmps = []
-
+		
 		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
 		append(out, _init)
 		append(tmps, _tmps)
@@ -1317,7 +1338,7 @@ class M_Grande(Mutator):
 			ss.else_st = S_Block()
 			ss.else_st.children = self._process_block(fn, s.else_st)
 			append(out, ss)
-
+		
 		return (out, tmps)
 
 
@@ -1328,13 +1349,11 @@ class M_Grande(Mutator):
 		append(out, S_Comment('WHILE begin'))
 
 		l_continue = self.label_pool.acquire('wh_cont')
-		#l_body = self.label_pool.acquire('wh_body')
 		l_break = self.label_pool.acquire('wh_break')
 
 		# add meta to the loop
 		s.meta = Obj()
 		s.meta.l_continue = l_continue
-		#s.meta.l_body = l_body
 		s.meta.l_break = l_break
 
 		# continue label
@@ -1348,13 +1367,7 @@ class M_Grande(Mutator):
 		ss = S_If()		
 		ss.cond = E_Group([E_Operator('!'), cond])
 		ss.then_st = self._mk_goto(l_break)
-		#ss.cond = cond
-		#ss.then_st = self._mk_goto(l_body)
-		#ss.else_st = self._mk_goto(l_break)
 		append(out, ss)
-
-		# body
-		#append(out, self._mk_label(l_body))
 
 		append(out, self._process_block(fn, s.body_st))
 
@@ -1399,20 +1412,20 @@ class M_Grande(Mutator):
 		ss = S_If()
 		ss.cond = cond
 		ss.then_st = self._mk_goto(l_body)
-		#ss.else_st = self._mk_goto(l_break)
 		append(out, ss)
 
 		# end of body
 		append(out, self._mk_label(l_break))
 
 		append(out, S_Comment('DO_WHILE end'))
-
 		return (out, tmps)
 
 
 	def _transform_for(self, fn, s):
 		out = []
 		tmps = []
+		
+		self._start_local_scope(fn)
 
 		append(out, S_Comment('FOR begin'))
 
@@ -1427,7 +1440,7 @@ class M_Grande(Mutator):
 		s.meta.l_cond = l_cond
 
 		# the init
-		append(out, self._process_block(fn, s.init))
+		append(out, self._process_block(fn, s.init, False))
 
 		# condition check
 		append(out, self._mk_label(l_cond))
@@ -1441,16 +1454,18 @@ class M_Grande(Mutator):
 		ss.then_st = self._mk_goto(l_break)
 		append(out, ss)
 
-		append(out, self._process_block(fn, s.body_st))
+		append(out, self._process_block(fn, s.body_st, False))
 
 		# continue (iter)
 		append(out, self._mk_label(l_continue))
-		append(out, self._process_block(fn, s.iter))
+		append(out, self._process_block(fn, s.iter, False))
 		append(out, self._mk_goto(l_cond))
 
 		# break
 		append(out, self._mk_label(l_break))
 		append(out, S_Comment('FOR end'))
+		
+		self._end_local_scope(fn)
 
 		return (out, tmps)
 

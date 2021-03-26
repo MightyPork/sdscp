@@ -1,9 +1,10 @@
 main() {
 	/// No braces
-	for(var i=0; i<10; i++)
-		echo("Cycle ", i);
+	for(var q=0; q<10; q++)
+		echo("Cycle ", q);
 
 	/// Complex test
+	var i;
 	var j = 150;
 	/// !
 	for(i = 0; i < 100 && j == 150; i++) {

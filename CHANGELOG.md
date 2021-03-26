@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.7.0
+
+- Added unit tests with a testing framework (yes it's a bash script)
+- Variables now have block scope. 
+  - Applies to if/while/do-while/for
+  - Each switch case has it's own block.
+  - For is special and the scope includes the initializers.
+- Optimized some generated code
+- Fixed crashes in less often used patterns
+- Add checks for duplicate argument names
+- Fix bad multi-line macro parsing
+- Add `#if 0` (note: ONLY this exact pattern! One space after if)
+- Switch case values can now contain variables or function calls
+- Improve auto-generated variable naming to avoid collisions
+- Fix some errors needlessly showing trace
+
 ## 1.6.3
 
 - Fix comments in macro definition tokenized as code, resulting in apostrophes and double quotes
