@@ -43,9 +43,9 @@ main
   __t0 = __a0;
   __t1 = __a1;
   __t2 = __a2;
-  __rval = 0;
   __t3 = (__t0 + __t1);
   echo('a + b =', __t3, ', c = ', __t2);
+  __rval = 0;
   __t3 = ram[__sp];
   __sp += 1;
   __t2 = ram[__sp];
@@ -60,7 +60,6 @@ main
   __sp -= 1;
   ram[__sp] = __t0;
   __t0 = __a0;
-  __rval = 0;
   echo('Recurs ', __t0);
   if (__t0 == 0) {
     goto __fn2L_end;
@@ -72,6 +71,7 @@ main
   goto __fn2_recurs;
   label __rp3:
   label __fn2L_end:
+  __rval = 0;
   __t0 = ram[__sp];
   __sp += 1;
   __addr = ram[__sp];

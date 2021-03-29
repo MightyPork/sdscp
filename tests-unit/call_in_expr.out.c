@@ -26,7 +26,6 @@ main
   ram[__sp] = __t1;
   __t0 = __a0;
   __t1 = __a1;
-  __rval = 0;
   /// Add
   __rval = (__t0 + __t1);
   __t1 = ram[__sp];

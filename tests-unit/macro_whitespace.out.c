@@ -26,8 +26,8 @@ main
   }
   goto __main_loop;
   label __fn1_wait_for_http_get:
-  __rval = 0;
   wait(2000);
+  __rval = 0;
   __sp += 1;
   goto __rp1;
 }

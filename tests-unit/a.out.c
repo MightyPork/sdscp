@@ -64,17 +64,15 @@ main
   label __sw_break_1:
   goto __main_loop;
   label __fn1_do_stuff:
-  __rval = 0;
   echoinline('Stuff');
+  __rval = 0;
   __sp += 1;
   goto __rp1;
   label __fn2_get_magic_number:
-  __rval = 0;
   __rval = 123456;
   __sp += 1;
   goto __rp2;
   label __fn3_one:
-  __rval = 0;
   __rval = 1;
   __sp += 1;
   goto __rp3;

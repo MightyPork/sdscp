@@ -27,8 +27,8 @@ main
   label __for_break_1:
   goto __main_loop;
   label __fn1_bar:
-  __rval = 0;
   echo('foo');
+  __rval = 0;
   __sp += 1;
   goto __rp1;
 }

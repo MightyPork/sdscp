@@ -1051,8 +1051,6 @@ class M_Grande(Mutator):
 				'params': argstr
 			}))
 
-		append(body, self._mk_assign('__rval', 0))
-
 		append(body, S_Comment('Function body'))
 		append(body, self._process_block(fn, fn.body_st.children))
 
@@ -1074,6 +1072,7 @@ class M_Grande(Mutator):
 			for n in fn.meta.changed_tmps:
 				append(out, self._mk_push(n))
 
+		append(body, self._mk_assign('__rval', 0))
 		append(out, body)
 
 		# end label

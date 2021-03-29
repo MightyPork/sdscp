@@ -68,18 +68,18 @@ main
   echo(__t2, __t3);
   goto __main_loop;
   label __fn1_before:
-  __rval = 0;
   /// Before
   echo('Hello');
+  __rval = 0;
   __addr = ram[__sp];
   __sp += 1;
   if (__addr == 1) goto __rp1;
   if (__addr == 8) goto __rp8;
   goto __err_bad_addr;
   label __fn2_after:
-  __rval = 0;
   /// After
   echo('Hello');
+  __rval = 0;
   __sp += 1;
   goto __rp2;
   label __fn4_add:
@@ -89,7 +89,6 @@ main
   ram[__sp] = __t1;
   __t0 = __a0;
   __t1 = __a1;
-  __rval = 0;
   /// Add a + b
   /// First, call before
   __sp -= 1;
@@ -125,7 +124,6 @@ main
   ram[__sp] = __t5;
   __t0 = __a0;
   __t1 = __a1;
-  __rval = 0;
   /// Variable test
   __t2 = __t0;
   __t3 = (__t2 + __t1);

@@ -40,7 +40,6 @@ main
   __t0 = __a0;
   __t1 = __a1;
   __t2 = __a2;
-  __rval = 0;
   echo('func_with_args');
   echo(__t0, ' is ', __t1, ' under ', __t2);
   __a0 = 77777;
@@ -48,6 +47,7 @@ main
   ram[__sp] = 2;
   goto __fn2_other_func;
   label __rp2:
+  __rval = 0;
   __t2 = ram[__sp];
   __sp += 1;
   __t1 = ram[__sp];
@@ -60,8 +60,8 @@ main
   __sp -= 1;
   ram[__sp] = __t0;
   __t0 = __a0;
-  __rval = 0;
   echo('other_func', __t0);
+  __rval = 0;
   __t0 = ram[__sp];
   __sp += 1;
   __sp += 1;

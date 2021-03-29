@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.7.4
+
+- Fix a bug with implicit return.
+
+The return register was not updated on implicit return, 
+so code like this would behave unexpectedly:
+
+```c
+five() { 
+  return 5;
+}
+
+zero() { 
+  five();
+  echo("Hi");
+}
+
+main() {
+  echo(zero()); // Prints 5
+}
+```
+
+All functions that do not return explicitly correctly return zero after this fix. It's confirmed 
+by unit tests, which have been updated and some functionally tested.
+
+A side effect is that some generated code is now slightly shorter, as it's easier for the dead 
+code removal algorithm to detect the unnecessary register clearing when explicit return is used.
+
 ## 1.7.3
 
 - Show error on macro or include recursion

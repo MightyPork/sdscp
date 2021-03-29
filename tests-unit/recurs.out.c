@@ -31,7 +31,6 @@ main
   if (__sp < 100) goto __err_so;
   ram[__sp] = __t2;
   __t0 = __a0;
-  __rval = 0;
   /// SUM func
   if (__t0 == 1) {
     __rval = 1;

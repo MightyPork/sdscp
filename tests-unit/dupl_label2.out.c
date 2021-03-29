@@ -13,7 +13,6 @@ main
   echo('yo');
   goto __fnmainL_omg;
   label __fn2_fuu2:
-  __rval = 0;
   label __fn2L_omg:
   echo('aaa');
   goto __fn2L_omg;

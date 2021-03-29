@@ -12,8 +12,8 @@ main
   label __rp1:
   goto __main_loop;
   label __fn1_do_stuff:
-  __rval = 0;
   echo('hi');
+  __rval = 0;
   __sp += 1;
   goto __rp1;
 }
