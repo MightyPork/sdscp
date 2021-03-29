@@ -1244,7 +1244,7 @@ class DirectiveProcessor:
 		return out
 
 
-	def process(self):
+	def process(self, recursion_depth=0):
 		""" Extract all directives and resolve the # branching.
 
 		Keeps the produced code in `self.output`, and all
@@ -1254,6 +1254,9 @@ class DirectiveProcessor:
 			The produced code (before replacing macros)
 
 		"""
+
+		if recursion_depth > 15:
+			raise SdscpSyntaxError('Recursion in include directives detected while processing file "%s".\nUse "#pragma once" or include guards.' % self.main_file)
 
 		rd = MacroReader(self.source, self.main_file)
 		self.built = ''
@@ -1351,7 +1354,7 @@ class DirectiveProcessor:
 				# mp.add_defines(self.defines)
 
 				# process the external file
-				mp.process()
+				mp.process(recursion_depth + 1)
 
 				out += mp.get_output()
 
@@ -1475,7 +1478,7 @@ class DirectiveProcessor:
 		return out
 
 
-	def apply_macros(self):
+	def apply_macros(self, recursion_depth=0):
 		""" Recursively apply macros to the output of `process()`
 
 		To be called after `process()`.
@@ -1486,6 +1489,9 @@ class DirectiveProcessor:
 			macro replacements.
 
 		"""
+
+		if recursion_depth > 10:
+			raise SdscpSyntaxError('Recursion in macro definitions detected')
 
 		if len(self.output) == 0:
 			print('There is no source code.')
@@ -1603,7 +1609,7 @@ class DirectiveProcessor:
 
 		# take care of macros in macros
 		if applied_count > 0:
-			return self.apply_macros()
+			return self.apply_macros(recursion_depth + 1)
 		else:
 			return out
 

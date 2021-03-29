@@ -1,0 +1,8 @@
+
+################################# SYNTAX ERROR #################################
+
+Recursion in include directives detected while processing file "tests-error/include_self.c".
+Use "#pragma once" or include guards.
+
+To see debug info, please use the -x flag.
+

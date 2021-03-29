@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.3
+
+- Show error on macro or include recursion
+
 ## 1.7.2
 
 - Allow underscore as a group separator in number literals (e.g. 123_456, 0xFFFF_FFFF, 0b1111_1111).

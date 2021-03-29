@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+Recursion in macro definitions detected
+
+To see debug info, please use the -x flag.
+
