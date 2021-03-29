@@ -303,6 +303,19 @@ class MacroReader(CodeReader):
 		return buffer
 
 
+	def consume_if1_directive(self):
+		""" consume #if 1
+
+		Returns:
+			The #ifdef directive.
+
+		"""
+
+		buffer = self._consume_directive_name('if 1')
+		self.consume_inline_whitespace()
+		return buffer
+
+
 	def consume_ifndef_directive(self):
 		""" consume a #ifndef
 
@@ -379,6 +392,15 @@ class MacroReader(CodeReader):
 			return False
 
 		return self.starts('#if 0')
+
+
+	def has_if1_directive(self):
+		""" Stupid hack to support if 1 """
+
+		if self.has_end():
+			return False
+
+		return self.starts('#if 1')
 
 
 	def has_ifndef_directive(self):
@@ -490,6 +512,13 @@ class MacroReader(CodeReader):
 				elif self.has_if0_directive():
 					nest += 1
 					self.consume_if0_directive()
+
+					# skip to end
+					self.pos = self.find_directive_block_end(can_else=True)
+
+				elif self.has_if1_directive():
+					nest += 1
+					self.consume_if1_directive()
 
 					# skip to end
 					self.pos = self.find_directive_block_end(can_else=True)
@@ -961,7 +990,7 @@ class D_Ifdef(Token):
 	def __init__(self, value):
 		super().__init__(value)
 		
-		if value == '*** stupid hack if0 ***':
+		if value == '*** stupid hack if0 ***' or value == '*** stupid hack if1 ***':
 			self.name = value
 			return
 
@@ -1331,10 +1360,13 @@ class DirectiveProcessor:
 
 
 			# #ifdef
-			elif rd.has_ifdef_directive() or rd.has_ifndef_directive() or rd.has_if0_directive():
+			elif rd.has_ifdef_directive() or rd.has_ifndef_directive() or rd.has_if0_directive() or rd.has_if1_directive():
 
 				positive = rd.has_ifdef_directive()
 				if0 = rd.has_if0_directive()
+				if1 = rd.has_if1_directive()
+
+				# TODO implement #if (expr) properly, not just 0/1
 
 				if positive:
 					s = rd.consume_ifdef_directive()
@@ -1342,6 +1374,10 @@ class DirectiveProcessor:
 				elif if0:
 					rd.consume_if0_directive()
 					d = D_Ifdef('*** stupid hack if0 ***')
+					positive = True
+				elif if1:
+					rd.consume_if1_directive()
+					d = D_Ifdef('*** stupid hack if1 ***')
 					positive = True
 				else:
 					s = rd.consume_ifndef_directive()
@@ -1365,7 +1401,7 @@ class DirectiveProcessor:
 
 					# print('- Checking # condition: %s is %s' % (d.name, [0,1][defined]) )
 
-				if positive == defined:
+				if positive == defined or if1:
 					# is defined
 
 					# remember current pos

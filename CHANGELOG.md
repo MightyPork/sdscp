@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.1
+
+- Support `#if 1`
+- Added unit test for `#if 0` and `#if 1`
+
 ## 1.7.0
 
 - Added unit tests with a testing framework (yes it's a bash script)
