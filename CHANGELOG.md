@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.2
+
+- Allow underscore as a group separator in number literals (e.g. 123_456, 0xFFFF_FFFF, 0b1111_1111).
+  The underscore is removed after parsing.
+- Show error on numeric or string literals that are not supported by SDS-C
+
 ## 1.7.1
 
 - Support `#if 1`

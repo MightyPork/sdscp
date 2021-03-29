@@ -2,6 +2,7 @@
 
 import re
 from sdscp_errors import *
+from utils import eval_expr
 
 class BaseReader:
 	""" Utility for scanning through a text
@@ -716,7 +717,11 @@ class CodeReader(BaseReader):
 				self.consume() # consume next character also (even quote)
 
 			elif char == quote:
-				return self.from_pos(pos_begin) # end quote
+				consumed = self.from_pos(pos_begin)
+				if len(consumed) == 2:
+					self.error('SDS-C compiler does not support empty strings')
+
+				return consumed  # end quote
 
 		self.set_pos(pos_begin)
 		self.error('Unterminated string literal.')
@@ -772,32 +777,36 @@ class CodeReader(BaseReader):
 		"""
 
 		pos_begin = self.pos
+		
+		is_hex = False
+		is_dec = False
+		is_bin = False
 
 		if self.matches(r'0x[0-9A-Fa-f]+'):
-			# hexa
+			is_hex = True
 			self.consume(2)
 			while self.pos < self.length:
-				if self.matches(r'[0-9A-Fa-f]'):
+				if self.matches(r'[0-9A-Fa-f_]'):
 					self.consume()
 				else:
 					break
 
 		elif self.matches(r'0b[01]+'):
-			# hexa
+			is_bin = True
 			self.consume(2)
 			while self.pos < self.length:
-				if self.matches(r'[01]'):
+				if self.matches(r'[01_]'):
 					self.consume()
 				else:
 					break
 
 		elif self.matches(r'-?[0-9]+'):
-			# decimal
+			is_dec = True
 			if self.starts('-'):
 				self.consume()
 
 			while self.pos < self.length:
-				if self.matches(r'[0-9]'):
+				if self.matches(r'[0-9_]'):
 					self.consume()
 				else:
 					break
@@ -805,7 +814,23 @@ class CodeReader(BaseReader):
 		else:
 			self.error('Invalid number literal.')
 
-		return self.from_pos(pos_begin) # whole number
+		consumed = self.from_pos(pos_begin).replace("_", "") # whole number, removing separator underscores
+		
+		number = 0
+		try:
+			number = eval_expr(consumed)
+		except:
+			self.error('Error parsing number literal: %s' % consumed)
+		if is_dec:
+			if number > 0x7FFFFFFF:
+				self.error('Number too large for SDS-C: %s' % consumed)
+			if number < -2147483647:
+				self.error('Number too small for SDS-C: %s' % consumed)
+		else:
+			if number > 0xFFFFFFFF:
+				self.error('Number too large for SDS-C: %s' % consumed)
+
+		return consumed
 
 
 	def consume_operator(self):

@@ -1,0 +1,9 @@
+
+################################# SYNTAX ERROR #################################
+
+Number too large for SDS-C: 0b111111111111111111111111111111111
+At: >><<
+Near: >>11111111111111111111<<
+
+To see debug info, please use the -x flag.
+

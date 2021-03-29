@@ -14,7 +14,7 @@ PRAGMAS="
     -p simplify_ifs false
 "
 
-echo $PRAGMAS;
+echo "Pragmas:" $PRAGMAS;
 
 
 for filename in tests-unit/*.in.c; do

@@ -1,0 +1,7 @@
+
+################################# SYNTAX ERROR #################################
+
+Call to undefined function this_doesnt_exist()
+
+To see debug info, please use the -x flag.
+
