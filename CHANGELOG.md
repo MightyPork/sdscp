@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.1
+
+- Fix that variables could not be declared in switch cases. 
+  These variables are scoped to the particular `case` or `default` block and do not survive 
+  pass-through.
+
 ## 1.8.0
 
 - Correctly implement `#if`, it now supports most compile-time evaluable expressions

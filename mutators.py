@@ -1541,9 +1541,14 @@ class M_Grande(Mutator):
 
 		case_active = False
 		l_next_case = self.label_pool.acquire('case')
+		
+		last_branch_ss = list()
 
 		for ss in s.body_st.children:
 			if type(ss) is S_Case:
+				if len(last_branch_ss) > 0:
+					append(out, self._process_block(fn, last_branch_ss))
+					last_branch_ss = list()
 
 				l_skip_case = self.label_pool.acquire('case_matched') # This is used for fall-through
 
@@ -1578,13 +1583,21 @@ class M_Grande(Mutator):
 				case_active = True
 
 			elif type(ss) is S_Default:
+				if len(last_branch_ss) > 0:
+					append(out, self._process_block(fn, last_branch_ss))
+					last_branch_ss = list()
+				
 				append(out, self._mk_label(l_next_case))
 				l_next_case = self.label_pool.acquire('case')
 
 				case_active = True
 
 			else:
-				append(out, self._process_block(fn, ss))
+				append(last_branch_ss, ss)
+
+		if len(last_branch_ss) > 0:
+			append(out, self._process_block(fn, last_branch_ss))
+			last_branch_ss = list()
 
 		# label for last case false jump
 		append(out, self._mk_label(l_next_case))

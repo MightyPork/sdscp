@@ -27,15 +27,5 @@ main
   label __case_5:
   echo('Default');
   label __sw_break_1:
-  /// --- Early default
-  __t0 = 15;
-  if (__t0 != 10) goto __case_8;
-  echo('One');
-  goto __sw_break_2;
-  label __case_8:
-  echo('Default');
-  /// Fall though to 20
-  echo('Two');
-  label __sw_break_2:
   goto __main_loop;
 }
