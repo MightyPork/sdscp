@@ -1,3 +1,5 @@
+//!!! Zero used to be treated as undefined. That is no longer the case, use #if for that!
+
 #define DO_STUFF 0 // ignored
 #define FOOBAR 1
 #define BE_LAZY 1 /*

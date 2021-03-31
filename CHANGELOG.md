@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.0
+
+- Correctly implement `#if`, it now supports most compile-time evaluable expressions
+- `#ifdef` now works exactly as you'd expect from normal C. This is a **breaking change**!
+  - Previously, `#ifdef` would treat `#define FOO 0` as undefined. This is now defined.
+- Add compile-time eval for boolean expressions
+- `defined(XXX)` can now be used in `#if`, effectively making:
+	- `#if defined(XXX)` the equivalent of `#ifdef XXX`
+	- `#if !defined(XXX)` the equivalent of `#ifndef XXX`
+
 ## 1.7.4
 
 - Fix a bug with implicit return.

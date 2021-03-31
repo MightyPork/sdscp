@@ -6,8 +6,5 @@ main
 {
   __sp = 512;
   label __main_loop:
-  echo('Doing stuff');
-  echo('laying on bed');
-  echo('Indent is OK');
   goto __main_loop;
 }

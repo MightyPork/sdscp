@@ -1,0 +1,11 @@
+
+################################# SYNTAX ERROR #################################
+
+ERROR: ONE IS TWO
+
+In file tests-error/err_error_directive3.in.c at line 5, col 1,
+At: >>#error ONE IS TWO #e<<
+Near: >>O 1 #if ONE == TWO #error ONE IS TWO #e<<
+
+To see debug info, please use the -x flag.
+

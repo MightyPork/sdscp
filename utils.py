@@ -108,13 +108,29 @@ operators = {
 }
 
 def eval_expr(expr):
-	return eval_(ast.parse(expr, mode='eval').body)
+	expr = expr \
+		.replace("&&", " and ") \
+		.replace("||", " or ") \
+		.replace("!", " not ") \
+		.strip()
+
+	#print(expr)
+	parsed = ast.parse(expr, mode='eval').body
+	return eval_(parsed)
 
 def eval_(node):
 	if isinstance(node, ast.Num): # <number>
 		return node.n
 	elif isinstance(node, ast.BinOp): # <left> <operator> <right>
 		return operators[type(node.op)](eval_(node.left), eval_(node.right))
+	
+	elif isinstance(node, ast.BoolOp): # <left> <operator> <right>
+		operator = operators[type(node.op)]
+		evaled = [eval_(v) for v in node.values]
+		prev = evaled[0]
+		for v in evaled[1:]:
+			prev = operator(prev, v)
+		return prev
 
 	elif isinstance(node, ast.UnaryOp): # <operator> <operand> e.g., -1
 		return operators[type(node.op)](eval_(node.operand))

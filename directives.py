@@ -6,6 +6,7 @@ import time
 from collections import OrderedDict
 
 from sdscp_errors import *
+from utils import eval_expr
 from readers import CodeReader
 from tokens import Token, T_Paren, ParenType
 
@@ -290,30 +291,48 @@ class MacroReader(CodeReader):
 		return buffer
 
 
-	def consume_if0_directive(self):
-		""" consume #if 0
+	def consume_ifX_directive(self):
+		""" consume #if X
 
 		Returns:
-			The #ifdef directive.
+			The #if directive.
 
 		"""
 
-		buffer = self._consume_directive_name('if 0')
+		buffer = self._consume_directive_name('if')
+		buffer += ' '
 		self.consume_inline_whitespace()
+		buffer += self.consume_code(end=[';', ',', '\n'], eof=True)
+		self.sweep()
+		#print("#if directive consumed: %s", buffer)
 		return buffer
 
 
-	def consume_if1_directive(self):
-		""" consume #if 1
+	def consume_warning_directive(self):
+		""" consume #warning XXX
 
 		Returns:
-			The #ifdef directive.
+			The #warning directive.
 
 		"""
 
-		buffer = self._consume_directive_name('if 1')
-		self.consume_inline_whitespace()
+		buffer = self._consume_directive_name('warning')
+		buffer += self.consume_line()
 		return buffer
+
+
+	def consume_error_directive(self):
+		""" consume #error XXX
+
+		Returns:
+			The #error directive.
+
+		"""
+
+		buffer = self._consume_directive_name('error')
+		buffer += self.consume_line()
+		return buffer
+	
 
 
 	def consume_ifndef_directive(self):
@@ -385,22 +404,31 @@ class MacroReader(CodeReader):
 		return self.starts('#ifdef')
 
 
-	def has_if0_directive(self):
-		""" Stupid hack to support if 0 """
+	def has_ifX_directive(self):
+		""" #if directive """
 
 		if self.has_end():
 			return False
 
-		return self.starts('#if 0')
+		return self.starts('#if ')
 
 
-	def has_if1_directive(self):
-		""" Stupid hack to support if 1 """
+	def has_warning_directive(self):
+		""" #warning directive """
 
 		if self.has_end():
 			return False
 
-		return self.starts('#if 1')
+		return self.starts('#warning ')
+
+
+	def has_error_directive(self):
+		""" #error directive """
+
+		if self.has_end():
+			return False
+
+		return self.starts('#error ')
 
 
 	def has_ifndef_directive(self):
@@ -509,19 +537,18 @@ class MacroReader(CodeReader):
 					# skip to end
 					self.pos = self.find_directive_block_end(can_else=True)
 
-				elif self.has_if0_directive():
+				elif self.has_ifX_directive():
 					nest += 1
-					self.consume_if0_directive()
+					self.consume_ifX_directive()
 
 					# skip to end
 					self.pos = self.find_directive_block_end(can_else=True)
 
-				elif self.has_if1_directive():
-					nest += 1
-					self.consume_if1_directive()
+				elif self.has_warning_directive():
+					self.consume_warning_directive()
 
-					# skip to end
-					self.pos = self.find_directive_block_end(can_else=True)
+				elif self.has_error_directive():
+					self.consume_error_directive()
 
 				elif self.has_ifndef_directive():
 					nest += 1
@@ -989,10 +1016,6 @@ class D_Ifdef(Token):
 
 	def __init__(self, value):
 		super().__init__(value)
-		
-		if value == '*** stupid hack if0 ***' or value == '*** stupid hack if1 ***':
-			self.name = value
-			return
 
 		rd = CodeReader(value)
 		rd.consume_exact('#ifdef')
@@ -1004,6 +1027,76 @@ class D_Ifdef(Token):
 	def __str__(self):
 		return type(self).__name__ + ': Name = ' + self.name
 
+
+class D_Warning(Token):
+	""" #warning directive
+
+	Args:
+		value (str): The directive code
+
+	Attributes:
+		msg (str): The warning message
+
+	"""
+
+	def __init__(self, value):
+		super().__init__(value)
+
+		rd = CodeReader(value)
+		rd.consume_exact('#warning')
+		rd.consume_inline_whitespace()
+
+		self.msg = rd.consume_line()
+
+	def __str__(self):
+		return type(self).__name__ + ': ' + self.msg
+
+
+class D_Error(Token):
+	""" #error directive
+
+	Args:
+		value (str): The directive code
+
+	Attributes:
+		msg (str): The error message
+
+	"""
+
+	def __init__(self, value):
+		super().__init__(value)
+
+		rd = CodeReader(value)
+		rd.consume_exact('#error')
+		rd.consume_inline_whitespace()
+
+		self.msg = rd.consume_line()
+
+	def __str__(self):
+		return type(self).__name__ + ': ' + self.msg
+
+
+class D_If(Token):
+	""" #if directive
+
+	Args:
+		value (str): The directive code
+
+	Attributes:
+		expr (str): Name of the tested macro (the condition)
+
+	"""
+
+	def __init__(self, value):
+		super().__init__(value)
+
+		rd = CodeReader(value)
+		rd.consume_exact('#if')
+		rd.consume_inline_whitespace()
+		self.expr = rd.consume_code(eof=True)
+
+	def __str__(self):
+		return type(self).__name__ + ': Expr = ' + self.expr
 
 
 class D_Ifndef(Token):
@@ -1286,7 +1379,7 @@ class DirectiveProcessor:
 				to_c = rd.pos2col( to_pos )
 
 				if not config.QUIET:
-					print('=== JUMP in file "%s":  %d:%d --> %d:%d ===' % (self.main_file, from_l, from_c, to_l, to_c))
+					print('Skip in file "%s":  %d:%d --> %d:%d' % (self.main_file, from_l, from_c, to_l, to_c))
 				rd.pos =  skip_dict[rd.pos]
 				continue
 
@@ -1361,50 +1454,70 @@ class DirectiveProcessor:
 				# # add back defines collected from the external file
 				# self.add_defines( mp.get_defines() )
 
+			elif rd.has_warning_directive():
+				s = rd.consume_warning_directive()
+				d = D_Warning(s)
+				
+				print('\x1b[33mWARNING: %s\x1b[m' % d.msg.strip())
+
+			elif rd.has_error_directive():
+				pos = rd.pos;
+				s = rd.consume_error_directive()
+				d = D_Error(s)
+				
+				rd.pos = pos
+				
+				raise rd.error('ERROR: %s' % d.msg)
+				
 
 			# #ifdef
-			elif rd.has_ifdef_directive() or rd.has_ifndef_directive() or rd.has_if0_directive() or rd.has_if1_directive():
+			elif rd.has_ifdef_directive() or rd.has_ifndef_directive() or rd.has_ifX_directive():
 
 				positive = rd.has_ifdef_directive()
-				if0 = rd.has_if0_directive()
-				if1 = rd.has_if1_directive()
+				ifX = rd.has_ifX_directive()
 
-				# TODO implement #if (expr) properly, not just 0/1
-
-				if positive:
+				if ifX:
+					s = rd.consume_ifX_directive()
+					d = D_If(s)
+				elif positive:
 					s = rd.consume_ifdef_directive()
 					d = D_Ifdef(s)
-				elif if0:
-					rd.consume_if0_directive()
-					d = D_Ifdef('*** stupid hack if0 ***')
-					positive = True
-				elif if1:
-					rd.consume_if1_directive()
-					d = D_Ifdef('*** stupid hack if1 ***')
-					positive = True
 				else:
 					s = rd.consume_ifndef_directive()
 					d = D_Ifndef(s)
 
-				defined = (d.name in self.defines)
-				if defined:
-					found = False
+				test_passed = False
+				if ifX:
+					# FIXME stupid hacks
+					old_output = self.output
+					self.output = d.expr
+					#print("Expr to process = %s" % d.expr)
+					self.apply_macros()
+					processed = self.output
+					self.output = old_output
+					#print("Expr processed = %s" % processed)
+					
+					# Replace defined(XYZ)
+					for d in self.defines.keys():
+						processed = processed.replace("defined(%s)" % d, "1")
+					processed = re.sub(r'defined\(.*?\)', '0', processed)
+					
+					evaled = eval_expr(processed)
+					#print("Eval result = %s" % evaled)
+					test_passed = evaled != False and evaled != 0
 
-					# print(','.join([str(m) for m in self.defines[d.name]]))
+				else:
+					defined = (d.name in self.defines)
+					if defined:
+						# Warn about a possible bug after 1.8.0
+						for dx in self.defines[d.name]:
+							if dx.body == '0':
+								if not config.QUIET:
+									print("\x1b[33m\"#ifdef %s\" with %s defined as 0. Maybe you want #if instead?\x1b[m" % (d.name, d.name))
 
-					for m in self.defines[d.name]:
-						if m.is_constant():
-							defined = (m.body != '0')
-							found = True
-							break
+					test_passed = positive == defined
 
-					if not found:
-						print('[W] Macro %s is not constant.' % (d.name) )
-						defined = False
-
-					# print('- Checking # condition: %s is %s' % (d.name, [0,1][defined]) )
-
-				if positive == defined or if1:
+				if test_passed:
 					# is defined
 
 					# remember current pos

@@ -23,11 +23,11 @@ main
   /// Always true 1
   echo('Always run 1');
   /// Always true 2
-  if (! 0) {
+  if (1) {
     echo('Always run 2');
   }
   /// Always true 3
-  if (! 0) {
+  if (1) {
     echo('Always run 3');
   }
   /// Always true 4
