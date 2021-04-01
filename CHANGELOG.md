@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.2
+
+- Fix nested function calls lead to mangled arguments
+- Temporaries / globals sort now uses natural ordering
+
 ## 1.8.1
 
 - Fix that variables could not be declared in switch cases. 

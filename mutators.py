@@ -366,6 +366,13 @@ class ArgPool:
 	def _gen_name(self, index):
 		return "__a%d" % (index)
 
+	def save(self):
+		""" Save position """
+		return self.ptr
+
+	def restore(self, saved_ptr):
+		""" Restore to saved position """
+		self.ptr = saved_ptr
 
 	def rewind(self):
 		""" Rewind to start """
@@ -852,7 +859,7 @@ class M_Grande(Mutator):
 		# Compose output code
 		output_code = []
 		append(output_code, S_Comment('Globals declaration'))
-		append(output_code, sorted(self.globals_declare, key=attrgetter('var.name')))
+		append(output_code, sorted(self.globals_declare, key=lambda x: natural_sort_key(x.var.name))) # stupid hacks to get natural sort
 
 		# main func body statements
 		sts = []
@@ -1067,7 +1074,7 @@ class M_Grande(Mutator):
 			append(out, S_Comment('Push used tmp vars'))
 
 			fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))
-			fn.meta.changed_tmps.sort() # Sort so we always keep the same order, important for unit tests
+			fn.meta.changed_tmps.sort(key=natural_sort_key) # Sort so we always keep the same order, important for unit tests
 
 			for n in fn.meta.changed_tmps:
 				append(out, self._mk_push(n))
@@ -1907,6 +1914,7 @@ class M_Grande(Mutator):
 			fn.meta.calls.add(name)
 
 			# regular user function call
+			argpool_saved = self.arg_pool.save()
 			self.arg_pool.rewind()
 
 			arg_assignments = []
@@ -1938,6 +1946,8 @@ class M_Grande(Mutator):
 			# return label
 			lbl = self.fn_pool.get_call_label(return_idx)
 			append(out, self._mk_label(lbl))
+			
+			self.arg_pool.restore(argpool_saved)
 
 		self._fn_release_tmps(fn, tmps)
 

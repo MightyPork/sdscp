@@ -3,6 +3,7 @@
 import ast
 import operator as op
 import functools
+import re
 from sdscp_errors import *
 
 def append(arr, added):
@@ -152,3 +153,8 @@ def power(a, b):
 	return op.pow(a, b)
 
 operators[ast.Pow] = power
+
+# From: https://stackoverflow.com/a/16090640/2180189
+def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
+    return [int(text) if text.isdigit() else text.lower()
+            for text in _nsre.split(s)]  
