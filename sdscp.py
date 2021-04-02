@@ -16,7 +16,7 @@ import statements
 
 import config
 
-VERSION = '1.8.1'
+VERSION = '1.8.3'
 
 # ==================== Command Line Arguments processing =======================
 
@@ -93,6 +93,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+		'-C', '--show-callgraph',
+		action='store_true',
+		default=False,
+		help='Show callgraph'
+)
+
+parser.add_argument(
 		'-O', '--show-original',
 		action='store_true',
 		default=False,
@@ -157,6 +164,7 @@ SHOW_TOKENS		= args.verbose or args.show_tokens
 SHOW_STATEMENTS	= args.verbose or args.show_statements
 SHOW_GENERATED	= args.verbose or args.show_generated
 SHOW_OUTPUT		= args.verbose or args.display
+config.SHOW_CALLGRAPH = args.verbose or args.show_callgraph
 
 config.QUIET	= not args.verbose and args.quiet
 SHOW_STRACE     = args.error_trace

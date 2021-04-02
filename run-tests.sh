@@ -12,6 +12,7 @@ PRAGMAS="
     -p fullspeed false
     -p comments false
     -p simplify_ifs false
+    -p inline_one_use_functions false
 "
 
 echo "Pragmas:" $PRAGMAS;

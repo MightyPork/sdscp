@@ -3,14 +3,38 @@
 Default pragma settings:
 
 ```c
+// Print error and restart on stack over/underflow 
 #pragma safe_stack true
+
+// Stack region in ram[] lower bound
 #pragma stack_start 300
+
+// Stack region in ram[] upper bound
 #pragma stack_end 511
+
+// Preserve original label/func/var names in the generated code
 #pragma keep_names false
+
+// Embed echo() calls tracing the control flow, only for sdscp debug
 #pragma show_trace false
+
+// Disable speed limiter at startup
 #pragma fullspeed true
+
+// Include built-in logging (e.g. "main started")
 #pragma builtin_logging true
+
+// Include built-in error logging.
+// This is enabled independently of `builtin_logging`
 #pragma builtin_error_logging true
+
+// Inline functions used only once.
+// Inlining speeds up execution and reduces code size. 
+#pragma inline_one_use_functions true
+
+// Remove dead code, e.g. unused functions, code after a goto,
+// or unused labels.
+#pragma remove_dead_code true
 ```
 
 Other pragmas:

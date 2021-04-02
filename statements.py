@@ -135,6 +135,8 @@ class Statement(SyntaxNode):
 	def __str__(self):
 		return type(self).__name__
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		pass
 
 
 class S_Empty(Statement):
@@ -317,6 +319,13 @@ class S_Call(Statement):
 		for a in self.args:
 			a.bind_parent(self)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.name not in callgraph:
+			callgraph[self.name] = list()
+		callgraph[self.name].append(func)
+
+		for arg in self.args:
+			arg.update_callgraph(func, callgraph)
 
 	def __str__(self):
 		s = 'CALL %s' % self.name
@@ -346,6 +355,7 @@ class S_Function(Statement):
 		self.name = None
 		self.args = []
 		self.body_st = None
+		self.inline = False
 
 		# if created without a TW
 		if tw is None:
@@ -387,6 +397,9 @@ class S_Function(Statement):
 
 		return s
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.body_st is not None:
+			self.body_st.update_callgraph(self.name, callgraph)
 
 
 class S_Return(Statement):
@@ -423,6 +436,9 @@ class S_Return(Statement):
 
 		tw.consume(T_Semicolon)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.value is not None:
+			self.value.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.value.bind_parent(self)
@@ -465,6 +481,9 @@ class S_Case(Statement):
 		# a colon
 		tw.consume(T_Colon)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.value is not None:
+			self.value.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.value.bind_parent(self)
@@ -581,6 +600,9 @@ class S_Block(Statement):
 		for s in self.children:
 			s.bind_parent(self)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		for ch in self.children:
+			ch.update_callgraph(func, callgraph)
 
 	def __str__(self):
 		return 'BLOCK {\n%s\n}' % (
@@ -642,6 +664,9 @@ class S_Var(Statement):
 
 		tw.consume(T_Semicolon)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.value is not None:
+			self.value.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.var.bind_parent(self)
@@ -705,6 +730,9 @@ class S_Assign(Statement):
 		# end of statement
 		tw.consume(T_Semicolon)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.value is not None:
+			self.value.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.var.bind_parent(self)
@@ -761,6 +789,11 @@ class S_If(Statement):
 			# add empty statement instead.
 			self.else_st = S_Empty()
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.cond is not None:
+			self.cond.update_callgraph(func, callgraph)
+		self.then_st.update_callgraph(func, callgraph)
+		self.else_st.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.cond.bind_parent(self)
@@ -809,6 +842,11 @@ class S_While(Statement):
 		# the loop body
 		self.body_st = tw.consume_statement()
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.cond is not None:
+			self.cond.update_callgraph(func, callgraph)
+		if self.body_st is not None:
+			self.body_st.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.cond.bind_parent(self)
@@ -862,6 +900,11 @@ class S_DoWhile(Statement):
 		# end of the statement.
 		tw.consume(T_Semicolon)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.cond is not None:
+			self.cond.update_callgraph(func, callgraph)
+		if self.body_st is not None:
+			self.body_st.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.cond.bind_parent(self)
@@ -928,6 +971,17 @@ class S_For(Statement):
 		# the loop body
 		self.body_st = tw.consume_statement()
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.init is not None:
+			for st in self.init:
+				st.update_callgraph(func, callgraph)
+		if self.cond is not None:
+			self.cond.update_callgraph(func, callgraph)
+		if self.iter is not None:
+			for st in self.iter:
+				st.update_callgraph(func, callgraph)
+		if self.body_st is not None:
+			self.body_st.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		for s in self.init:
@@ -994,6 +1048,11 @@ class S_Switch(Statement):
 		# the switch body
 		self.body_st = S_Block(tw)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.value is not None:
+			self.value.update_callgraph(func, callgraph)
+		if self.body_st is not None:
+			self.body_st.update_callgraph(func, callgraph)
 
 	def _bind_children(self):
 		self.value.bind_parent(self)

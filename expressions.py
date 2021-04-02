@@ -90,9 +90,11 @@ class Expression(SyntaxNode):
 
 	"""
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		pass
+
 	def __str__(self):
 		return type(self).__name__
-
 
 
 class E_Group(Expression):
@@ -116,6 +118,9 @@ class E_Group(Expression):
 
 		self.children = children
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		for ch in self.children:
+			ch.update_callgraph(func, callgraph)
 
 	def _add(self, child):
 		""" Add a child expression
@@ -272,6 +277,13 @@ class E_Call(Expression):
 		for e in self.args:
 			e.bind_parent(self)
 
+	def update_callgraph(self, func: str, callgraph: dict):
+		if self.name not in callgraph:
+			callgraph[self.name] = list()
+		callgraph[self.name].append(func)
+
+		for arg in self.args:
+			arg.update_callgraph(func, callgraph)
 
 	def __str__(self):
 		s = self.name + '(%s)' % ', '.join( [str(a) for a in self.args] )
