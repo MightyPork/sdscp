@@ -726,7 +726,7 @@ class M_Grande(Mutator):
 		self.add_debug_trace_logging	= pragmas.get('show_trace', False)
 		self.do_builtin_logging			= pragmas.get('builtin_logging', True)
 		self.do_builtin_error_logging	= pragmas.get('builtin_error_logging', True)
-		self.do_inline_one_use_functions = pragmas.get('inline_one_use_functions', False)
+		self.do_inline_one_use_functions = pragmas.get('inline_one_use_functions', True)
 
 
 	def _transform(self, code):
@@ -1304,9 +1304,10 @@ class M_Grande(Mutator):
 
 	def _end_local_scope(self, fn):
 		for entry in self.scope_locals[self.scope_level]:
-			del fn.meta.local_tmp_dict[entry[0]]
+			if entry[0] in fn.meta.local_tmp_dict:
+				del fn.meta.local_tmp_dict[entry[0]]
 			self.tmp_pool.release(entry[1])
-		del self.scope_locals[self.scope_level];
+		del self.scope_locals[self.scope_level]
 		self.scope_level -= 1
 
 	def _transform_var(self, fn, s):
