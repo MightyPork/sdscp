@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.8.3
+
+- Add single-use function inlining, enabled by default, plus added new unit tests
+  - Inlining reduces code size by avoiding the function call emulation
+  - The inlined function works exactly as if it wasn't inlined, e.g. parameters and `return` work
+    normally, goto is restricted to the inlined function, local variables are scoped correctly.
+- Add warning about unused functions
+- Add warning about functions that should be inlined but are not (e.g. because it's disabled)
+- New pragmas `inline_one_use_functions` and `remove_dead_code`, both default true
+
+```c
+// Inline functions used only once.
+// Inlining speeds up execution and reduces code size. 
+#pragma inline_one_use_functions true
+
+// Remove dead code, e.g. unused functions, code after a goto,
+// or unused labels.
+#pragma remove_dead_code true
+```
+
 ## 1.8.2
 
 - Fix nested function calls lead to mangled arguments

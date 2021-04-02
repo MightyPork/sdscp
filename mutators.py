@@ -130,10 +130,12 @@ class M_RemoveDeadCode(Mutator):
 	""" Removes obvious dead code, unused labels etc. """
 
 	def read_pragmas(self, pragmas):
+		self.do_remove_dead_code = pragmas.get('remove_dead_code', True)
 		self.keep_banner_comments = pragmas.get('comments', True)
 
-
 	def _transform(self, code):
+		if not self.do_remove_dead_code:
+			return code
 
 		if not config.QUIET: print('Removing dead code...')
 		p = 1
@@ -145,8 +147,11 @@ class M_RemoveDeadCode(Mutator):
 			self.used_labels = set()
 			self.existing_labels = set()
 
+			# FIXME
 			self.do_rm_labels = False
 			code = self._rm_dead(code)
+
+			#print("Existing labels: %s" % str(self.existing_labels))
 
 			self.do_rm_labels = True
 			code = self._rm_dead(code)
@@ -179,7 +184,7 @@ class M_RemoveDeadCode(Mutator):
 					if s.name not in self.used_labels:
 						i += 1 # skip
 						self.removed = True
-						# print('INFO: Removing unused label %s' % s.name)
+						#if not config.QUIET: print('Removing unused label %s' % s.name)
 						continue
 
 			if type(s) is S_Goto:
@@ -218,6 +223,7 @@ class M_RemoveDeadCode(Mutator):
 					if type(ss) is S_Label:
 
 						if self.do_rm_labels and ss.name not in self.used_labels:
+							#if not config.QUIET: print('Removing unused label %s' % ss.name)
 							self.removed = True
 							continue
 
@@ -727,6 +733,7 @@ class M_Grande(Mutator):
 		self.do_builtin_logging			= pragmas.get('builtin_logging', True)
 		self.do_builtin_error_logging	= pragmas.get('builtin_error_logging', True)
 		self.do_inline_one_use_functions = pragmas.get('inline_one_use_functions', True)
+		self.do_remove_dead_code = pragmas.get('remove_dead_code', True)
 
 
 	def _transform(self, code):
@@ -833,7 +840,8 @@ class M_Grande(Mutator):
 		for fn in functions:
 			if fn.name not in callgraph:
 				if not config.QUIET: print('\x1b[33mFunction %s is never called!\x1b[m' % fn.name)
-				continue
+				if self.do_remove_dead_code:
+					continue
 
 			if fn.inline:
 				continue
@@ -871,13 +879,18 @@ class M_Grande(Mutator):
 					if name in _resolved_calls:
 						continue
 
-					fn = pr_userfuncs[name]
 					_resolved_calls.add(name)
 					_unresolved_calls.remove(name)
 
-					_labels.update(fn.labels)
-					_calls.update(fn.calls)
-					_gotos.update(fn.gotos)
+					fns = self.fn_pool.get_statement(name)
+					if fns is None:
+						continue
+
+					if not fns.inline:
+						fn = pr_userfuncs[name]
+						_labels.update(fn.labels)
+						_calls.update(fn.calls)
+						_gotos.update(fn.gotos)
 
 					_unresolved_calls.update(_calls.difference(_resolved_calls))
 
@@ -945,11 +958,19 @@ class M_Grande(Mutator):
 
 		# other user functions (already processed)
 		# sorted by function label
-		for name in sorted(_resolved_calls, key=self.fn_pool.get_transformed_name):
-			func = pr_userfuncs[name]
-			append(sts, func.code)
-			append(sts, self._build_trampoline_for_func(func.name))
+		if self.do_remove_dead_code:
+			funcs_to_render = sorted(_resolved_calls, key=self.fn_pool.get_transformed_name)
+		else:
+			funcs_to_render = sorted(pr_userfuncs.keys(), key=self.fn_pool.get_transformed_name)
 
+		for name in funcs_to_render:
+			fns = self.fn_pool.get_statement(name)
+			if fns is None:
+				continue
+			if not fns.inline:
+				func = pr_userfuncs[name]
+				append(sts, func.code)
+				append(sts, self._build_trampoline_for_func(func.name))
 
 		# ERRORS
 		append(sts, self._build_error_handlers())
@@ -1151,6 +1172,8 @@ class M_Grande(Mutator):
 	def _inline_user_func(self, fn, name, args, out_var):
 		""" linearize a function. naked = do not push / pop used tmp vars """
 
+		fn.meta.calls.add(name)
+
 		inlined = self.fn_pool.get_statement(name)
 		self._decorate_fn(inlined)
 
@@ -1161,6 +1184,8 @@ class M_Grande(Mutator):
 
 		out = []
 		tmps = []
+
+		append(out, S_Comment('INLINED: %s()' % name))
 
 		self._start_local_scope(fn)
 
@@ -1181,12 +1206,22 @@ class M_Grande(Mutator):
 		# end label
 		label = self._mk_label(self.fn_pool.get_end(inlined.name))
 		append(out, label)
+		#fn.meta.labels.add(label.name)
 
 		if out_var is not None:
 			append(out, self._mk_assign(out_var, '__rval'))
 
-		# Clean up
+		append(out, S_Comment('End of inlined %s' % name))
 
+		#print(inlined.meta.labels)
+		#print(inlined.meta.gotos)
+		#print(inlined.meta.calls)
+
+		fn.meta.labels.update(inlined.meta.labels)
+		fn.meta.gotos.update(inlined.meta.gotos)
+		fn.meta.calls.update(inlined.meta.calls)
+
+		# Clean up
 		# _end_local_scope, but specialized for inlining
 		for entry in self.scope_locals[self.scope_level]:
 			del inlined.meta.local_tmp_dict[entry[0]]
@@ -1426,7 +1461,7 @@ class M_Grande(Mutator):
 		append(out, _init)
 		append(tmps, _tmps)
 
-		if type(s.cond) is E_Literal:
+		if type(s.cond) is E_Literal and self.do_remove_dead_code:
 			if int(str(s.cond)) == 0:
 				# always False
 				append(out, S_Comment('(IF always false: else only)'))

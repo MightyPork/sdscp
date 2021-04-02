@@ -701,6 +701,9 @@ class BaseSdsRenderer(CSyntaxRenderer):
 	def _get_name(self):
 		return 'basic_sds'
 
+	def _render_empty(self, s):  # S_Empty
+		return '{}' # SDS-C seems to have a problem with empty statements
+
 	def __init__(self, program):
 		super().__init__(program)
 
