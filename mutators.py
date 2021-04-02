@@ -940,8 +940,9 @@ class M_Grande(Mutator):
 				append(my_callers, i)
 		
 		if len(my_callers) == 1:
-			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldnt even be pushed!
+			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldn't even be pushed!
 			append(sts, S_Comment('Only one caller'))
+			print("\x1b[33mFunction %s has only one caller, it should be inlined!\x1b[m" % name)
 		else:
 			append(sts, self._mk_pop('__addr'))  # pop a return address
 
