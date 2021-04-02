@@ -489,6 +489,9 @@ class FnRegistry:
 		self.counter += 1
 		return i
 
+	def get_statement(self, name):
+		i = self.fnname2fnindex[name]
+		return self.fnindex2statement[i]
 
 	def register_call(self, called, from_):
 		""" Register a call. Returns index. """
@@ -731,7 +734,7 @@ class M_Grande(Mutator):
 		self.label_pool = LabelPool()
 		self.fn_pool = FnRegistry(self.label_pool)
 		self.fn_pool.gr = self
-		
+
 		self.scope_level = 0
 		self.scope_locals = {}
 
@@ -748,7 +751,7 @@ class M_Grande(Mutator):
 		self._add_global_var('__addr')  # jump address pointer
 
 		# iterate through top level statements
-		
+
 		# Variables first
 		for s in code:
 			if isinstance(s, S_Var):
@@ -757,7 +760,7 @@ class M_Grande(Mutator):
 		for s in code:
 			if isinstance(s, S_Var):
 				pass # Processed before
-			
+
 			elif isinstance(s, S_DocComment):
 				pass # Simply discard it
 
@@ -785,6 +788,27 @@ class M_Grande(Mutator):
 		if main_userfn is None:
 			raise SdscpSyntaxError('Missing main function!')
 
+		# Callgraph is a dict where
+		# - keys are function names
+		# - values are lists of function names that call them
+		callgraph = dict()
+
+		if init_userfn is not None:
+			# functions do not use the first argument, it's there to keep the signature the same in all statements
+			init_userfn.update_callgraph('', callgraph)
+
+		main_userfn.update_callgraph('', callgraph)
+
+		for f in functions:
+			f.update_callgraph('', callgraph)
+
+		print("Callgraph:")
+		for callee, callers in sorted(callgraph.items()):
+			if callee not in self.builtin_fn:
+				print("  %s <- %s" % (callee, ', '.join(callers)))
+				st = self.fn_pool.get_statement(callee)
+				st.inline = len(callers) == 1
+
 		# process init()
 		pr_init = None
 		if init_userfn is not None:
@@ -795,6 +819,14 @@ class M_Grande(Mutator):
 		# process user functions except main() & init()
 		pr_userfuncs = {}
 		for fn in functions:
+			if fn.name not in callgraph:
+				print('\x1b[33mFunction %s is never called!\x1b[m' % fn.name)
+				continue
+
+			if fn.inline:
+				print("Function %s is inlined, not emitting!" % fn.name)
+				continue
+
 			# now we get
 			pr_userfuncs[fn.name] = self._process_fn(fn)
 
@@ -865,7 +897,7 @@ class M_Grande(Mutator):
 		sts = []
 
 		# goto reset (skip trampolines)
-		
+
 		if self.do_fullspeed:
 			append(sts, S_Comment('Disable speed limit'))
 			append(sts, synth('sys[63] = 128;'))
@@ -889,7 +921,7 @@ class M_Grande(Mutator):
 
 		# infinite main loop
 		append(sts, self._banner('FUNC: main()'))
-		if self.do_builtin_logging: 
+		if self.do_builtin_logging:
 			append(sts, self._mk_echo('[INFO] main() started.'))
 		append(sts, self._mk_label('__main_loop'))
 
@@ -938,7 +970,7 @@ class M_Grande(Mutator):
 		for (i, called_name) in self.fn_pool.callindex2fnname.items():
 			if called_name == name:
 				append(my_callers, i)
-		
+
 		if len(my_callers) == 1:
 			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldn't even be pushed!
 			append(sts, S_Comment('Only one caller'))
@@ -1011,6 +1043,9 @@ class M_Grande(Mutator):
 
 	def _process_fn(self, fn, naked=False):
 		""" linearize a function. naked = do not push / pop used tmp vars """
+
+		if fn.inline:
+			raise Exception("_process_fn must not be called for inline functions!")
 
 		self._decorate_fn(fn)
 		self.tmp_pool.release_all()
@@ -1102,6 +1137,33 @@ class M_Grande(Mutator):
 
 		return self._compose_func_obj(fn, out)
 
+	def _inline_user_func(self, fn, name, args):
+		""" linearize a function. naked = do not push / pop used tmp vars """
+
+		inlined = self.fn_pool.get_statement(name)
+
+		if not fn.inline:
+			raise Exception("%s cannot be inlined!" % name)
+
+		out = []
+		tmps = []
+
+		self._start_local_scope(fn)
+
+		# Store args into temporaries
+		# TODO!!!!!!!!!!!!!!
+
+		append(out, self._process_block(inlined, inlined.body_st.children, own_scope=False))
+		append(out, self._mk_assign('__rval', 0))
+		# end label
+		label = self._mk_label(self.fn_pool.get_end(fn.name))
+		append(out, label)
+
+		for entry in self.scope_locals[self.scope_level]:
+			del inlined.meta.local_tmp_dict[entry[0]]
+		self._end_local_scope(fn)
+
+		return (out, tmps)
 
 	def _compose_func_obj(self, fn, code):
 
@@ -1278,6 +1340,8 @@ class M_Grande(Mutator):
 		out = []
 		tmps = []
 
+		print("CALL -> %s" % s.name)
+
 		if s.name in self.builtin_fn:
 			# a builtin function,
 			# take care of complex arguments (SDS-C bug workaround)
@@ -1294,8 +1358,12 @@ class M_Grande(Mutator):
 
 		else:
 			# call to user func
-			append(out, self._call_user_func(fn, s.name, s.args))
-			self.functions_called.add(s.name)
+			called_fn_st = self.fn_pool.get_statement(s.name)
+			if called_fn_st.inline:
+				append(out, self._inline_user_func(fn, s.name, s.args, None))
+			else:
+				append(out, self._call_user_func(fn, s.name, s.args))
+				self.functions_called.add(s.name)
 
 		return (out, tmps)
 
@@ -1322,7 +1390,7 @@ class M_Grande(Mutator):
 	def _transform_if(self, fn, s):
 		out = []
 		tmps = []
-		
+
 		(_init, _tmps, cond) = self._process_expr(fn, s.cond)
 		append(out, _init)
 		append(tmps, _tmps)
@@ -1345,7 +1413,7 @@ class M_Grande(Mutator):
 			ss.else_st = S_Block()
 			ss.else_st.children = self._process_block(fn, s.else_st)
 			append(out, ss)
-		
+
 		return (out, tmps)
 
 
@@ -1371,7 +1439,7 @@ class M_Grande(Mutator):
 		append(tmps, _tmps)
 
 		# condition
-		ss = S_If()		
+		ss = S_If()
 		ss.cond = E_Group([E_Operator('!'), cond])
 		ss.then_st = self._mk_goto(l_break)
 		append(out, ss)
@@ -1431,7 +1499,7 @@ class M_Grande(Mutator):
 	def _transform_for(self, fn, s):
 		out = []
 		tmps = []
-		
+
 		self._start_local_scope(fn)
 
 		append(out, S_Comment('FOR begin'))
@@ -1471,7 +1539,7 @@ class M_Grande(Mutator):
 		# break
 		append(out, self._mk_label(l_break))
 		append(out, S_Comment('FOR end'))
-		
+
 		self._end_local_scope(fn)
 
 		return (out, tmps)
@@ -1549,7 +1617,7 @@ class M_Grande(Mutator):
 
 		case_active = False
 		l_next_case = self.label_pool.acquire('case')
-		
+
 		last_branch_ss = list()
 
 		for ss in s.body_st.children:
@@ -1569,7 +1637,7 @@ class M_Grande(Mutator):
 
 				# prepare label for next case
 				l_next_case = self.label_pool.acquire('case')
-				
+
 				# The case value can be a variable or even a function call
 				(_init, _tmps, cond) = self._process_expr(fn, ss.value)
 				append(out, _init)
@@ -1580,7 +1648,7 @@ class M_Grande(Mutator):
 				st.cond = E_Group([E_Variable(compared), E_Operator('!='), cond])
 				st.then_st = self._mk_goto(l_next_case)
 				append(out, st)
-				
+
 				# Release temporaries allocated for the tmp eval
 				for t in _tmps:
 					self.tmp_pool.release(t)
@@ -1594,7 +1662,7 @@ class M_Grande(Mutator):
 				if len(last_branch_ss) > 0:
 					append(out, self._process_block(fn, last_branch_ss))
 					last_branch_ss = list()
-				
+
 				append(out, self._mk_label(l_next_case))
 				l_next_case = self.label_pool.acquire('case')
 
@@ -1733,17 +1801,20 @@ class M_Grande(Mutator):
 				expr = E_Call(e.name, args)
 			else:
 				# user func
-				append(init, self._call_user_func(fn, e.name, e.args))
-
+				print("eCALL -> %s" % e.name)
+				called_fn_st = self.fn_pool.get_statement(e.name)
 				tmp = self.tmp_pool.acquire()
-				append(tmps, tmp) # mark as clobbered
-				append(init, self._mk_assign(tmp, '__rval'))
+				append(tmps, tmp)  # mark as clobbered
+
+				if called_fn_st.inline:
+					print("TODO inline func %s" % e.name)
+					append(init, self._inline_user_func(fn, e.name, e.args, tmp))
+					#expr = E_Literal(T_Number('0'))
+				else:
+					append(init, self._call_user_func(fn, e.name, e.args))
+					append(init, self._mk_assign(tmp, '__rval'))
+					self.functions_called.add(e.name)
 				expr = E_Variable(tmp)
-
-				# It's tempting to just use __rval here. That works OK - except for expressions that contain multiple functions!
-				#expr = E_Variable('__rval')
-
-				self.functions_called.add(e.name)
 
 		elif isinstance(e, E_Literal) or isinstance(e, E_Operator):
 			expr = e
@@ -1947,7 +2018,7 @@ class M_Grande(Mutator):
 			# return label
 			lbl = self.fn_pool.get_call_label(return_idx)
 			append(out, self._mk_label(lbl))
-			
+
 			self.arg_pool.restore(argpool_saved)
 
 		self._fn_release_tmps(fn, tmps)
@@ -2020,7 +2091,7 @@ class M_Grande(Mutator):
 					self.global_rename[name] = nm
 					name = nm
 
-		if name in self.globals_vars:			
+		if name in self.globals_vars:
 			if name in self.global_rename.values():
 				# We got this collision through renaming another variable
 				nm = 'u'+name
