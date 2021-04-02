@@ -332,7 +332,12 @@ class TmpVarPool:
 
 
 	def release(self, name):
-		""" Release a temporary variable """
+		""" Release temporary variable(s) """
+
+		if type(name) == list:
+			for n in name:
+				self.release(n)
+			return
 
 		if not name in self.locks.keys():
 			raise Exception('Cannot release %s, not defined.' % name)
@@ -490,6 +495,10 @@ class FnRegistry:
 		return i
 
 	def get_statement(self, name):
+		""" Get a function statement by name """
+		if not name in self.fnname2fnindex:
+			return None
+
 		i = self.fnname2fnindex[name]
 		return self.fnindex2statement[i]
 
@@ -717,6 +726,7 @@ class M_Grande(Mutator):
 		self.add_debug_trace_logging	= pragmas.get('show_trace', False)
 		self.do_builtin_logging			= pragmas.get('builtin_logging', True)
 		self.do_builtin_error_logging	= pragmas.get('builtin_error_logging', True)
+		self.do_inline_one_use_functions = pragmas.get('inline_one_use_functions', False)
 
 
 	def _transform(self, code):
@@ -802,12 +812,14 @@ class M_Grande(Mutator):
 		for f in functions:
 			f.update_callgraph('', callgraph)
 
-		print("Callgraph:")
+		if config.SHOW_CALLGRAPH: print("Callgraph:")
 		for callee, callers in sorted(callgraph.items()):
 			if callee not in self.builtin_fn:
-				print("  %s <- %s" % (callee, ', '.join(callers)))
+				if config.SHOW_CALLGRAPH:
+					print("  %s <- %s" % (callee, ', '.join(callers)))
 				st = self.fn_pool.get_statement(callee)
-				st.inline = len(callers) == 1
+				if self.do_inline_one_use_functions:
+					st.inline = len(callers) == 1
 
 		# process init()
 		pr_init = None
@@ -820,11 +832,10 @@ class M_Grande(Mutator):
 		pr_userfuncs = {}
 		for fn in functions:
 			if fn.name not in callgraph:
-				print('\x1b[33mFunction %s is never called!\x1b[m' % fn.name)
+				if not config.QUIET: print('\x1b[33mFunction %s is never called!\x1b[m' % fn.name)
 				continue
 
 			if fn.inline:
-				print("Function %s is inlined, not emitting!" % fn.name)
 				continue
 
 			# now we get
@@ -974,7 +985,7 @@ class M_Grande(Mutator):
 		if len(my_callers) == 1:
 			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldn't even be pushed!
 			append(sts, S_Comment('Only one caller'))
-			print("\x1b[33mFunction %s has only one caller, it should be inlined!\x1b[m" % name)
+			if not config.QUIET: print("\x1b[33mFunction %s has only one caller, it should be inlined!\x1b[m" % name)
 		else:
 			append(sts, self._mk_pop('__addr'))  # pop a return address
 
@@ -1137,12 +1148,15 @@ class M_Grande(Mutator):
 
 		return self._compose_func_obj(fn, out)
 
-	def _inline_user_func(self, fn, name, args):
+	def _inline_user_func(self, fn, name, args, out_var):
 		""" linearize a function. naked = do not push / pop used tmp vars """
 
 		inlined = self.fn_pool.get_statement(name)
+		self._decorate_fn(inlined)
 
-		if not fn.inline:
+		if not config.QUIET: print("Inlining %s" % name)
+
+		if not inlined.inline:
 			raise Exception("%s cannot be inlined!" % name)
 
 		out = []
@@ -1151,16 +1165,27 @@ class M_Grande(Mutator):
 		self._start_local_scope(fn)
 
 		# Store args into temporaries
-		# TODO!!!!!!!!!!!!!!
+		for (ai, arg_name) in enumerate(inlined.args):
+			tmp = self.tmp_pool.acquire()
+			tmps.append(tmp)
+			inlined.meta.local_tmp_dict[arg_name] = tmp
+
+			(_init, _tmps, a_val) = self._process_expr(fn, args[ai])
+			append(out, _init)
+			append(tmps, _tmps)
+			append(out, self._mk_assign(tmp, a_val))
+			#self.tmp_pool.release(_tmps)
 
 		append(out, self._process_block(inlined, inlined.body_st.children, own_scope=False))
 		append(out, self._mk_assign('__rval', 0))
 		# end label
-		label = self._mk_label(self.fn_pool.get_end(fn.name))
+		label = self._mk_label(self.fn_pool.get_end(inlined.name))
 		append(out, label)
 
-		for entry in self.scope_locals[self.scope_level]:
-			del inlined.meta.local_tmp_dict[entry[0]]
+		if out_var is not None:
+			append(out, self._mk_assign(out_var, '__rval'))
+
+		# Clean up
 		self._end_local_scope(fn)
 
 		return (out, tmps)
@@ -1340,8 +1365,6 @@ class M_Grande(Mutator):
 		out = []
 		tmps = []
 
-		print("CALL -> %s" % s.name)
-
 		if s.name in self.builtin_fn:
 			# a builtin function,
 			# take care of complex arguments (SDS-C bug workaround)
@@ -1359,8 +1382,10 @@ class M_Grande(Mutator):
 		else:
 			# call to user func
 			called_fn_st = self.fn_pool.get_statement(s.name)
-			if called_fn_st.inline:
-				append(out, self._inline_user_func(fn, s.name, s.args, None))
+			if called_fn_st is not None and called_fn_st.inline:
+				(_out, _tmps) = self._inline_user_func(fn, s.name, s.args, None)
+				append(out, _out)
+				append(tmps, _tmps)
 			else:
 				append(out, self._call_user_func(fn, s.name, s.args))
 				self.functions_called.add(s.name)
@@ -1801,17 +1826,18 @@ class M_Grande(Mutator):
 				expr = E_Call(e.name, args)
 			else:
 				# user func
-				print("eCALL -> %s" % e.name)
 				called_fn_st = self.fn_pool.get_statement(e.name)
-				tmp = self.tmp_pool.acquire()
-				append(tmps, tmp)  # mark as clobbered
 
-				if called_fn_st.inline:
-					print("TODO inline func %s" % e.name)
-					append(init, self._inline_user_func(fn, e.name, e.args, tmp))
-					#expr = E_Literal(T_Number('0'))
+				if called_fn_st is not None and called_fn_st.inline:
+					tmp = self.tmp_pool.acquire()
+					append(tmps, tmp)  # mark as clobbered
+					(_out, _tmps) = self._inline_user_func(fn, e.name, e.args, tmp)
+					append(init, _out)
+					append(tmps, _tmps)
 				else:
 					append(init, self._call_user_func(fn, e.name, e.args))
+					tmp = self.tmp_pool.acquire()
+					append(tmps, tmp)  # mark as clobbered
 					append(init, self._mk_assign(tmp, '__rval'))
 					self.functions_called.add(e.name)
 				expr = E_Variable(tmp)
