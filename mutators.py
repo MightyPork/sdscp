@@ -1186,7 +1186,13 @@ class M_Grande(Mutator):
 			append(out, self._mk_assign(out_var, '__rval'))
 
 		# Clean up
-		self._end_local_scope(fn)
+
+		# _end_local_scope, but specialized for inlining
+		for entry in self.scope_locals[self.scope_level]:
+			del inlined.meta.local_tmp_dict[entry[0]]
+			self.tmp_pool.release(entry[1])
+		del self.scope_locals[self.scope_level]
+		self.scope_level -= 1
 
 		return (out, tmps)
 
@@ -1304,8 +1310,7 @@ class M_Grande(Mutator):
 
 	def _end_local_scope(self, fn):
 		for entry in self.scope_locals[self.scope_level]:
-			if entry[0] in fn.meta.local_tmp_dict:
-				del fn.meta.local_tmp_dict[entry[0]]
+			del fn.meta.local_tmp_dict[entry[0]]
 			self.tmp_pool.release(entry[1])
 		del self.scope_locals[self.scope_level]
 		self.scope_level -= 1
