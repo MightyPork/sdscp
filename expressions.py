@@ -91,6 +91,7 @@ class Expression(SyntaxNode):
 	"""
 
 	def update_callgraph(self, func: str, callgraph: dict):
+		""" func - the calling function, callgraph-dict to update """
 		pass
 
 	def __str__(self):

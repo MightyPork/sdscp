@@ -57,13 +57,8 @@ main
   __sp += 1;
   goto __rp1;
   label __fn2_other_func:
-  __sp -= 1;
-  ram[__sp] = __t0;
-  __t0 = __a0;
-  echo('other_func', __t0);
+  echo('other_func', __a0);
   __rval = 0;
-  __t0 = ram[__sp];
-  __sp += 1;
   __sp += 1;
   goto __rp2;
 }

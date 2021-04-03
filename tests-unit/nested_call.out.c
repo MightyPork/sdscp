@@ -10,9 +10,6 @@ var __sp;
 var __t0;
 var __t1;
 var __t2;
-var __t3;
-var __t4;
-var __t5;
 
 main
 {
@@ -58,51 +55,11 @@ main
   }
   goto __main_loop;
   label __fn1_add6:
-  __sp -= 1;
-  ram[__sp] = __t0;
-  __sp -= 1;
-  ram[__sp] = __t1;
-  __sp -= 1;
-  ram[__sp] = __t2;
-  __sp -= 1;
-  ram[__sp] = __t3;
-  __sp -= 1;
-  ram[__sp] = __t4;
-  __sp -= 1;
-  ram[__sp] = __t5;
-  __t0 = __a0;
-  __t1 = __a1;
-  __t2 = __a2;
-  __t3 = __a3;
-  __t4 = __a4;
-  __t5 = __a5;
-  __rval = (((((__t0 + __t1) + __t2) + __t3) + __t4) + __t5);
-  __t5 = ram[__sp];
-  __sp += 1;
-  __t4 = ram[__sp];
-  __sp += 1;
-  __t3 = ram[__sp];
-  __sp += 1;
-  __t2 = ram[__sp];
-  __sp += 1;
-  __t1 = ram[__sp];
-  __sp += 1;
-  __t0 = ram[__sp];
-  __sp += 1;
+  __rval = (((((__a0 + __a1) + __a2) + __a3) + __a4) + __a5);
   __sp += 1;
   goto __rp4;
   label __fn2_add2:
-  __sp -= 1;
-  ram[__sp] = __t0;
-  __sp -= 1;
-  ram[__sp] = __t1;
-  __t0 = __a0;
-  __t1 = __a1;
-  __rval = (__t0 + __t1);
-  __t1 = ram[__sp];
-  __sp += 1;
-  __t0 = ram[__sp];
-  __sp += 1;
+  __rval = (__a0 + __a1);
   __addr = ram[__sp];
   __sp += 1;
   if (__addr == 1) goto __rp1;

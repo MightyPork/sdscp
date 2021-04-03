@@ -136,6 +136,7 @@ class Statement(SyntaxNode):
 		return type(self).__name__
 
 	def update_callgraph(self, func: str, callgraph: dict):
+		""" func - the calling function, callgraph-dict to update """
 		pass
 
 

@@ -3,8 +3,6 @@ var __a1;
 var __addr;
 var __rval;
 var __sp;
-var __t0;
-var __t1;
 var _skfk;
 var k;
 var u__fuck;
@@ -40,17 +38,7 @@ main
   echo('__sp', u__sp);
   goto __main_loop;
   label __fn1_moo:
-  __sp -= 1;
-  ram[__sp] = __t0;
-  __sp -= 1;
-  ram[__sp] = __t1;
-  __t0 = __a0;
-  __t1 = __a1;
-  __rval = 0;
-  __t1 = ram[__sp];
-  __sp += 1;
-  __t0 = ram[__sp];
-  __sp += 1;
+  __rval = (__a0 + __a1);
   __sp += 1;
   goto __rp1;
 }

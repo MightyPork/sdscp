@@ -61,17 +61,7 @@ main
   __rval = 0;
   goto __main_loop;
   label __fn4_not_inlined_add:
-  __sp -= 1;
-  ram[__sp] = __t0;
-  __sp -= 1;
-  ram[__sp] = __t1;
-  __t0 = __a0;
-  __t1 = __a1;
-  __rval = (__t0 + __t1);
-  __t1 = ram[__sp];
-  __sp += 1;
-  __t0 = ram[__sp];
-  __sp += 1;
+  __rval = (__a0 + __a1);
   __addr = ram[__sp];
   __sp += 1;
   if (__addr == 1) goto __rp1;

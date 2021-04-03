@@ -402,6 +402,8 @@ class ArgPool:
 
 		return name
 
+	def is_defined(self, v : str):
+		return v in self.vars
 
 	def get_names(self):
 		return self.vars
@@ -718,6 +720,13 @@ class M_Grande(Mutator):
 			'ram',
 			'share',
 			'text',
+		]
+
+		self.sdscp_builtin_fn = [
+			'reset',
+			'end',
+			'push',
+			'pop',
 		]
 
 		self._halt_used = False
@@ -1100,21 +1109,37 @@ class M_Grande(Mutator):
 
 		# TODO if the function does not contain any calls, we can directly use the arg_pool variables as temporaries
 
+		local_cg = dict()
+		fn.update_callgraph(fn.name, local_cg)
+
+		not_inlined_inner_calls = 0
+		for called in local_cg.keys():
+			if called in self.builtin_fn or called in self.sdscp_builtin_fn:
+				continue
+			called_fn_st = self.fn_pool.get_statement(called)
+			if not called_fn_st.inline:
+				not_inlined_inner_calls += 1
+		no_inner_calls = not_inlined_inner_calls == 0
+
 		passed_arg_names = []
 
 		if len(fn.args) > 0:
 			# assign arguments to tmps
-			append(body, S_Comment('Store args to tmp vars'))
-			for n in fn.args:
-				arg = self.arg_pool.acquire()
-				tmp = self.tmp_pool.acquire()
-				fn.meta.changed_tmps.append(tmp)
-				fn.meta.local_tmp_dict[n] = tmp
-				fn.meta.arg_tmps.append(tmp)
+			if no_inner_calls:
+				for n in fn.args:
+					arg = self.arg_pool.acquire()
+					fn.meta.local_tmp_dict[n] = arg
+			else:
+				append(body, S_Comment('Store args to tmp vars'))
+				for n in fn.args:
+					arg = self.arg_pool.acquire()
+					tmp = self.tmp_pool.acquire()
+					fn.meta.changed_tmps.append(tmp)
+					fn.meta.local_tmp_dict[n] = tmp
 
-				append(passed_arg_names, arg)
+					append(passed_arg_names, arg)
 
-				append(body, self._mk_assign(tmp, arg))
+					append(body, self._mk_assign(tmp, arg))
 
 
 		if self.add_debug_trace_logging:
@@ -1690,15 +1715,19 @@ class M_Grande(Mutator):
 		s.meta = Obj()
 		s.meta.l_break = l_break
 
-		compared = self.tmp_pool.acquire()
-		tmps.append(compared)
-
 		# resolve compared value
 		(_init, _tmps, cond) = self._process_expr(fn, s.value)
 		append(out, _init)
 		append(tmps, _tmps)
 
-		append(out, self._mk_assign(compared, cond))
+		if type(cond) is E_Variable:
+			# Use it directly. If the variable is assigned inside the switch, that's fine: once we get into a branch,
+			# no other tests are taken anyway.
+			compared = cond.name
+		else:
+			compared = self.tmp_pool.acquire()
+			tmps.append(compared)
+			append(out, self._mk_assign(compared, cond))
 
 		case_active = False
 		l_next_case = self.label_pool.acquire('case')
@@ -1838,10 +1867,11 @@ class M_Grande(Mutator):
 				else:
 					name = e.name
 
-				if not name in self.builtin_var:
-					if not name in self.tmp_pool.get_names():
-						if not name in self.globals_vars:
-							raise SdscpSyntaxError('Use of undefined variable %s' % name)
+				if not name in self.builtin_var \
+						and not name in self.tmp_pool.get_names() \
+						and not self.arg_pool.is_defined(name) \
+						and not name in self.globals_vars:
+					raise SdscpSyntaxError('Use of undefined variable %s' % name)
 
 			if e.index is None:
 				expr = E_Variable(name)
@@ -2059,7 +2089,7 @@ class M_Grande(Mutator):
 			if not name in self.user_fn:
 				raise SdscpSyntaxError('Call to undefined function %s()' % name)
 
-			declared_args = self.fn_pool.get_fn_args(name);
+			declared_args = self.fn_pool.get_fn_args(name)
 
 			if len(args) != len(declared_args):
 				raise SdscpSyntaxError('Invalid call of %s(%s):\n\n\t%s(%s)' % (
@@ -2234,11 +2264,6 @@ class M_Grande(Mutator):
 		# dict of translations of "local" var names to acquired tmp vars used instead
 		# better than making global variable that's used as local.
 		fn.meta.local_tmp_dict = {}
-
-		# mapping arguments to tmp vars (order is kept)
-		# vars are also added to local_tmp_dict
-		fn.meta.arg_tmps = []
-
 		return fn
 
 

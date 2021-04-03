@@ -24,5 +24,5 @@ main()
 
 moo(__sp, __fuck)
 {
-
+	return __sp + __fuck;
 }

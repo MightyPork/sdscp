@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.8.4
+
+- New optimizations to reduce code size:
+  - Functions that call no other functions (excluding inlined and built-in)
+    now use the __aX argument variables directly instead of first moving them
+    to temporaries. This saves 5 operations per argument (push, assign, pop)
+    and inlining is much more efficient for small functions.
+  - Inlined functions store the result directly into the output variable, removing 
+    the need to move it from __rval to the output variable at the end. This saves 
+    one operation per inlined function.
+  - Switch now uses the input directly if it's a variable, instead of moving it to
+    a temporary. This will be the most common case. This saves 1 to 5 operations
+    per function using the switch.
+
 ## 1.8.3
 
 - Add single-use function inlining, enabled by default, plus added new unit tests
