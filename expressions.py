@@ -232,7 +232,7 @@ class E_Variable(Expression):
 	def is_array(self):
 		""" Check if this variable is array element """
 
-		return self.index is None
+		return self.index is not None
 
 
 	def _bind_children(self):

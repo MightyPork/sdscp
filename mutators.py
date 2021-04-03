@@ -1720,7 +1720,7 @@ class M_Grande(Mutator):
 		append(out, _init)
 		append(tmps, _tmps)
 
-		if type(cond) is E_Variable:
+		if type(cond) is E_Variable and not cond.is_array():
 			# Use it directly. If the variable is assigned inside the switch, that's fine: once we get into a branch,
 			# no other tests are taken anyway.
 			compared = cond.name

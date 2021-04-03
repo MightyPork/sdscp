@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.5
+
+- Bugfix for switch with `text[]` or similar arguments
+
 ## 1.8.4
 
 - New optimizations to reduce code size:
