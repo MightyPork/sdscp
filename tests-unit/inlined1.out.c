@@ -35,24 +35,25 @@ main
   /// Inlined
   __t1 = 5;
   __t2 = 6;
-  __rval = (__t1 + __t2);
-  __t0 = __rval;
+  __t0 = (__t1 + __t2);
   echo(__t0);
   /// Inlined2
   __t1 = 5;
   __t2 = 6;
-  __rval = (__t1 + __t2);
-  __t0 = __rval;
+  __t0 = (__t1 + __t2);
   echo(__t0);
   /// Inlined nested
   __t1 = 7;
   __t2 = 8;
-  __t4 = __t1;
-  __t5 = __t2;
-  __rval = (__t4 + __t5);
-  __t3 = __rval;
-  __rval = (__t3 * 2);
-  __t0 = __rval;
+  if (sys[1] == 0) {
+    __t4 = __t1;
+    __t5 = __t2;
+    __t3 = (__t4 + __t5);
+    __t0 = (__t3 * 2);
+    goto __fn5_end;
+  }
+  __t0 = 15;
+  label __fn5_end:
   __t3 = ((2 * __t0) + 2);
   echo(__t3);
   /// no return inline

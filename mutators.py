@@ -752,6 +752,7 @@ class M_Grande(Mutator):
 		self.fn_pool = FnRegistry(self.label_pool)
 		self.fn_pool.gr = self
 
+		self.inline_return_var = None
 		self.scope_level = 0
 		self.scope_locals = {}
 
@@ -1097,6 +1098,8 @@ class M_Grande(Mutator):
 
 		self.arg_pool.rewind()
 
+		# TODO if the function does not contain any calls, we can directly use the arg_pool variables as temporaries
+
 		passed_arg_names = []
 
 		if len(fn.args) > 0:
@@ -1170,7 +1173,14 @@ class M_Grande(Mutator):
 		return self._compose_func_obj(fn, out)
 
 	def _inline_user_func(self, fn, name, args, out_var):
-		""" linearize a function. naked = do not push / pop used tmp vars """
+		"""
+		inline a user function
+
+		fn - the outer function
+		name - the inlined function name
+		args - args given to the inlined function (expressions)
+		out_var - a temporary where the caller wants to store the result; str or None
+		"""
 
 		fn.meta.calls.add(name)
 
@@ -1187,9 +1197,13 @@ class M_Grande(Mutator):
 
 		append(out, S_Comment('INLINED: %s()' % name))
 
+		# Hack to directly use `out_var` in place of `__retval`
+		old_inline_return_var = self.inline_return_var  # Keep the original in case we are already in an inlined function
+		self.inline_return_var = out_var  # This can be None, that's correct
+
 		self._start_local_scope(fn)
 
-		# Store args into temporaries
+		# Store args into temporaries, aliased to the given names in the inlined function
 		for (ai, arg_name) in enumerate(inlined.args):
 			tmp = self.tmp_pool.acquire()
 			tmps.append(tmp)
@@ -1208,8 +1222,10 @@ class M_Grande(Mutator):
 		append(out, label)
 		#fn.meta.labels.add(label.name)
 
-		if out_var is not None:
-			append(out, self._mk_assign(out_var, '__rval'))
+		# if out_var is not None:
+		# 	append(out, self._mk_assign(out_var, '__rval'))
+
+		self.inline_return_var = old_inline_return_var
 
 		append(out, S_Comment('End of inlined %s' % name))
 
@@ -1397,7 +1413,10 @@ class M_Grande(Mutator):
 		append(out, _init)
 		append(tmps, _tmps)
 
-		append(out, self._mk_assign(name=var, value=value, op=s.op))
+		assign = self._mk_assign(name=var, value=value, op=s.op)
+		self._patch_s_assign_for_inline(assign)
+
+		append(out, assign)
 
 		return (out, tmps)
 
@@ -2235,6 +2254,10 @@ class M_Grande(Mutator):
 		self.labels_used.add(name)
 		return s
 
+	def _patch_s_assign_for_inline(self, s):
+		if self.inline_return_var is not None and s.var.name == '__rval':
+			s.var.name = self.inline_return_var
+
 
 	def _mk_assign(self, name, value, op='=', index=None):
 		s = S_Assign()
@@ -2259,6 +2282,8 @@ class M_Grande(Mutator):
 			op = T_AssignOperator(op)
 
 		s.op = op
+
+		self._patch_s_assign_for_inline(s)
 
 		return s
 

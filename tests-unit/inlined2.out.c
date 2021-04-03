@@ -34,16 +34,13 @@ main
   /// Level 3
   __t13 = (__t11 + __t12);
   /// End 3
-  __rval = __t13;
-  __t10 = __rval;
+  __t10 = __t13;
   __t9 = __t10;
   /// End 2
-  __rval = __t9;
-  __t6 = __rval;
+  __t6 = __t9;
   __t5 = __t6;
   /// End 1
-  __rval = (__t5 + __t4);
-  __t1 = __rval;
+  __t1 = (__t5 + __t4);
   echo(__t1);
   /// End 0
   echo(__t0);

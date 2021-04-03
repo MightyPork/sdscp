@@ -32,7 +32,11 @@ not_inlined_add(a, b) {
 }
 
 inlined_nested(a, b) {
-	return inlined_nested2(a, b) * 2;
+	// adding a little complexity to check the return value is assigned handled properly
+	if (sys[1]==0) {
+		return inlined_nested2(a, b) * 2;
+	}
+	return 15;
 }
 
 inlined_nested2(a, b) {
