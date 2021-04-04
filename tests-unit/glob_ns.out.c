@@ -38,7 +38,7 @@ main
   echo('__sp', u__sp);
   goto __main_loop;
   label __fn1_moo:
-  __rval = (__a0 + __a1);
+  __rval = __a0 + __a1;
   __sp += 1;
   goto __rp1;
 }

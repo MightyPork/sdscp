@@ -13,11 +13,11 @@ main
 {
   __sp = 512;
   /// Three args with sub-call
-  __t0 = (12 * sys[1053]);
-  __t1 = (99 + ram[__t0]);
+  __t0 = 12 * sys[1053];
+  __t1 = 99 + ram[__t0];
   __a0 = 12;
   __a1 = 84;
-  __a2 = (ram[17] + sys[__t1]);
+  __a2 = ram[17] + sys[__t1];
   __sp -= 1;
   ram[__sp] = 1;
   goto __fn1_three_args;
@@ -51,7 +51,7 @@ main
   __t0 = __a0;
   __t1 = __a1;
   __t2 = __a2;
-  __t3 = (__t0 + __t1);
+  __t3 = __t0 + __t1;
   echo('a + b =', __t3, ', c = ', __t2);
   __sp -= 1;
   ram[__sp] = 4;
@@ -75,7 +75,7 @@ main
   label __fn3_three_args_with_no_inner_calls:
   __sp -= 1;
   ram[__sp] = __t0;
-  __t0 = (__a0 + __a1);
+  __t0 = __a0 + __a1;
   echo('a + b =', __t0, ', c = ', __a2);
   __rval = 0;
   __t0 = ram[__sp];
@@ -91,7 +91,7 @@ main
     goto __fn4L_end;
   }
   /// Deeper
-  __a0 = (__t0 -1);
+  __a0 = __t0 -1;
   __sp -= 1;
   ram[__sp] = 5;
   goto __fn4_recurs;

@@ -59,7 +59,7 @@ main
   label __rp6:
   __t3 = __rval;
   __a0 = 6;
-  __a1 = (4 - __t3);
+  __a1 = 4 - __t3;
   __sp -= 1;
   ram[__sp] = 7;
   goto __fn4_add;
@@ -96,7 +96,7 @@ main
   goto __fn1_before;
   label __rp8:
   /// Return sum
-  __rval = (__t0 + __t1);
+  __rval = __t0 + __t1;
   __t1 = ram[__sp];
   __sp += 1;
   __t0 = ram[__sp];
@@ -126,8 +126,8 @@ main
   __t1 = __a1;
   /// Variable test
   __t2 = __t0;
-  __t3 = (__t2 + __t1);
-  __t4 = (__t2 + __t3);
+  __t3 = __t2 + __t1;
+  __t4 = __t2 + __t3;
   __t2 = __t4;
   __t0 = 15;
   __a0 = __t0;
@@ -137,7 +137,7 @@ main
   goto __fn4_add;
   label __rp9:
   __t5 = __rval;
-  __rval = (__t4 + __t5);
+  __rval = __t4 + __t5;
   __t5 = ram[__sp];
   __sp += 1;
   __t4 = ram[__sp];

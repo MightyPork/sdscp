@@ -36,14 +36,14 @@ main
     __rval = 1;
     goto __fn1_end;
   }
-  __a0 = (__t0 -1);
+  __a0 = __t0 -1;
   __sp -= 1;
   if (__sp < 100) goto __err_so;
   ram[__sp] = 2;
   goto __fn1_sum;
   label __rp2:
   __t2 = __rval;
-  __t1 = (__t0 + __t2);
+  __t1 = __t0 + __t2;
   __rval = __t1;
   label __fn1_end:
   if (__sp > 511) goto __err_su;

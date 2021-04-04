@@ -20,7 +20,7 @@ main
   goto __main_loop;
   label __fn1_add:
   /// Add
-  __rval = (__a0 + __a1);
+  __rval = __a0 + __a1;
   __sp += 1;
   goto __rp1;
 }

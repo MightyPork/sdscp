@@ -6,7 +6,6 @@
   causing error "illegal -- operator"
 - Extend simplification to more expression types 
   (now including expressions that contain the `~` and `/` operators)
-- Add workaround for SDS-C bug with bitwise operators vs. negative numbers
 
 ```c
 var j;
@@ -19,6 +18,10 @@ main
   echo(j);
 }
 ```
+
+- Add workaround for SDS-C bug with bitwise operators vs. negative numbers
+- Strip outermost parentheses from expressions in assignments. 
+  SDS-C adds 10 bytes of bytecode for every parenthesis pair!
 
 ## 1.8.5
 

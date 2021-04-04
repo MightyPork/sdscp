@@ -598,16 +598,14 @@ class CSyntaxRenderer(Renderer):
 		src = self._render_expr_variable(s.var)
 
 		src += ' %s ' % s.op.value
-
-		self.expr_render_mode = 'normal'
-		src += self._render_subexpr(s.value) # Hack: go directly to sub-expr so there are no parens
-
+		src += self._render_expr(s.value)
 		src += ';'
 
 		return src
 
 
 	def _render_expr(self, e, expr_render_mode='normal'):  # Expression
+		""" expr_render_mode = normal or eval """
 		self.expr_render_mode = expr_render_mode
 
 		if isinstance(e, E_Group):

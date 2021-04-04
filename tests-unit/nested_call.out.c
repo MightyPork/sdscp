@@ -55,11 +55,11 @@ main
   }
   goto __main_loop;
   label __fn1_add6:
-  __rval = (((((__a0 + __a1) + __a2) + __a3) + __a4) + __a5);
+  __rval = ((((__a0 + __a1) + __a2) + __a3) + __a4) + __a5;
   __sp += 1;
   goto __rp4;
   label __fn2_add2:
-  __rval = (__a0 + __a1);
+  __rval = __a0 + __a1;
   __addr = ram[__sp];
   __sp += 1;
   if (__addr == 1) goto __rp1;

@@ -13,7 +13,7 @@ main
   echo('a');
   /// First free block
   __t1 = 15;
-  __t2 = (__t1 + 1);
+  __t2 = __t1 + 1;
   echo(__t2);
   /// -- Nested free block 1
   __t2 = 15;
@@ -22,7 +22,7 @@ main
   /// end block
   /// Second free block
   __t1 = 15;
-  __t2 = (__t1 + 1);
+  __t2 = __t1 + 1;
   echo(__t2);
   /// -- Nested free block 2
   __t2 = 15;

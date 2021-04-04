@@ -28,7 +28,7 @@ main
   __t2 = 0x80000000;
   /// Invert operator producing hex
   __t3 = 0x500;
-  __t4 = (__t3 & 0xffffff00);
+  __t4 = __t3 & 0xffffff00;
   goto __main_loop;
   label __fn1_foo:
   __rval = 0;

@@ -35,12 +35,12 @@ main
   /// Inlined
   __t1 = 5;
   __t2 = 6;
-  __t0 = (__t1 + __t2);
+  __t0 = __t1 + __t2;
   echo(__t0);
   /// Inlined2
   __t1 = 5;
   __t2 = 6;
-  __t0 = (__t1 + __t2);
+  __t0 = __t1 + __t2;
   echo(__t0);
   /// Inlined nested
   __t1 = 7;
@@ -48,20 +48,20 @@ main
   if (sys[1] == 0) {
     __t4 = __t1;
     __t5 = __t2;
-    __t3 = (__t4 + __t5);
-    __t0 = (__t3 * 2);
+    __t3 = __t4 + __t5;
+    __t0 = __t3 * 2;
     goto __fn5_end;
   }
   __t0 = 15;
   label __fn5_end:
-  __t3 = ((2 * __t0) + 2);
+  __t3 = (2 * __t0) + 2;
   echo(__t3);
   /// no return inline
   echo('cau');
   __rval = 0;
   goto __main_loop;
   label __fn4_not_inlined_add:
-  __rval = (__a0 + __a1);
+  __rval = __a0 + __a1;
   __addr = ram[__sp];
   __sp += 1;
   if (__addr == 1) goto __rp1;

@@ -11,7 +11,7 @@ main
   __t0 = 0;
   label __for_test_1:
   if (! (__t0 < 100)) goto __for_break_1;
-  __t1 = (__t0 * 2);
+  __t1 = __t0 * 2;
   echo(__t1);
   __t0 += 1;
   goto __for_test_1;
@@ -19,7 +19,7 @@ main
   __t0 = 0;
   label __for_test_2:
   if (! (__t0 < 100)) goto __for_break_2;
-  __t1 = (__t0 * 3);
+  __t1 = __t0 * 3;
   echo(__t1);
   __t0 += 1;
   goto __for_test_2;
