@@ -35,6 +35,13 @@ Default pragma settings:
 // Remove dead code, e.g. unused functions, code after a goto,
 // or unused labels.
 #pragma remove_dead_code true
+
+// Remove or unwrap IFs that are at compile time known to be always true or false
+#pragma simplify_ifs true
+
+// Simplify arithmetic expressions at compile time.
+// This effectively evaluates any parts of an expression that doesn't use variables.
+#pragma simplify_expressions true
 ```
 
 Other pragmas:

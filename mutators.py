@@ -742,7 +742,9 @@ class M_Grande(Mutator):
 		self.do_builtin_logging			= pragmas.get('builtin_logging', True)
 		self.do_builtin_error_logging	= pragmas.get('builtin_error_logging', True)
 		self.do_inline_one_use_functions = pragmas.get('inline_one_use_functions', True)
-		self.do_remove_dead_code = pragmas.get('remove_dead_code', True)
+		self.do_remove_dead_code     = pragmas.get('remove_dead_code', True)
+		self.do_simplify_ifs         = pragmas.get('simplify_ifs', True)
+		self.do_simplify_expressions = pragmas.get('simplify_expressions', True)
 
 
 	def _transform(self, code):
@@ -1826,7 +1828,7 @@ class M_Grande(Mutator):
 		if not hasattr(self, '_erndr'):
 			self._erndr = renderers.CSyntaxRenderer([])
 
-		if type(e) is E_Group:
+		if type(e) is E_Group and self.do_simplify_expressions:
 			try:
 				as_str = self._erndr._render_expr(e)
 				# print('Trying to simplify: %s' % as_str)
@@ -2006,6 +2008,10 @@ class M_Grande(Mutator):
 						# Last was an operator, now we got the operand
 						times += 1
 						if arity == 2:
+							# Negative numbers after minus must be parenthesised or SDS-C explodes
+							if prev.value == '-' and type(e) == E_Literal and e.is_number():
+								if e.token.value[0] == '-':
+									e = E_Group([e])
 							out.append(E_Group([prev2, prev, e]))
 						else:
 							out.append(E_Group([prev, e]))

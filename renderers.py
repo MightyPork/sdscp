@@ -383,7 +383,7 @@ class CSyntaxRenderer(Renderer):
 			# TODO this transformation should be done in a mutator so that labels and calls used only in the dead branches
 			#  can be removed as dead code.
 
-			if type(s.cond) is E_Group:
+			if type(s.cond) is E_Group and self.do_simplify_expressions:
 				try:
 					as_str = self._erndr._render_expr(s.cond, expr_render_mode='eval')
 					val = eval_expr(as_str)
@@ -662,7 +662,12 @@ class CSyntaxRenderer(Renderer):
 	def _render_expr_group(self, e):  # E_Group
 
 		if len(e.children) == 1:
-			return self._render_subexpr(e.children[0])
+			ch = e.children[0]
+			if type(ch) == E_Literal and ch.is_number() and ch.token.value[0] == '-':
+				# Special case for parenthesized negative values
+				pass
+			else:
+				return self._render_subexpr(e.children[0])
 
 		src = ''
 		for ee in e.children:
@@ -877,6 +882,7 @@ class AsmSdsRenderer(BaseSdsRenderer):
 
 	def _on_pragmas_set(self):
 		self.do_simplify_ifs = self.pragmas.get('simplify_ifs', True)
+		self.do_simplify_expressions = self.pragmas.get('simplify_expressions', True)
 
 		for m in self.mutators:
 			m.read_pragmas(self.pragmas)

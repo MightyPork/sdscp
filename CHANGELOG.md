@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.6
+
+- Add workaround for SDS-C bug with `1 - -1` being interpreted as `1-- 1` and 
+  causing error "illegal -- operator"
+- Extend simplification to more expression types 
+  (now including expressions that contain the `~` and `/` operators)
+
 ## 1.8.5
 
 - Bugfix for switch with `text[]` or similar arguments

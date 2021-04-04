@@ -87,7 +87,7 @@ operators = {
 	ast.Add: op.add,
 	ast.Sub: op.sub,
 	ast.Mult: op.mul,
-	ast.Div: op.truediv,
+	ast.Div: op.floordiv,
 	ast.Pow: op.pow,
 	ast.USub: op.neg,
 	ast.BitXor: op.xor,
@@ -98,6 +98,7 @@ operators = {
 	ast.Not: op.not_,
 	ast.LShift: op.lshift,
 	ast.RShift: op.rshift,
+	ast.Invert: op.invert,
 
 	ast.NotEq: op.ne,
 	ast.Eq: op.eq,
@@ -115,16 +116,21 @@ def eval_expr(expr):
 		.replace("!", " not ") \
 		.strip()
 
-	#print(expr)
-	parsed = ast.parse(expr, mode='eval').body
-	return eval_(parsed)
+	try:
+		parsed = ast.parse(expr, mode='eval').body
+		evaled = eval_(parsed)
+		#print("Expr eval OK: %s => %s" % (expr, evaled))
+		return evaled
+	except Exception as e:
+		#print("Expr eval failed: %s - %s" % (expr, str(e)))
+		raise e
 
 def eval_(node):
 	if isinstance(node, ast.Num): # <number>
 		return node.n
 	elif isinstance(node, ast.BinOp): # <left> <operator> <right>
 		return operators[type(node.op)](eval_(node.left), eval_(node.right))
-	
+
 	elif isinstance(node, ast.BoolOp): # <left> <operator> <right>
 		operator = operators[type(node.op)]
 		evaled = [eval_(v) for v in node.values]
@@ -156,5 +162,5 @@ operators[ast.Pow] = power
 
 # From: https://stackoverflow.com/a/16090640/2180189
 def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
-    return [int(text) if text.isdigit() else text.lower()
-            for text in _nsre.split(s)]  
+	return [int(text) if text.isdigit() else text.lower()
+			for text in _nsre.split(s)]
