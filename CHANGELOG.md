@@ -6,6 +6,19 @@
   causing error "illegal -- operator"
 - Extend simplification to more expression types 
   (now including expressions that contain the `~` and `/` operators)
+- Add workaround for SDS-C bug with bitwise operators vs. negative numbers
+
+```c
+var j;
+main
+{
+  j = 0x512 & (~ 0xFF); // 1280
+  j = 0x512 & -256; // 256 ??? what
+  j = 0x512 & (-256); // 1280
+
+  echo(j);
+}
+```
 
 ## 1.8.5
 

@@ -20,7 +20,7 @@ main()
 {
 	echo("2^2 = ", squares[2]);
 	echo("10^3 = ", cubes[10]);
-	echo("10000^3 = ", cubes[10000]);
+	echo("1000^3 = ", cubes[1000]);
 
 	RELAY[6] = ON;
     RELAY_BETTER[6] = ON;

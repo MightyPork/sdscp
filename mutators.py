@@ -1833,8 +1833,25 @@ class M_Grande(Mutator):
 				as_str = self._erndr._render_expr(e)
 				# print('Trying to simplify: %s' % as_str)
 				val = eval_expr(as_str)
+				val = round(val)
 
-				e = E_Literal(T_Number(str(round(val))))
+				if val > 0xFFFFFFFF:
+					raise SdscpSyntaxError('Number too large for SDS-C: %s, from simplifying expr "%s"' % (val, as_str))
+
+				if val < -2147483648:
+					raise SdscpSyntaxError('Number too small for SDS-C: %s, from simplifying expr "%s"' % (val, as_str))
+
+				if val < 0 or val >= 0x80000000:
+					# Negative values obtained through simplification will often
+					# be the result of the ~ operator. There is a SDS-C bug
+					# that prevents bitwise ops to work correctly with negative
+					# integers. If we convert it to float, it will be OK.
+					# Likewise, integers with the highest bit set can only be expressed
+					# as hex.
+					val = val & 0xFFFFFFFF
+					e = E_Literal(T_Number(hex(val)))
+				else:
+					e = E_Literal(T_Number(str(val)))
 
 				#print('Expression "%s" simplified to "%s"' % (as_str, val))
 
@@ -2008,7 +2025,8 @@ class M_Grande(Mutator):
 						# Last was an operator, now we got the operand
 						times += 1
 						if arity == 2:
-							# Negative numbers after minus must be parenthesised or SDS-C explodes
+							# Negative numbers after minus must be parenthesised or SDS-C explodes.
+							# We could also convert these to hex.
 							if prev.value == '-' and type(e) == E_Literal and e.is_number():
 								if e.token.value[0] == '-':
 									e = E_Group([e])

@@ -825,6 +825,7 @@ class CodeReader(BaseReader):
 			if number > 0x7FFFFFFF:
 				self.error('Number too large for SDS-C: %s' % consumed)
 			if number < -2147483647:
+				# -2147483648 should be allowed, but does not work due to a bug in SDS-C
 				self.error('Number too small for SDS-C: %s' % consumed)
 		else:
 			if number > 0xFFFFFFFF:
