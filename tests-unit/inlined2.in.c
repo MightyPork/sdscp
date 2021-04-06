@@ -4,7 +4,13 @@
 // inlining
 
 main () {
-	var y = 15;
+    // Called twice to avoid inlining
+	inner();
+	inner();
+}
+
+inner() {
+    var y = 15;
 	/// Level 0
 	echo(sum3(1, 2, 3));
 	/// End 0

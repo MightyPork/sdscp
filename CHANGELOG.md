@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.8
+
+- Fix bug in inlining where clobbered temporaries were not properly pushed / popped in the outer func
+
 ## 1.8.7
 
 - Allow empty strings when they are later joined to another string

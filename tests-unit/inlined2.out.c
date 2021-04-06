@@ -20,6 +20,44 @@ main
 {
   __sp = 512;
   label __main_loop:
+  __sp -= 1;
+  ram[__sp] = 1;
+  goto __fn1_inner;
+  label __rp1:
+  __sp -= 1;
+  ram[__sp] = 2;
+  goto __fn1_inner;
+  label __rp2:
+  goto __main_loop;
+  label __fn1_inner:
+  __sp -= 1;
+  ram[__sp] = __t0;
+  __sp -= 1;
+  ram[__sp] = __t1;
+  __sp -= 1;
+  ram[__sp] = __t2;
+  __sp -= 1;
+  ram[__sp] = __t3;
+  __sp -= 1;
+  ram[__sp] = __t4;
+  __sp -= 1;
+  ram[__sp] = __t5;
+  __sp -= 1;
+  ram[__sp] = __t6;
+  __sp -= 1;
+  ram[__sp] = __t7;
+  __sp -= 1;
+  ram[__sp] = __t8;
+  __sp -= 1;
+  ram[__sp] = __t9;
+  __sp -= 1;
+  ram[__sp] = __t10;
+  __sp -= 1;
+  ram[__sp] = __t11;
+  __sp -= 1;
+  ram[__sp] = __t12;
+  __sp -= 1;
+  ram[__sp] = __t13;
   __t0 = 15;
   /// Level 0
   __t2 = 1;
@@ -44,5 +82,37 @@ main
   echo(__t1);
   /// End 0
   echo(__t0);
-  goto __main_loop;
+  __rval = 0;
+  __t13 = ram[__sp];
+  __sp += 1;
+  __t12 = ram[__sp];
+  __sp += 1;
+  __t11 = ram[__sp];
+  __sp += 1;
+  __t10 = ram[__sp];
+  __sp += 1;
+  __t9 = ram[__sp];
+  __sp += 1;
+  __t8 = ram[__sp];
+  __sp += 1;
+  __t7 = ram[__sp];
+  __sp += 1;
+  __t6 = ram[__sp];
+  __sp += 1;
+  __t5 = ram[__sp];
+  __sp += 1;
+  __t4 = ram[__sp];
+  __sp += 1;
+  __t3 = ram[__sp];
+  __sp += 1;
+  __t2 = ram[__sp];
+  __sp += 1;
+  __t1 = ram[__sp];
+  __sp += 1;
+  __t0 = ram[__sp];
+  __sp += 1;
+  __addr = ram[__sp];
+  __sp += 1;
+  if (__addr == 1) goto __rp1;
+  if (__addr == 2) goto __rp2;
 }

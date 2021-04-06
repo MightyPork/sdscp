@@ -1171,8 +1171,8 @@ class M_Grande(Mutator):
 		if len(fn.meta.changed_tmps) > 0:
 			append(out, S_Comment('Push used tmp vars'))
 
-			fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))
-			fn.meta.changed_tmps.sort(key=natural_sort_key) # Sort so we always keep the same order, important for unit tests
+			fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))  # get unique names
+			fn.meta.changed_tmps.sort(key=natural_sort_key)  # Sort so we always keep the same order, important for unit tests
 
 			for n in fn.meta.changed_tmps:
 				append(out, self._mk_push(n))
@@ -1268,7 +1268,11 @@ class M_Grande(Mutator):
 		# _end_local_scope, but specialized for inlining
 		for entry in self.scope_locals[self.scope_level]:
 			del inlined.meta.local_tmp_dict[entry[0]]
+			fn.meta.changed_tmps.append(entry[1])  # mark as clobbered in the outer func
 			self.tmp_pool.release(entry[1])
+
+		append(fn.meta.changed_tmps, inlined.meta.changed_tmps)
+
 		del self.scope_locals[self.scope_level]
 		self.scope_level -= 1
 
