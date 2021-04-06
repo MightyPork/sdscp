@@ -1,10 +1,7 @@
 
-################################# SYNTAX ERROR #################################
+############################## COMPATIBILITY ERROR #############################
 
-SDS-C compiler does not support empty strings
-In file tests-error/err_bad_literal1.in.c at line 2, col 9,
-At: >>); } <<
-Near: >>main() { echo(""); } <<
+SDS-C does not support empty strings
 
 To see debug info, please use the -x flag.
 

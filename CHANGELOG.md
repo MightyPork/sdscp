@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.7
+
+- Allow empty strings when they are later joined to another string
+- Move empty string warning to SDS-C renderer
+
 ## 1.8.6
 
 - Add workaround for SDS-C bug with `1 - -1` being interpreted as `1-- 1` and 

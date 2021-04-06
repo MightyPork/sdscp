@@ -736,6 +736,9 @@ class BaseSdsRenderer(CSyntaxRenderer):
 			s = s.replace("'", "\\'")
 			s = s.replace('\\"', '"')
 
+			if len(s) == 0:
+				raise CompatibilityError('SDS-C does not support empty strings')
+
 			return "'%s'" % s
 
 		elif e.is_char():

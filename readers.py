@@ -718,8 +718,6 @@ class CodeReader(BaseReader):
 
 			elif char == quote:
 				consumed = self.from_pos(pos_begin)
-				if len(consumed) == 2:
-					self.error('SDS-C compiler does not support empty strings')
 
 				return consumed  # end quote
 
