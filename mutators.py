@@ -745,6 +745,7 @@ class M_Grande(Mutator):
 		self.do_remove_dead_code     = pragmas.get('remove_dead_code', True)
 		self.do_simplify_ifs         = pragmas.get('simplify_ifs', True)
 		self.do_simplify_expressions = pragmas.get('simplify_expressions', True)
+		self.do_use_push_pop_trampolines = pragmas.get('push_pop_trampolines', False)
 
 
 	def _transform(self, code):
@@ -991,6 +992,44 @@ class M_Grande(Mutator):
 			# Shutdown trap
 			append(sts, self._build_shutdown_trap())
 
+		if self.do_use_push_pop_trampolines:
+			# Push-pop trampoline (code size saving)
+			used_tmps = list(reversed(list(self.tmp_pool.get_names())))
+			used_tmps_count = len(used_tmps)
+
+			for (i, name) in enumerate(used_tmps):
+				append(sts, self._mk_label('__push_tmps_%s' % (used_tmps_count - i)))
+				append(sts, self._mk_push(name))
+			for name in funcs_to_render: # TODO sort by number
+				st = self.fn_pool.get_statement(name)
+				if st is None or st.inline or len(st.meta.changed_tmps) < 3:
+					continue
+
+				try:
+					i = self.fn_pool.get_fn_addr(name)
+					append(sts, synth("""
+						if (__addr == %d) goto %s;
+					""" % (i, "__fn%d_push_tmps_end" % i)))
+				except SdscpSyntaxError as e:
+					pass
+			append(sts, self._mk_goto('__err_bad_addr'))
+
+			for (i, name) in enumerate(used_tmps):
+				append(sts, self._mk_label('__pop_tmps_%s' % (used_tmps_count - i)))
+				append(sts, self._mk_pop(name))
+			for name in funcs_to_render: # TODO sort by number
+				st = self.fn_pool.get_statement(name)
+				if st is None or st.inline or len(st.meta.changed_tmps) < 3:
+					continue
+
+				try:
+					i = self.fn_pool.get_fn_addr(name)
+					append(sts, synth("""
+						if (__addr == %d) goto %s;
+					""" % (i, "__fn%d_pop_tmps_end" % i)))
+				except SdscpSyntaxError:
+					pass
+			append(sts, self._mk_goto('__err_bad_addr'))
 
 		# compose main function with all the code
 		main = S_Function()
@@ -1170,12 +1209,22 @@ class M_Grande(Mutator):
 		# push all changed tmp vars
 		if len(fn.meta.changed_tmps) > 0:
 			append(out, S_Comment('Push used tmp vars'))
-
 			fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))  # get unique names
 			fn.meta.changed_tmps.sort(key=natural_sort_key)  # Sort so we always keep the same order, important for unit tests
 
-			for n in fn.meta.changed_tmps:
-				append(out, self._mk_push(n))
+			if self.do_use_push_pop_trampolines and len(fn.meta.changed_tmps) >= 3:
+				# TODO clean up
+				fn_addr = self.fn_pool.get_fn_addr(fn.name)
+				append(out, self._mk_assign('__addr', fn_addr))
+				lbl = '__push_tmps_%d' % len(fn.meta.changed_tmps)
+				fn.meta.gotos.add(lbl)
+				append(out, self._mk_goto(lbl))
+				lbl = '__fn%d_push_tmps_end' % fn_addr
+				fn.meta.labels.add(lbl)
+				append(out, self._mk_label(lbl))
+			else:
+				for n in fn.meta.changed_tmps:
+					append(out, self._mk_push(n))
 
 		append(body, self._mk_assign('__rval', 0))
 		append(out, body)
@@ -1186,8 +1235,22 @@ class M_Grande(Mutator):
 
 		if len(fn.meta.changed_tmps) > 0:
 			append(out, S_Comment('Pop used tmp vars'))
-			for n in reversed(fn.meta.changed_tmps):
-				append(out, self._mk_pop(n))
+
+			if self.do_use_push_pop_trampolines and len(fn.meta.changed_tmps) >= 3:
+				# TODO clean up
+				fn_addr = self.fn_pool.get_fn_addr(fn.name)
+				append(out, self._mk_assign('__sp', len(fn.meta.changed_tmps), op='+='))
+				append(out, self._mk_assign('__addr', fn_addr))
+				lbl = '__pop_tmps_%d' % len(fn.meta.changed_tmps)
+				fn.meta.gotos.add(lbl)
+				append(out, self._mk_goto(lbl))
+				lbl = '__fn%d_pop_tmps_end' % fn_addr
+				fn.meta.labels.add(lbl)
+				append(out, self._mk_label(lbl))
+				append(out, self._mk_assign('__sp', len(fn.meta.changed_tmps), op='+='))
+			else:
+				for n in reversed(fn.meta.changed_tmps):
+					append(out, self._mk_pop(n))
 
 		if self.add_debug_trace_logging:
 			append(out, synth('echo("[TRACE] return from %(name)s, with: ", %(rval)s);' % {
@@ -2304,7 +2367,6 @@ class M_Grande(Mutator):
 	def _mk_goto(self, name):
 		s = S_Goto()
 		s.name = name
-		self.labels_used.add(name)
 		return s
 
 	def _patch_s_assign_for_inline(self, s):

@@ -42,6 +42,10 @@ Default pragma settings:
 // Simplify arithmetic expressions at compile time.
 // This effectively evaluates any parts of an expression that doesn't use variables.
 #pragma simplify_expressions true
+
+// Use push-pop trampolines to optimize code size.
+// Only meaningful if there are many functions with more than 2 arguments
+#pragma push_pop_trampolines false
 ```
 
 Other pragmas:
