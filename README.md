@@ -10,26 +10,55 @@ It's a python script that works as a processor, digesting your source to a form 
 
 ## Features
 
-For more detailed info, see the **[SDSCP wiki](https://github.com/MightyPork/sdscp/wiki)**.
+Look in the unit tests folder to see what transformations SDSCP can do.
+
+Highlights:
+
+### Macros and directives
 
 - `#include` directive
-- Function-like macros
-- Array-like macros
-- Double quotes for strings
-- Code branching with `#ifdef`, `#ifndef` etc...
-- Automatic code formatting
-- Fixed some SDS-C bugs (expression as array index, etc.)
-- Extra control structures
-  - `FOR`
-  - `WHILE`
-  - `UNTIL`
-  - `SWITCH`
-  - `IF_ELSEIF_ELSE`
-- Stack in `ram[]` - Used for argument passing and return values
-- Local variables
-- Expression as array index
-- Reimplemented functions (with arguments and return values)
+- Function-like and array-like macros
+- Code branching with `#ifdef`, `#ifndef`, `#if`, `defined()` ...
 
+### String fixes
+
+- Double quotes for strings, single quotes for ASCII characters
+- Adjacent strings without comma are now correctly joined
+
+### Control structures
+
+- `for(var i = 0; i < 100; i++)`, even with multiple variables and complex expressions
+- `while(cond)`
+- `do {} while(cond)`
+- `switch` - just like in C, including `default:`, `break;` and fall-through
+- `break`, `continue` in all loops
+- `if - else if - else`, with unlimited chaining
+- Free-standing blocks `{}`
+
+### Functions
+
+- Reimplemented functions (with arguments and return values). 
+- Unlimited number of functions
+- Stack in `ram[]` - Used for argument passing and return values
+- Single-use function inlining
+- Dead code removal
+- Any function can be called from anywhere, declaration order does not matter like in classic C or SDS-C
+- `goto` is only allowed within a function, 
+- labels are local to function
+
+### Variables
+
+- Global, function and block scope
+- All variables can have default value (`var x = 15;`)
+- Automatic management and re-use of temporary variables, this works around the variable limit in SDS-C
+
+### SDS-C bug workarounds
+
+- Incorrect arithmetic operator precedence: SDSCP automatically adds parentheses to expressions
+- Fix unary minus not working correctly in SDS-C
+- `if()` can now have any statement as body, not only goto or block
+- All built-in functions now accept arbitary expressions as arguments: e.g. `echo()`, `sprintf()`
+- Arrays can use any expression as index: `sys[]`, `text[]`, `ram[]`, `share[]`. SDS-C only allows a variable or number as index.
 
 ## How to use SDSCP
 
@@ -51,4 +80,5 @@ sdscp input.c -d
 sdscp input.c -o output.c
 ```
 
-SDSCP generates a SDS-C compatible source code, or warns you if there is some problem.
+SDSCP generates a SDS-C compatible source code, or warns you if there is a problem.
+
