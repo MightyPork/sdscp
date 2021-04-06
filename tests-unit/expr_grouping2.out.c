@@ -1,13 +1,11 @@
 var __addr;
 var __rval;
 var __sp;
-var one;
 var v;
 
 main
 {
   __sp = 512;
-  one = 1;
   v = (! 0) + 1;
   if (v != 2) {
     echo('Test 1 failed');
@@ -52,9 +50,21 @@ main
   if (v != 3) {
     echo('Test 11 failed: ', v);
   }
-  v = one - (-1);
+  v = 1 - (-1);
   if (v != 2) {
     echo('Test 12 failed: ', v);
+  }
+  v = 0x5FF & (-256);
+  if (v != 1280) {
+    echo('Test 13 failed: ', v);
+  }
+  v = 0x5FF & 0xFFFFFF00;
+  if (v != 1280) {
+    echo('Test 14 failed: ', v);
+  }
+  v = 0x80000000;
+  if (v != 0x80000000) {
+    echo('Test 15 failed: ', v);
   }
   echo('Tests done.');
   label __fnmainL_end:

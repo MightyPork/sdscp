@@ -7,6 +7,10 @@ var __t1;
 var __t2;
 var __t3;
 var __t4;
+var __t5;
+var __t6;
+var __t7;
+var __t8;
 
 main
 {
@@ -29,6 +33,10 @@ main
   /// Invert operator producing hex
   __t3 = 0x500;
   __t4 = __t3 & 0xffffff00;
+  __t5 = 0xffffffff;
+  __t6 = 0xffffffff;
+  __t7 = 0x80000000;
+  __t8 = 0x80000001;
   goto __main_loop;
   label __fn1_foo:
   __rval = 0;

@@ -820,11 +820,20 @@ class CodeReader(BaseReader):
 		except:
 			self.error('Error parsing number literal: %s' % consumed)
 		if is_dec:
+			if number > 0x7FFFFFFF and number <= 0xFFFFFFFF:
+				print('\x1b[33mNumber %s is too large for int32, changing to hex\x1b[m' % consumed)
+				return hex(number)  # Can be expressed as hex
+
 			if number > 0x7FFFFFFF:
 				self.error('Number too large for SDS-C: %s' % consumed)
-			if number < -2147483647:
+
+			if number < -2147483648:
 				# -2147483648 should be allowed, but does not work due to a bug in SDS-C
 				self.error('Number too small for SDS-C: %s' % consumed)
+
+			if number == -2147483648:
+				print('\x1b[33mNumber %s is too large for SDS-C int32, changing to hex\x1b[m' % consumed)
+				return '0x80000000'  # This is fine with SDS-C
 		else:
 			if number > 0xFFFFFFFF:
 				self.error('Number too large for SDS-C: %s' % consumed)

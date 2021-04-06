@@ -1,9 +1,9 @@
 
 ################################# SYNTAX ERROR #################################
 
-Number too large for SDS-C: 2147483648
+Number too large for SDS-C: 4294967296
 At: >><<
-Near: >>2147483648<<
+Near: >>4294967296<<
 
 To see debug info, please use the -x flag.
 

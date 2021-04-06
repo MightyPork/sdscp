@@ -4,6 +4,8 @@
 
 - Allow empty strings when they are later joined to another string
 - Move empty string warning to SDS-C renderer
+- Add transforms to allow `-2147483648` and unsigned int up to `0xFFFFFFFF`, automatically turning it into hex with a warning printed.
+- Add parentheses around all negative numbers to work around a SDS-C bug with unary minus (the minus is seemingly discarded)
 
 ## 1.8.6
 

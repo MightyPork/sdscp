@@ -2025,9 +2025,9 @@ class M_Grande(Mutator):
 						# Last was an operator, now we got the operand
 						times += 1
 						if arity == 2:
-							# Negative numbers after minus must be parenthesised or SDS-C explodes.
+							# Negative numbers must be parenthesised or SDS-C produces complete nonsense results
 							# We could also convert these to hex.
-							if prev.value == '-' and type(e) == E_Literal and e.is_number():
+							if type(e) == E_Literal and e.is_number():  # prev.value in ['-'] and 
 								if e.token.value[0] == '-':
 									e = E_Group([e])
 							out.append(E_Group([prev2, prev, e]))

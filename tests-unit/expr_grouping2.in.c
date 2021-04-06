@@ -1,7 +1,6 @@
 #pragma simplify_expressions false
 
 var v;
-var one = 1;
 main () {
 	v = !0 + 1;
 	if (v != 2) { echo("Test 1 failed"); }
@@ -25,8 +24,15 @@ main () {
 	if (v != 1) { echo("Test 10 failed: ", v); }
 	v = 1 + 2 * 3 - 4;
 	if (v != 3) { echo("Test 11 failed: ", v); }
-	v = one - -1;
+	v = 1 - -1;
 	if (v != 2) { echo("Test 12 failed: ", v); }
+	v = 0x5FF & -256;
+	if (v != 1280) { echo("Test 13 failed: ", v); }
+	v = 0x5FF & 0xFFFF_FF00;
+	if (v != 1280) { echo("Test 14 failed: ", v); }
+	v = -2147483648;
+	if (v != 0x8000_0000) { echo("Test 15 failed: ", v); }
+	
 	echo("Tests done.");
 	end:goto end;
 }
