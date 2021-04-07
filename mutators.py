@@ -15,6 +15,7 @@ import math
 import config
 
 
+
 def synth(source):
 	""" Parse source & convert to statements """
 
@@ -747,6 +748,11 @@ class M_Grande(Mutator):
 		self.do_simplify_expressions = pragmas.get('simplify_expressions', True)
 		self.do_use_push_pop_trampolines = pragmas.get('push_pop_trampolines', False)
 
+		if self.do_check_stack_bounds:
+			# Push-pop gets larger in this case, so pushpop trampolines are
+			# worthwhile even with only 2 tmps
+			config.PUSHPOP_TRAMPOLINE_MIN_TMP_COUNT = 2
+
 
 	def _transform(self, code):
 
@@ -993,43 +999,7 @@ class M_Grande(Mutator):
 			append(sts, self._build_shutdown_trap())
 
 		if self.do_use_push_pop_trampolines:
-			# Push-pop trampoline (code size saving)
-			used_tmps = list(reversed(list(self.tmp_pool.get_names())))
-			used_tmps_count = len(used_tmps)
-
-			for (i, name) in enumerate(used_tmps):
-				append(sts, self._mk_label('__push_tmps_%s' % (used_tmps_count - i)))
-				append(sts, self._mk_push(name))
-			for name in funcs_to_render: # TODO sort by number
-				st = self.fn_pool.get_statement(name)
-				if st is None or st.inline or len(st.meta.changed_tmps) < 3:
-					continue
-
-				try:
-					i = self.fn_pool.get_fn_addr(name)
-					append(sts, synth("""
-						if (__addr == %d) goto %s;
-					""" % (i, "__fn%d_push_tmps_end" % i)))
-				except SdscpSyntaxError as e:
-					pass
-			append(sts, self._mk_goto('__err_bad_addr'))
-
-			for (i, name) in enumerate(used_tmps):
-				append(sts, self._mk_label('__pop_tmps_%s' % (used_tmps_count - i)))
-				append(sts, self._mk_pop(name))
-			for name in funcs_to_render: # TODO sort by number
-				st = self.fn_pool.get_statement(name)
-				if st is None or st.inline or len(st.meta.changed_tmps) < 3:
-					continue
-
-				try:
-					i = self.fn_pool.get_fn_addr(name)
-					append(sts, synth("""
-						if (__addr == %d) goto %s;
-					""" % (i, "__fn%d_pop_tmps_end" % i)))
-				except SdscpSyntaxError:
-					pass
-			append(sts, self._mk_goto('__err_bad_addr'))
+			append(sts, self._build_pushpop_trampolines(funcs_to_render))
 
 		# compose main function with all the code
 		main = S_Function()
@@ -1041,6 +1011,46 @@ class M_Grande(Mutator):
 
 		return output_code
 
+	def _build_pushpop_trampolines(self, function_names):
+		""" Build trampolines for temporaries push/pop deduplication """
+
+		sts = list()
+		# Push-pop trampoline (code size saving)
+		used_tmps = list(reversed(list(self.tmp_pool.get_names())))
+		used_tmps_count = len(used_tmps)
+
+		# Prepare a list of function indices
+		funcs_using_pushpop_trp = list()
+		for name in function_names:
+			st = self.fn_pool.get_statement(name)
+			if st is None or st.inline or len(st.meta.changed_tmps) < config.PUSHPOP_TRAMPOLINE_MIN_TMP_COUNT:
+				continue
+			a = self.fn_pool.get_fn_addr(name)
+			funcs_using_pushpop_trp.append(a)
+		funcs_using_pushpop_trp.sort()
+
+		if len(funcs_using_pushpop_trp) > 0:
+			append(sts, self._banner('Tmp push trampoline'))
+			for (i, name) in enumerate(used_tmps):
+				append(sts, self._mk_label('__push_tmps_%s' % (used_tmps_count - i)))
+				append(sts, self._mk_push(name))
+			for a in funcs_using_pushpop_trp:
+				append(sts, synth("""
+								if (__addr == %d) goto %s;
+							""" % (a, "__fn%d_push_tmps_end" % a)))
+			append(sts, self._mk_goto('__err_bad_addr'))
+
+			# Using reverse pop, so SP must be rewinded before calling this!
+			append(sts, self._banner('Tmp pop trampoline'))
+			for (i, name) in enumerate(used_tmps):
+				append(sts, self._mk_label('__pop_tmps_%s' % (used_tmps_count - i)))
+				append(sts, self._mk_reverse_pop(name))
+			for a in funcs_using_pushpop_trp:
+				append(sts, synth("""
+								if (__addr == %d) goto %s;
+							""" % (a, "__fn%d_pop_tmps_end" % a)))
+			append(sts, self._mk_goto('__err_bad_addr'))
+		return sts
 
 	def _build_trampoline_for_func(self, name):
 		""" Build redirection vector for return from func """
@@ -1206,19 +1216,24 @@ class M_Grande(Mutator):
 		label = self._mk_label(self.fn_pool.get_begin(fn.name))
 		append(out, label)
 
+		using_pushpop_trampoline = False
+
 		# push all changed tmp vars
 		if len(fn.meta.changed_tmps) > 0:
 			append(out, S_Comment('Push used tmp vars'))
 			fn.meta.changed_tmps = list(set(fn.meta.changed_tmps))  # get unique names
 			fn.meta.changed_tmps.sort(key=natural_sort_key)  # Sort so we always keep the same order, important for unit tests
 
-			if self.do_use_push_pop_trampolines and len(fn.meta.changed_tmps) >= 3:
-				# TODO clean up
+			if self.do_use_push_pop_trampolines and len(fn.meta.changed_tmps) >= config.PUSHPOP_TRAMPOLINE_MIN_TMP_COUNT:
+				# Use the push/pop trampoline
+				using_pushpop_trampoline = True
 				fn_addr = self.fn_pool.get_fn_addr(fn.name)
+				# Jump to the trampoline
 				append(out, self._mk_assign('__addr', fn_addr))
 				lbl = '__push_tmps_%d' % len(fn.meta.changed_tmps)
 				fn.meta.gotos.add(lbl)
 				append(out, self._mk_goto(lbl))
+				# Return label from trampoline
 				lbl = '__fn%d_push_tmps_end' % fn_addr
 				fn.meta.labels.add(lbl)
 				append(out, self._mk_label(lbl))
@@ -1236,17 +1251,25 @@ class M_Grande(Mutator):
 		if len(fn.meta.changed_tmps) > 0:
 			append(out, S_Comment('Pop used tmp vars'))
 
-			if self.do_use_push_pop_trampolines and len(fn.meta.changed_tmps) >= 3:
-				# TODO clean up
+			if using_pushpop_trampoline:
+				# This is a bit hacky. To allow reusing one trampoline for multiple push/pop counts,
+				# we can't restore the variables in the reverse order. Instead, we first increment
+				# SP to get back to the beginning, then restore the changed temporaries with a
+				# "reverse pop", and then set SP to the original value AGAIN, so it's correct for the
+				# caller.
 				fn_addr = self.fn_pool.get_fn_addr(fn.name)
+				# Rewind SP + offset
 				append(out, self._mk_assign('__sp', len(fn.meta.changed_tmps), op='+='))
+				# Jump to the trampoline
 				append(out, self._mk_assign('__addr', fn_addr))
 				lbl = '__pop_tmps_%d' % len(fn.meta.changed_tmps)
 				fn.meta.gotos.add(lbl)
 				append(out, self._mk_goto(lbl))
+				# Return label from trampoline
 				lbl = '__fn%d_pop_tmps_end' % fn_addr
 				fn.meta.labels.add(lbl)
 				append(out, self._mk_label(lbl))
+				# Rewind SP *again*
 				append(out, self._mk_assign('__sp', len(fn.meta.changed_tmps), op='+='))
 			else:
 				for n in reversed(fn.meta.changed_tmps):
@@ -2404,13 +2427,14 @@ class M_Grande(Mutator):
 
 
 	def _mk_var(self, name):
+		""" Create a var statement """
 		s = S_Var()
 		s.var = E_Variable(name)
 		return s
 
 
 	def _mk_push(self, what):
-
+		""" Push a value onto stack """
 		out = []
 		append(out, self._mk_assign('__sp', 1, op='-='))
 
@@ -2422,17 +2446,27 @@ class M_Grande(Mutator):
 		append(out, self._mk_assign('ram', what, index='__sp'))
 		return out
 
+	def _mk_reverse_pop(self, name):
+		""" POP, but advancing SP in the reverse direction beforehand. This is used in pop trampolines. """
+		out = []
+		append(out, self._mk_assign('__sp', 1, op='-='))
+		if self.do_check_stack_bounds:
+			append(out, synth("""
+				if(__sp < %d) goto __err_so;
+			""" % self.stack_start))
+
+		append(out, self._mk_assign(name, E_Variable('ram', index=E_Variable('__sp'))))
+		return out
 
 	def _mk_pop(self, name):
-
+		""" Normal POP """
 		out = []
-
 		if self.do_check_stack_bounds:
 			append(out, synth("""
 				if(__sp > %d) goto __err_su;
 			""" % self.stack_end))
 
-		append(out, self._mk_assign(name, E_Variable('ram', E_Variable('__sp'))))
+		append(out, self._mk_assign(name, E_Variable('ram', index=E_Variable('__sp'))))
 		append(out, self._mk_assign('__sp', 1, op='+='))
 		return out
 

@@ -720,18 +720,34 @@ class BaseSdsRenderer(CSyntaxRenderer):
 		del self._render_dict[S_Break]
 		del self._render_dict[S_Continue]
 
+		self.total_strings = 0
+		self.total_string_len = 0
+		self.seen_strings = set()
+
 		# find all user funcs (for detecting invalid use in exprs)
 		self._userfuncs = []
 		for s in program:
 			if isinstance(s, S_Function):
 				self._userfuncs.append(s.name)
 
+	def _render(self, code):
+		rv = super()._render(code)
+		if not config.QUIET:
+			num_uni = len(self.seen_strings)
+			print("Program contains %d strings (%d unique), using ~%d bytes"
+				  % (self.total_strings, num_uni, self.total_string_len + num_uni * 6))
+		return rv
 
 	def _render_expr_literal(self, e):
 
 		# convert quotes for string
 		if e.is_string():
 			s = e.value[1:-1]
+
+			self.total_strings += 1
+			if not s in self.seen_strings:
+				self.seen_strings.add(s)
+				self.total_string_len += len(s)  # XXX this may be off by a few bytes due to escapes
 
 			s = s.replace("'", "\\'")
 			s = s.replace('\\"', '"')

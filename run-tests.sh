@@ -13,6 +13,7 @@ PRAGMAS="
     -p comments false
     -p simplify_ifs false
     -p inline_one_use_functions false
+    -p push_pop_trampolines false
 "
 
 echo "Pragmas:" $PRAGMAS;

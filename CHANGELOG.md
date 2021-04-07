@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.9
+
+- Add push/pop trampolines - disabled by default, opt in with `#pragma push_pop_trampolines true`
+  - Reduces code size if there are many functions using 3 or more temporary variables
+  - Slightly worsens performance due to added jumps
+- Add a statistic showing how many strings are included in the program
+
 ## 1.8.8
 
 - Fix bug in inlining where clobbered temporaries were not properly pushed / popped in the outer func

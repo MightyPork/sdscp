@@ -44,7 +44,8 @@ Default pragma settings:
 #pragma simplify_expressions true
 
 // Use push-pop trampolines to optimize code size.
-// Only meaningful if there are many functions with more than 2 arguments
+// Only meaningful if there are many functions with more than 2 arguments.
+// This is disabled by default, because it slightly lowers performance
 #pragma push_pop_trampolines false
 ```
 

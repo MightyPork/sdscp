@@ -16,7 +16,7 @@ import statements
 
 import config
 
-VERSION = '1.8.7'
+VERSION = '1.8.9'
 
 # ==================== Command Line Arguments processing =======================
 
