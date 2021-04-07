@@ -753,6 +753,8 @@ class M_Grande(Mutator):
 			# worthwhile even with only 2 tmps
 			config.PUSHPOP_TRAMPOLINE_MIN_TMP_COUNT = 2
 
+		if 'push_pop_trampoline_limit' in pragmas:
+			config.PUSHPOP_TRAMPOLINE_MIN_TMP_COUNT = pragmas.get('push_pop_trampoline_limit')
 
 	def _transform(self, code):
 

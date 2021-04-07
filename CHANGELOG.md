@@ -1,5 +1,11 @@
 # Changelog
 
+## ..
+
+- Add `#pragma push_pop_trampoline_limit X` to set minimal number of push/pops needed
+  to use the trampoline. (The default is 3, or 2 with `safe_stack true`, which is normally
+  the optimal setting)
+
 ## 1.8.9
 
 - Add push/pop trampolines - disabled by default, opt in with `#pragma push_pop_trampolines true`
