@@ -846,7 +846,7 @@ class M_Grande(Mutator):
 				if config.SHOW_CALLGRAPH:
 					print("  %s <- %s" % (callee, ', '.join(callers)))
 				st = self.fn_pool.get_statement(callee)
-				if self.do_inline_one_use_functions:
+				if st is not None and self.do_inline_one_use_functions:
 					st.inline = len(callers) == 1
 
 		# process init()

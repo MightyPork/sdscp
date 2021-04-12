@@ -18,7 +18,7 @@ PRAGMAS="
 
 echo "Pragmas:" $PRAGMAS;
 
-
+echo "Unit tests..."
 for filename in tests-unit/*.in.c; do
     resultfile=$(echo "$filename" | sed 's/.in.c/.out.c/' | sed 's/tests-unit/out/')
     expectation=$(echo "$filename" | sed 's/.in.c/.out.c/')
@@ -39,6 +39,20 @@ for filename in tests-unit/*.in.c; do
 	fi
 done
 
+echo "Unit tests with default settings..."
+# smoke test to see if any of our tests explode with default settings
+for filename in tests-unit/*.in.c; do
+    ./sdscp -q "$filename" -o /tmp/sdscp-dummy.c
+
+    if [[ $? == 1 ]]; then
+		echo -e "\x1b[31mTest \"$filename\" failed!\x1b[m"
+		exit
+	fi
+
+	echo -e "\x1b[32mTEST \"$filename\" OK\x1b[m"
+done
+
+echo "Error tests..."
 for filename in tests-error/*.in.c; do
     resultfile=$(echo "$filename" | sed 's/.in.c/.out.c/' | sed 's/tests-error/out/')
     errorfile=$(echo "$filename" | sed 's/.in.c/.out.txt/' | sed 's/tests-error/out/')

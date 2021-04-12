@@ -1,3 +1,5 @@
+#pragma inline_one_use_functions true
+
 main()
 {
 	echo("Cau");
