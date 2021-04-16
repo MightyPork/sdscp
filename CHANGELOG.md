@@ -1,10 +1,11 @@
 # Changelog
 
-## ..
+## 1.8.10
 
 - Add `#pragma push_pop_trampoline_limit X` to set minimal number of push/pops needed
   to use the trampoline. (The default is 3, or 2 with `safe_stack true`, which is normally
   the optimal setting)
+- Fix bug with nested inlining
 
 ## 1.8.9
 
