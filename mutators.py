@@ -860,7 +860,7 @@ class M_Grande(Mutator):
 		pr_userfuncs = {}
 		for fn in functions:
 			if fn.name not in callgraph:
-				if not config.QUIET: print('\x1b[33mFunction %s is never called!\x1b[m' % fn.name)
+				if not config.QUIET: print('\x1b[33mRemoving unused function "%s()"\x1b[m' % fn.name)
 				if self.do_remove_dead_code:
 					continue
 
@@ -1069,7 +1069,10 @@ class M_Grande(Mutator):
 		if len(my_callers) == 1:
 			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldn't even be pushed!
 			append(sts, S_Comment('Only one caller'))
-			if not config.QUIET: print("\x1b[33mFunction %s has only one caller, it should be inlined!\x1b[m" % name)
+			if self.do_inline_one_use_functions:				
+				print("\x1b[31;1mFunction %s should have been inlined, this is a BUG! The generated program may be incorrect.\x1b[m" % name)
+			else:
+				if not config.QUIET: print("\x1b[33mFunction %s has only one caller, it should be inlined!\x1b[m" % name)
 		else:
 			append(sts, self._mk_pop('__addr'))  # pop a return address
 
@@ -1170,7 +1173,7 @@ class M_Grande(Mutator):
 			if called in self.builtin_fn or called in self.sdscp_builtin_fn:
 				continue
 			called_fn_st = self.fn_pool.get_statement(called)
-			if not called_fn_st.inline:
+			if called_fn_st is not None and not called_fn_st.inline:
 				not_inlined_inner_calls += 1
 		no_inner_calls = not_inlined_inner_calls == 0
 
