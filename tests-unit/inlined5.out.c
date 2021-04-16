@@ -8,6 +8,9 @@ var __sp;
 var __t0;
 var __t1;
 var __t2;
+var __t3;
+var __t4;
+var __t5;
 
 main
 {
@@ -33,11 +36,21 @@ main
   ram[__sp] = __t1;
   __sp -= 1;
   ram[__sp] = __t2;
-  // Function body
-  // INLINED: inlined1()
+  __sp -= 1;
+  ram[__sp] = __t3;
+  __sp -= 1;
+  ram[__sp] = __t4;
+  __sp -= 1;
+  ram[__sp] = __t5;
+  // Store args to tmp vars
   __t0 = __a0;
   __t1 = __a1;
   __t2 = __a2;
+  // Function body
+  // INLINED: inlined()
+  __t3 = __t0;
+  __t4 = __t1;
+  __t5 = __t2;
   // CALL: should_inline2()
   __a0 = 6;
   __sp -= 1;
@@ -45,11 +58,17 @@ main
   goto __fn3_should_inline2;
   label __rp2:
   __rval = 0;
-  // End of inlined inlined1
+  // End of inlined inlined
   /// Bug: __a0 used while clobbered in 'inlined1'
-  echo(__a0, __a1, __a2);
+  echo(__t0, __t1, __t2);
   __rval = 0;
   // Pop used tmp vars
+  __t5 = ram[__sp];
+  __sp += 1;
+  __t4 = ram[__sp];
+  __sp += 1;
+  __t3 = ram[__sp];
+  __sp += 1;
   __t2 = ram[__sp];
   __sp += 1;
   __t1 = ram[__sp];

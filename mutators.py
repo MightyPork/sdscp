@@ -847,7 +847,7 @@ class M_Grande(Mutator):
 					print("  %s <- %s" % (callee, ', '.join(callers)))
 				st = self.fn_pool.get_statement(callee)
 				if st is not None and self.do_inline_one_use_functions:
-					st.inline = len(callers) == 1
+					st.inline = len(callers) <= 1
 
 		# process init()
 		pr_init = None
@@ -860,9 +860,12 @@ class M_Grande(Mutator):
 		pr_userfuncs = {}
 		for fn in functions:
 			if fn.name not in callgraph:
-				if not config.QUIET: print('\x1b[33mRemoving unused function "%s()"\x1b[m' % fn.name)
 				if self.do_remove_dead_code:
+					if not config.QUIET: print('\x1b[33mRemoving unused function "%s()"\x1b[m' % fn.name)
 					continue
+				else:
+					if not config.QUIET: print('\x1b[33mFunction "%s()" is unused\x1b[m' % fn.name)
+					# Include it in this case!
 
 			if fn.inline:
 				continue
@@ -1070,7 +1073,7 @@ class M_Grande(Mutator):
 			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldn't even be pushed!
 			append(sts, S_Comment('Only one caller'))
 			if self.do_inline_one_use_functions:				
-				print("\x1b[31;1mFunction %s should have been inlined, this is a BUG! The generated program may be incorrect.\x1b[m" % name)
+				print("\x1b[33mFunction %s should have been inlined! This may be caused by unused functions.\x1b[m" % name)
 			else:
 				if not config.QUIET: print("\x1b[33mFunction %s has only one caller, it should be inlined!\x1b[m" % name)
 		else:
@@ -1165,17 +1168,10 @@ class M_Grande(Mutator):
 
 		# TODO if the function does not contain any calls, we can directly use the arg_pool variables as temporaries
 
-		local_cg = dict()
-		fn.update_callgraph(fn.name, local_cg)
+		no_inner_calls = self._func_has_non_inlined_inner_calls(fn)
 
-		not_inlined_inner_calls = 0
-		for called in local_cg.keys():
-			if called in self.builtin_fn or called in self.sdscp_builtin_fn:
-				continue
-			called_fn_st = self.fn_pool.get_statement(called)
-			if called_fn_st is not None and not called_fn_st.inline:
-				not_inlined_inner_calls += 1
-		no_inner_calls = not_inlined_inner_calls == 0
+		if no_inner_calls:
+			if not config.QUIET: print('Func %s has no non-inlined inner calls, skip copying aX->tmp' % fn.name)
 
 		passed_arg_names = []
 
@@ -1289,6 +1285,39 @@ class M_Grande(Mutator):
 		append(out, S_Comment('Return to caller'))
 
 		return self._compose_func_obj(fn, out)
+
+	def _func_has_non_inlined_inner_calls(self, fn):
+		local_cg = dict()
+		fn.update_callgraph(fn.name, local_cg)
+
+		not_inlined_inner_calls = 0
+		to_process = [x for x in local_cg.keys()]
+
+		iterations = 0
+
+		while len(to_process) > 0:
+			iterations += 1
+			if iterations > 10000:
+				print("!!! Stuck in a loop trying to walk callgraph, forcibly breaking")
+				break
+
+			called = to_process.pop()
+
+			if called in self.builtin_fn or called in self.sdscp_builtin_fn:
+				continue
+			called_fn_st = self.fn_pool.get_statement(called)
+
+			if called_fn_st is None:
+				raise Exception('Callgraph contains a call to undefined function %s' % called)
+
+			if not called_fn_st.inline:
+				return False
+			else:
+				sub_local_cg = dict()
+				called_fn_st.update_callgraph(fn.name, sub_local_cg)
+				append(to_process, [x for x in sub_local_cg.keys()])
+
+		return True
 
 	def _inline_user_func(self, fn, name, args, out_var):
 		"""
@@ -1564,6 +1593,7 @@ class M_Grande(Mutator):
 		else:
 			# call to user func
 			called_fn_st = self.fn_pool.get_statement(s.name)
+
 			if called_fn_st is not None and called_fn_st.inline:
 				(_out, _tmps) = self._inline_user_func(fn, s.name, s.args, None)
 				append(out, _out)
