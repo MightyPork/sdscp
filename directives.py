@@ -1496,13 +1496,17 @@ class DirectiveProcessor:
 					processed = self.output
 					self.output = old_output
 					#print("Expr processed = %s" % processed)
-					
+
 					# Replace defined(XYZ)
-					for d in self.defines.keys():
-						processed = processed.replace("defined(%s)" % d, "1")
+					for name in self.defines.keys():
+						processed = processed.replace("defined(%s)" % name, "1")
 					processed = re.sub(r'defined\(.*?\)', '0', processed)
-					
-					evaled = eval_expr(processed)
+
+					try:
+						evaled = eval_expr(processed)
+					except Exception:
+						raise rd.error('ERROR parsing #if condition: %s' % d.expr)
+
 					#print("Eval result = %s" % evaled)
 					test_passed = evaled != False and evaled != 0
 
