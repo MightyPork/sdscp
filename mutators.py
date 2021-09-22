@@ -1072,7 +1072,7 @@ class M_Grande(Mutator):
 		if len(my_callers) == 1:
 			append(sts, synth('__sp += 1;'))  # Discard the return address TODO in this case it shouldn't even be pushed!
 			append(sts, S_Comment('Only one caller'))
-			if self.do_inline_one_use_functions:				
+			if self.do_inline_one_use_functions:
 				print("\x1b[33mFunction %s should have been inlined! This may be caused by unused functions.\x1b[m" % name)
 			else:
 				if not config.QUIET: print("\x1b[33mFunction %s has only one caller, it should be inlined!\x1b[m" % name)
@@ -1308,7 +1308,7 @@ class M_Grande(Mutator):
 			called_fn_st = self.fn_pool.get_statement(called)
 
 			if called_fn_st is None:
-				raise Exception('Callgraph contains a call to undefined function %s' % called)
+				raise SdscpInternalError('Callgraph contains a call to undefined function %s' % called)
 
 			if not called_fn_st.inline:
 				return False
@@ -1337,7 +1337,7 @@ class M_Grande(Mutator):
 		if not config.QUIET: print("Inlining %s" % name)
 
 		if not inlined.inline:
-			raise Exception("%s cannot be inlined!" % name)
+			raise SdscpInternalError("%s cannot be inlined!" % name)
 
 		out = []
 		tmps = []
@@ -1349,6 +1349,10 @@ class M_Grande(Mutator):
 		self.inline_return_var = out_var  # This can be None, that's correct
 
 		self._start_local_scope(fn)
+
+		if len(args) != len(inlined.args):
+			raise SdscpSyntaxError("%s called with wrong argument count (%d), expecting %d!" % (name, len(args), len(inlined.args)))
+
 
 		# Store args into temporaries, aliased to the given names in the inlined function
 		for (ai, arg_name) in enumerate(inlined.args):
@@ -2152,7 +2156,7 @@ class M_Grande(Mutator):
 						if arity == 2:
 							# Negative numbers must be parenthesised or SDS-C produces complete nonsense results
 							# We could also convert these to hex.
-							if type(e) == E_Literal and e.is_number():  # prev.value in ['-'] and 
+							if type(e) == E_Literal and e.is_number():  # prev.value in ['-'] and
 								if e.token.value[0] == '-':
 									e = E_Group([e])
 							out.append(E_Group([prev2, prev, e]))
